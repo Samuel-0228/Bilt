@@ -4,7 +4,11 @@
 // and per-category breakdown.  Pure function — no side effects.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ScanFinding, FindingCategory, Severity } from '../../types/index.js';
+import type {
+  ScanFinding,
+  FindingCategory,
+  Severity,
+} from "../../types/index.js";
 
 // ─── Point Deductions ────────────────────────────────────────────────────────
 
@@ -18,17 +22,17 @@ const SEVERITY_COST: Record<Severity, number> = {
 // Ordered from highest to lowest so the first match wins.
 
 const GRADE_THRESHOLDS: Array<{ min: number; grade: string }> = [
-  { min: 97, grade: 'A+' },
-  { min: 93, grade: 'A' },
-  { min: 90, grade: 'A-' },
-  { min: 87, grade: 'B+' },
-  { min: 83, grade: 'B' },
-  { min: 80, grade: 'B-' },
-  { min: 77, grade: 'C+' },
-  { min: 73, grade: 'C' },
-  { min: 70, grade: 'C-' },
-  { min: 60, grade: 'D' },
-  { min: 0, grade: 'F' },
+  { min: 97, grade: "A+" },
+  { min: 93, grade: "A" },
+  { min: 90, grade: "A-" },
+  { min: 87, grade: "B+" },
+  { min: 83, grade: "B" },
+  { min: 80, grade: "B-" },
+  { min: 77, grade: "C+" },
+  { min: 73, grade: "C" },
+  { min: 70, grade: "C-" },
+  { min: 60, grade: "D" },
+  { min: 0, grade: "F" },
 ];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -91,8 +95,7 @@ export function calculateHealthScore(findings: ScanFinding[]): HealthReport {
   const score = Math.max(0, 100 - totalDeduction);
 
   // Determine grade
-  const grade =
-    GRADE_THRESHOLDS.find((t) => score >= t.min)?.grade ?? 'F';
+  const grade = GRADE_THRESHOLDS.find((t) => score >= t.min)?.grade ?? "F";
 
   // Build sorted breakdown
   const breakdown: CategoryBreakdown[] = [...categoryMap.entries()]

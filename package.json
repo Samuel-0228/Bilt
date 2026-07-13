@@ -13,11 +13,25 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:regression": "vitest run --project regression",
+    "test:fuzz": "vitest run --project fuzz",
+    "test:perf": "vitest run --project perf",
+    "test:coverage": "vitest run --coverage",
+    "test:all": "vitest run",
     "clean": "rimraf dist",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
-  "keywords": ["cli", "security", "secrets", "env", "gitignore", "developer-tools"],
+  "keywords": [
+    "cli",
+    "security",
+    "secrets",
+    "env",
+    "gitignore",
+    "developer-tools"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

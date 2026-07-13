@@ -5,16 +5,16 @@
 // whether any env vars exposed to the client bundle contain secrets.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { isHighEntropy } from '../rules/entropy.js';
-import { SECRET_RULES } from '../rules/secret-rules.js';
+import fs from "node:fs/promises";
+import path from "node:path";
+import { isHighEntropy } from "../rules/entropy.js";
+import { SECRET_RULES } from "../rules/secret-rules.js";
 import type {
   FrameworkInfo,
   ParsedEnvFile,
   SecretRule,
   ScanFinding,
-} from '../../types/index.js';
+} from "../../types/index.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ function nextId(prefix: string): string {
  */
 async function tryReadJson(filePath: string): Promise<unknown> {
   try {
-    const raw = await fs.readFile(filePath, 'utf-8');
+    const raw = await fs.readFile(filePath, "utf-8");
     return JSON.parse(raw) as unknown;
   } catch {
     return null;
@@ -61,66 +61,66 @@ interface FrameworkCandidate {
 
 const FRAMEWORK_CANDIDATES: FrameworkCandidate[] = [
   {
-    npmPackage: 'next',
+    npmPackage: "next",
     info: {
-      name: 'nextjs',
-      displayName: 'Next.js',
-      clientExposedPrefixes: ['NEXT_PUBLIC_'],
-      configFiles: ['next.config.js', 'next.config.mjs', 'next.config.ts'],
+      name: "nextjs",
+      displayName: "Next.js",
+      clientExposedPrefixes: ["NEXT_PUBLIC_"],
+      configFiles: ["next.config.js", "next.config.mjs", "next.config.ts"],
     },
   },
   {
-    npmPackage: 'vite',
+    npmPackage: "vite",
     info: {
-      name: 'vite',
-      displayName: 'Vite',
-      clientExposedPrefixes: ['VITE_'],
-      configFiles: ['vite.config.ts', 'vite.config.js', 'vite.config.mjs'],
+      name: "vite",
+      displayName: "Vite",
+      clientExposedPrefixes: ["VITE_"],
+      configFiles: ["vite.config.ts", "vite.config.js", "vite.config.mjs"],
     },
   },
   {
-    npmPackage: 'react-scripts',
+    npmPackage: "react-scripts",
     info: {
-      name: 'cra',
-      displayName: 'Create React App',
-      clientExposedPrefixes: ['REACT_APP_'],
+      name: "cra",
+      displayName: "Create React App",
+      clientExposedPrefixes: ["REACT_APP_"],
       configFiles: [],
     },
   },
   {
-    npmPackage: '@angular/core',
+    npmPackage: "@angular/core",
     info: {
-      name: 'angular',
-      displayName: 'Angular',
-      clientExposedPrefixes: ['NG_'],
-      configFiles: ['angular.json'],
+      name: "angular",
+      displayName: "Angular",
+      clientExposedPrefixes: ["NG_"],
+      configFiles: ["angular.json"],
     },
   },
   {
-    npmPackage: 'nuxt',
+    npmPackage: "nuxt",
     info: {
-      name: 'nuxt',
-      displayName: 'Nuxt',
-      clientExposedPrefixes: ['NUXT_PUBLIC_'],
-      configFiles: ['nuxt.config.ts', 'nuxt.config.js'],
+      name: "nuxt",
+      displayName: "Nuxt",
+      clientExposedPrefixes: ["NUXT_PUBLIC_"],
+      configFiles: ["nuxt.config.ts", "nuxt.config.js"],
     },
   },
   {
-    npmPackage: '@sveltejs/kit',
+    npmPackage: "@sveltejs/kit",
     info: {
-      name: 'sveltekit',
-      displayName: 'SvelteKit',
-      clientExposedPrefixes: ['PUBLIC_'],
-      configFiles: ['svelte.config.js'],
+      name: "sveltekit",
+      displayName: "SvelteKit",
+      clientExposedPrefixes: ["PUBLIC_"],
+      configFiles: ["svelte.config.js"],
     },
   },
   {
-    npmPackage: 'gatsby',
+    npmPackage: "gatsby",
     info: {
-      name: 'gatsby',
-      displayName: 'Gatsby',
-      clientExposedPrefixes: ['GATSBY_'],
-      configFiles: ['gatsby-config.js', 'gatsby-config.ts'],
+      name: "gatsby",
+      displayName: "Gatsby",
+      clientExposedPrefixes: ["GATSBY_"],
+      configFiles: ["gatsby-config.js", "gatsby-config.ts"],
     },
   },
 ];
@@ -134,30 +134,30 @@ const FILE_BASED_FRAMEWORKS: Array<{
   info: FrameworkInfo;
 }> = [
   {
-    file: 'manage.py',
+    file: "manage.py",
     info: {
-      name: 'django',
-      displayName: 'Django',
+      name: "django",
+      displayName: "Django",
       clientExposedPrefixes: [], // Django doesn't expose env to client
-      configFiles: ['manage.py', 'settings.py'],
+      configFiles: ["manage.py", "settings.py"],
     },
   },
   {
-    file: 'Gemfile',
+    file: "Gemfile",
     info: {
-      name: 'rails',
-      displayName: 'Ruby on Rails',
+      name: "rails",
+      displayName: "Ruby on Rails",
       clientExposedPrefixes: [], // Rails doesn't expose env to client by default
-      configFiles: ['Gemfile', 'config/application.rb'],
+      configFiles: ["Gemfile", "config/application.rb"],
     },
   },
   {
-    file: 'requirements.txt',
+    file: "requirements.txt",
     info: {
-      name: 'flask',
-      displayName: 'Flask / Python',
+      name: "flask",
+      displayName: "Flask / Python",
       clientExposedPrefixes: [],
-      configFiles: ['requirements.txt', 'app.py'],
+      configFiles: ["requirements.txt", "app.py"],
     },
   },
 ];
@@ -177,11 +177,11 @@ export async function detectFramework(
   projectDir: string,
 ): Promise<FrameworkInfo | undefined> {
   // 1. Dependency-based detection
-  const pkgJsonPath = path.join(projectDir, 'package.json');
+  const pkgJsonPath = path.join(projectDir, "package.json");
   let pkg: any;
 
   try {
-    const raw = await fs.readFile(pkgJsonPath, 'utf-8');
+    const raw = await fs.readFile(pkgJsonPath, "utf-8");
     pkg = JSON.parse(raw);
   } catch {
     // No package.json — skip dependency checks
@@ -189,7 +189,10 @@ export async function detectFramework(
 
   if (pkg) {
     // Check dependencies / devDependencies
-    const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+    const deps = {
+      ...(pkg.dependencies || {}),
+      ...(pkg.devDependencies || {}),
+    };
 
     for (const candidate of FRAMEWORK_CANDIDATES) {
       if (candidate.npmPackage && deps[candidate.npmPackage]) {
@@ -247,10 +250,10 @@ export function checkClientExposedSecrets(
       // Skip known safe client-exposed variables (false positives)
       const lowerKey = key.toLowerCase();
       if (
-        lowerKey.includes('anon_key') ||
-        lowerKey.includes('publishable_key') ||
-        lowerKey.includes('public_key') ||
-        lowerKey.includes('app_id')
+        lowerKey.includes("anon_key") ||
+        lowerKey.includes("publishable_key") ||
+        lowerKey.includes("public_key") ||
+        lowerKey.includes("app_id")
       ) {
         continue;
       }
@@ -261,9 +264,9 @@ export function checkClientExposedSecrets(
         rule.pattern.lastIndex = 0;
         if (rule.pattern.test(value)) {
           findings.push({
-            id: nextId('env-exposed'),
-            severity: 'critical',
-            category: 'env-exposed',
+            id: nextId("env-exposed"),
+            severity: "critical",
+            category: "env-exposed",
             message:
               `Variable "${key}" is exposed to the client bundle via ${framework.displayName} ` +
               `and contains a secret (${rule.name})`,
@@ -282,9 +285,9 @@ export function checkClientExposedSecrets(
       // If no rule matched, check entropy
       if (!matchedRule && isHighEntropy(value, entropyThreshold)) {
         findings.push({
-          id: nextId('env-exposed'),
-          severity: 'warning',
-          category: 'env-exposed',
+          id: nextId("env-exposed"),
+          severity: "warning",
+          category: "env-exposed",
           message:
             `Variable "${key}" is exposed to the client bundle via ${framework.displayName} ` +
             `and has a high-entropy value that may be a secret`,

@@ -1,0 +1,11 @@
+// Leaky index file
+const port = process.env.PORT || 3000;
+const databaseUrl = process.env.DATABASE_URL;
+
+// Planted secrets in code
+const stripeKey = "STRIPE_SECRET_KEY_PLACEHOLDER";
+const awsAccessKey = "AWS_ACCESS_KEY_PLACEHOLDER";
+const awsSecretKey = "AWS_SECRET_KEY_PLACEHOLDER";
+
+console.log(`Keys loaded: ${stripeKey.slice(0, 4)}, ${awsAccessKey.slice(0, 4)}`);
+export {};

@@ -6,9 +6,9 @@
 //   • Append stub entries for missing env vars
 // ─────────────────────────────────────────────────────────────────────────────
 
-import fs from 'node:fs/promises';
-import { isHighEntropy } from '../rules/entropy.js';
-import type { ParsedEnvFile, SecretRule } from '../../types/index.js';
+import fs from "node:fs/promises";
+import { isHighEntropy } from "../rules/entropy.js";
+import type { ParsedEnvFile, SecretRule } from "../../types/index.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,19 +44,27 @@ function isSecretValue(
 function placeholderFor(key: string): string {
   const lower = key.toLowerCase();
 
-  if (lower.includes('url') || lower.includes('uri')) return 'https://example.com';
-  if (lower.includes('host')) return 'localhost';
-  if (lower.includes('port')) return '3000';
-  if (lower.includes('email') || lower.includes('mail')) return 'user@example.com';
-  if (lower.includes('password') || lower.includes('passwd')) return 'your-password-here';
-  if (lower.includes('key') || lower.includes('token') || lower.includes('secret'))
-    return 'your-secret-here';
-  if (lower.includes('database') || lower.includes('db')) return 'your-database-here';
-  if (lower.includes('region')) return 'us-east-1';
-  if (lower.includes('bucket')) return 'your-bucket-name';
-  if (lower.includes('name')) return 'your-name-here';
+  if (lower.includes("url") || lower.includes("uri"))
+    return "https://example.com";
+  if (lower.includes("host")) return "localhost";
+  if (lower.includes("port")) return "3000";
+  if (lower.includes("email") || lower.includes("mail"))
+    return "user@example.com";
+  if (lower.includes("password") || lower.includes("passwd"))
+    return "your-password-here";
+  if (
+    lower.includes("key") ||
+    lower.includes("token") ||
+    lower.includes("secret")
+  )
+    return "your-secret-here";
+  if (lower.includes("database") || lower.includes("db"))
+    return "your-database-here";
+  if (lower.includes("region")) return "us-east-1";
+  if (lower.includes("bucket")) return "your-bucket-name";
+  if (lower.includes("name")) return "your-name-here";
 
-  return 'your-value-here';
+  return "your-value-here";
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -85,17 +93,17 @@ export function generateEnvExample(
     const trimmed = rawLine.trim();
 
     // Preserve empty lines and comments as-is
-    if (trimmed === '' || trimmed.startsWith('#')) {
+    if (trimmed === "" || trimmed.startsWith("#")) {
       outputLines.push(rawLine);
       continue;
     }
 
     // Strip optional `export ` prefix for parsing
-    const line = trimmed.startsWith('export ')
+    const line = trimmed.startsWith("export ")
       ? trimmed.slice(7).trim()
       : trimmed;
 
-    const eqIdx = line.indexOf('=');
+    const eqIdx = line.indexOf("=");
     if (eqIdx === -1) {
       // Not a key=value line — preserve as-is
       outputLines.push(rawLine);
@@ -112,12 +120,12 @@ export function generateEnvExample(
     }
 
     // Determine leading whitespace / export prefix for reconstruction
-    const prefix = trimmed.startsWith('export ') ? 'export ' : '';
+    const prefix = trimmed.startsWith("export ") ? "export " : "";
 
     if (isSecretValue(entry.value, rules, entropyThreshold)) {
       // Replace the value with a placeholder
       const placeholder = placeholderFor(key);
-      const comment = entry.comment ? ` # ${entry.comment}` : '';
+      const comment = entry.comment ? ` # ${entry.comment}` : "";
       outputLines.push(`${prefix}${key}=${placeholder}${comment}`);
     } else {
       // Keep the original line
@@ -125,7 +133,7 @@ export function generateEnvExample(
     }
   }
 
-  return outputLines.join('\n');
+  return outputLines.join("\n");
 }
 
 /**
@@ -145,19 +153,19 @@ export async function addToGitignore(
   entries: string[],
   gitignorePath: string,
 ): Promise<string> {
-  let currentContent = '';
+  let currentContent = "";
 
   try {
-    currentContent = await fs.readFile(gitignorePath, 'utf-8');
+    currentContent = await fs.readFile(gitignorePath, "utf-8");
   } catch {
     // File doesn't exist yet — start fresh
   }
 
   const existingLines = new Set(
     currentContent
-      .split('\n')
+      .split("\n")
       .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith('#')),
+      .filter((l) => l.length > 0 && !l.startsWith("#")),
   );
 
   const toAdd = entries.filter((entry) => !existingLines.has(entry));
@@ -168,17 +176,17 @@ export async function addToGitignore(
   const lines: string[] = [];
 
   // Add a newline separator if the file doesn't end with one
-  if (currentContent.length > 0 && !currentContent.endsWith('\n')) {
-    lines.push('');
+  if (currentContent.length > 0 && !currentContent.endsWith("\n")) {
+    lines.push("");
   }
 
-  lines.push('# Added by bilt — environment files');
+  lines.push("# Added by bilt — environment files");
   for (const entry of toAdd) {
     lines.push(entry);
   }
-  lines.push(''); // trailing newline
+  lines.push(""); // trailing newline
 
-  return currentContent + lines.join('\n');
+  return currentContent + lines.join("\n");
 }
 
 /**
@@ -200,18 +208,18 @@ export function addMissingEnvVars(
   const lines: string[] = [];
 
   // Ensure we start on a new line
-  if (targetContent.length > 0 && !targetContent.endsWith('\n')) {
-    lines.push('');
+  if (targetContent.length > 0 && !targetContent.endsWith("\n")) {
+    lines.push("");
   }
 
-  lines.push('');
-  lines.push('# Added by bilt — missing variables');
+  lines.push("");
+  lines.push("# Added by bilt — missing variables");
 
   for (const varName of missingVars) {
     lines.push(`${varName}=`);
   }
 
-  lines.push(''); // trailing newline
+  lines.push(""); // trailing newline
 
-  return targetContent + lines.join('\n');
+  return targetContent + lines.join("\n");
 }

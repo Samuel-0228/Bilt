@@ -1,11 +1,11 @@
 // ─── Plugin Loader ───────────────────────────────────────────────────────────
 // Discovers, loads, and validates plugins from node_modules and config paths.
 
-import { createRequire } from 'node:module';
-import path from 'node:path';
-import { promises as fs } from 'node:fs';
-import type { BiltConfig, PluginManifest } from '../types/index.js';
-import { validatePlugin } from './interface.js';
+import { createRequire } from "node:module";
+import path from "node:path";
+import { promises as fs } from "node:fs";
+import type { BiltConfig, PluginManifest } from "../types/index.js";
+import { validatePlugin } from "./interface.js";
 
 const require = createRequire(import.meta.url);
 
@@ -24,11 +24,11 @@ export async function loadPlugins(
   const seen = new Set<string>();
 
   // ── 1. Discover bilt-plugin-* in node_modules ────────────────────────
-  const nodeModulesDir = path.join(rootDir, 'node_modules');
+  const nodeModulesDir = path.join(rootDir, "node_modules");
   try {
     const entries = await fs.readdir(nodeModulesDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && entry.name.startsWith('bilt-plugin-')) {
+      if (entry.isDirectory() && entry.name.startsWith("bilt-plugin-")) {
         const pluginPath = path.join(nodeModulesDir, entry.name);
         const loaded = await tryLoadPlugin(pluginPath);
         if (loaded && !seen.has(loaded.name)) {
@@ -38,14 +38,14 @@ export async function loadPlugins(
       }
 
       // Also check @bilt/ scoped packages
-      if (entry.isDirectory() && entry.name === '@bilt') {
-        const scopedDir = path.join(nodeModulesDir, '@bilt');
+      if (entry.isDirectory() && entry.name === "@bilt") {
+        const scopedDir = path.join(nodeModulesDir, "@bilt");
         try {
           const scopedEntries = await fs.readdir(scopedDir, {
             withFileTypes: true,
           });
           for (const se of scopedEntries) {
-            if (se.isDirectory() && se.name.startsWith('plugin-')) {
+            if (se.isDirectory() && se.name.startsWith("plugin-")) {
               const pluginPath = path.join(scopedDir, se.name);
               const loaded = await tryLoadPlugin(pluginPath);
               if (loaded && !seen.has(loaded.name)) {
@@ -102,10 +102,8 @@ async function tryLoadPlugin(
 
     // Unwrap default export if present
     const exported =
-      mod !== null &&
-      typeof mod === 'object' &&
-      'default' in mod
-        ? (mod as Record<string, unknown>)['default']
+      mod !== null && typeof mod === "object" && "default" in mod
+        ? (mod as Record<string, unknown>)["default"]
         : mod;
 
     if (validatePlugin(exported)) {
