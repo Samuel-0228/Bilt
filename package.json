@@ -7,6 +7,10 @@
   "bin": {
     "bilt": "./bin/bilt.js"
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc",
