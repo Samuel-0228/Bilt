@@ -6,11 +6,11 @@
 // numbers, and provider information.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { simpleGit } from 'simple-git';
-import { isHighEntropy } from '../rules/entropy.js';
-import { detectProvider } from '../rules/providers.js';
-import { SECRET_RULES } from '../rules/secret-rules.js';
-import type { SecretRule, ScanFinding, BiltConfig } from '../../types/index.js';
+import { simpleGit } from "simple-git";
+import { isHighEntropy } from "../rules/entropy.js";
+import { detectProvider } from "../rules/providers.js";
+import { SECRET_RULES } from "../rules/secret-rules.js";
+import type { SecretRule, ScanFinding, BiltConfig } from "../../types/index.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -25,25 +25,25 @@ function nextId(prefix: string): string {
  * actual secrets.
  */
 const PLACEHOLDER_PATTERNS: RegExp[] = [
-  /^<.*>$/,                        // <YOUR_KEY>, <api-key>
-  /^your[_-]?/i,                   // your-api-key-here, your_key
-  /^xxx+$/i,                       // xxx, xxxx, etc.
-  /^change[_-]?me$/i,              // CHANGE_ME, changeme
-  /^replace[_-]?me$/i,             // REPLACE_ME, replaceme
-  /^todo$/i,                       // TODO
-  /^fixme$/i,                      // FIXME
-  /^placeholder$/i,                // placeholder
-  /^example$/i,                    // example
-  /^test$/i,                       // test
-  /^none$/i,                       // none
-  /^null$/i,                       // null
-  /^undefined$/i,                  // undefined
-  /^insert[_-]?/i,                 // insert-your-key, insert_key_here
-  /^dummy/i,                       // dummy, dummy-key
-  /^\*+$/,                         // ***, ******, etc.
-  /^\.{3,}$/,                      // ..., ......
-  /^_+$/,                          // ___, ______
-  /^0+$/,                          // 000, 0000000
+  /^<.*>$/, // <YOUR_KEY>, <api-key>
+  /^your[_-]?/i, // your-api-key-here, your_key
+  /^xxx+$/i, // xxx, xxxx, etc.
+  /^change[_-]?me$/i, // CHANGE_ME, changeme
+  /^replace[_-]?me$/i, // REPLACE_ME, replaceme
+  /^todo$/i, // TODO
+  /^fixme$/i, // FIXME
+  /^placeholder$/i, // placeholder
+  /^example$/i, // example
+  /^test$/i, // test
+  /^none$/i, // none
+  /^null$/i, // null
+  /^undefined$/i, // undefined
+  /^insert[_-]?/i, // insert-your-key, insert_key_here
+  /^dummy/i, // dummy, dummy-key
+  /^\*+$/, // ***, ******, etc.
+  /^\.{3,}$/, // ..., ......
+  /^_+$/, // ___, ______
+  /^0+$/, // 000, 0000000
 ];
 
 /**
@@ -62,10 +62,10 @@ function isPlaceholder(value: string): boolean {
  * with stars in between.  Very short values are fully masked.
  */
 function maskValue(value: string): string {
-  if (value.length <= 8) return '*'.repeat(value.length);
+  if (value.length <= 8) return "*".repeat(value.length);
   const start = value.slice(0, 4);
   const end = value.slice(-4);
-  return `${start}${'*'.repeat(Math.min(value.length - 8, 20))}${end}`;
+  return `${start}${"*".repeat(Math.min(value.length - 8, 20))}${end}`;
 }
 
 /**
@@ -75,7 +75,7 @@ function maskValue(value: string): string {
 function lineNumberAt(content: string, offset: number): number {
   let line = 1;
   for (let i = 0; i < offset && i < content.length; i++) {
-    if (content[i] === '\n') line++;
+    if (content[i] === "\n") line++;
   }
   return line;
 }
@@ -106,7 +106,7 @@ export function scanFileForSecrets(
 
   if (Array.isArray(rulesOrConfig)) {
     rules = rulesOrConfig;
-  } else if (rulesOrConfig && typeof rulesOrConfig === 'object') {
+  } else if (rulesOrConfig && typeof rulesOrConfig === "object") {
     // It's a BiltConfig
     const config = rulesOrConfig;
     rules = [...SECRET_RULES, ...(config.customRules || [])];
@@ -118,7 +118,7 @@ export function scanFileForSecrets(
   const findings: ScanFinding[] = [];
 
   // Split content into lines for ignore-comment checks
-  const fileLines = content.split('\n');
+  const fileLines = content.split("\n");
 
   // Track matches we've already reported to avoid duplicates when
   // multiple rules match the same span.
@@ -143,13 +143,13 @@ export function scanFileForSecrets(
       if (isPlaceholder(matchedValue)) continue;
 
       // For the generic high-entropy rule, require high entropy
-      if (rule.id === 'generic-high-entropy') {
+      if (rule.id === "generic-high-entropy") {
         if (!isHighEntropy(matchedValue, threshold)) continue;
       }
 
       // For the AWS secret key rule, require high entropy to avoid
       // false positives from 40-char strings in code.
-      if (rule.id === 'aws-secret-key') {
+      if (rule.id === "aws-secret-key") {
         if (!isHighEntropy(matchedValue, threshold)) continue;
       }
 
@@ -169,25 +169,27 @@ export function scanFileForSecrets(
       const previousLine = line > 1 ? fileLines[line - 2] : undefined;
       const isAllowed =
         (matchedLine &&
-          (matchedLine.includes('gitleaks:allow') ||
-            matchedLine.includes('bilt:allow'))) ||
+          (matchedLine.includes("gitleaks:allow") ||
+            matchedLine.includes("bilt:allow"))) ||
         (previousLine &&
-          (previousLine.includes('gitleaks:allow') ||
-            previousLine.includes('bilt:allow')));
+          (previousLine.includes("gitleaks:allow") ||
+            previousLine.includes("bilt:allow")));
 
       if (isAllowed) continue;
       const provider = detectProvider(matchedValue, rule.id) ?? undefined;
 
       findings.push({
-        id: nextId('secret'),
+        id: nextId("secret"),
         severity: rule.severity,
-        category: 'secret-detected',
-        message: `${rule.name} detected` + (provider ? ` (${provider.displayName})` : ''),
+        category: "secret-detected",
+        message:
+          `${rule.name} detected` +
+          (provider ? ` (${provider.displayName})` : ""),
         file: filePath,
         line,
         suggestion: provider
           ? `Rotate this key at ${provider.rotationUrl} and move the value to a .env file`
-          : 'Move this value to a .env file and add the file to .gitignore',
+          : "Move this value to a .env file and add the file to .gitignore",
         provider,
         ruleId: rule.id,
         preview: maskValue(matchedValue),
@@ -216,6 +218,11 @@ export async function scanGitHistory(
 ): Promise<ScanFinding[]> {
   const findings: ScanFinding[] = [];
   const git = simpleGit(repoPath);
+  git.env({
+    ...process.env,
+    GIT_DIR: undefined,
+    GIT_WORK_TREE: undefined,
+  });
 
   // Verify we're in a git repo
   try {
@@ -243,7 +250,7 @@ export async function scanGitHistory(
       // First commit has no parent — diff against empty tree
       try {
         diff = await git.diff([
-          '4b825dc642cb6eb9a060e54bf899d69f82ef7b21',
+          "4b825dc642cb6eb9a060e54bf899d69f82ef7b21",
           commit.hash,
         ]);
       } catch {
@@ -254,10 +261,10 @@ export async function scanGitHistory(
     // Extract only the added lines (lines starting with `+` in the diff,
     // excluding the `+++` file header).
     const addedLines = diff
-      .split('\n')
-      .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+      .split("\n")
+      .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
       .map((line) => line.slice(1))
-      .join('\n');
+      .join("\n");
 
     if (addedLines.length === 0) continue;
 

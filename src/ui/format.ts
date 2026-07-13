@@ -1,8 +1,8 @@
 // ─── UI Format Utilities ─────────────────────────────────────────────────────
 // Atomic formatters used across the entire CLI output layer.
 
-import chalk from 'chalk';
-import type { ScanFinding, Severity, ProviderInfo } from '../types/index.js';
+import chalk from "chalk";
+import type { ScanFinding, Severity, ProviderInfo } from "../types/index.js";
 
 // ─── Severity Helpers ────────────────────────────────────────────────────────
 
@@ -11,12 +11,12 @@ import type { ScanFinding, Severity, ProviderInfo } from '../types/index.js';
  */
 export function severityIcon(severity: Severity): string {
   switch (severity) {
-    case 'critical':
-      return '🔴';
-    case 'warning':
-      return '🟡';
-    case 'info':
-      return '🔵';
+    case "critical":
+      return "🔴";
+    case "warning":
+      return "🟡";
+    case "info":
+      return "🔵";
   }
 }
 
@@ -25,11 +25,11 @@ export function severityIcon(severity: Severity): string {
  */
 export function severityColor(severity: Severity): (text: string) => string {
   switch (severity) {
-    case 'critical':
+    case "critical":
       return (t: string) => chalk.red(t);
-    case 'warning':
+    case "warning":
       return (t: string) => chalk.yellow(t);
-    case 'info':
+    case "info":
       return (t: string) => chalk.cyan(t);
   }
 }
@@ -72,12 +72,13 @@ export function formatHealthScore(score: number, grade: string): string {
   const filled = Math.round((clamped / 100) * barWidth);
   const empty = barWidth - filled;
 
-  const filledChar = '█';
-  const emptyChar = '░';
+  const filledChar = "█";
+  const emptyChar = "░";
 
   const gradeColorFn = gradeColor(grade);
   const bar =
-    gradeColorFn(filledChar.repeat(filled)) + chalk.dim(emptyChar.repeat(empty));
+    gradeColorFn(filledChar.repeat(filled)) +
+    chalk.dim(emptyChar.repeat(empty));
   const pct = gradeColorFn(`${clamped}%`);
   const gradeLabel = gradeColorFn(chalk.bold(grade));
 
@@ -90,14 +91,14 @@ export function formatHealthScore(score: number, grade: string): string {
 function gradeColor(grade: string): (text: string) => string {
   const letter = grade.charAt(0).toUpperCase();
   switch (letter) {
-    case 'A':
+    case "A":
       return (t: string) => chalk.green(t);
-    case 'B':
+    case "B":
       return (t: string) => chalk.blue(t);
-    case 'C':
+    case "C":
       return (t: string) => chalk.yellow(t);
-    case 'D':
-    case 'F':
+    case "D":
+    case "F":
       return (t: string) => chalk.red(t);
     default:
       return (t: string) => chalk.white(t);
@@ -112,7 +113,7 @@ function gradeColor(grade: string): (text: string) => string {
  * Terminals that support OSC 8 will render this as a clickable link.
  */
 export function formatProviderLink(provider: ProviderInfo): string {
-  const icon = provider.icon || '🔑';
+  const icon = provider.icon || "🔑";
   // OSC 8 hyperlink: \e]8;;URL\e\\LABEL\e]8;;\e\\
   const link = `\u001B]8;;${provider.rotationUrl}\u001B\\${chalk.underline.cyan(provider.rotationUrl)}\u001B]8;;\u001B\\`;
   return `  ${icon} ${chalk.bold(provider.displayName)}  →  Rotate: ${link}`;
@@ -130,16 +131,16 @@ export function maskSecret(value: string): string {
   if (value.length >= 12) {
     const first = value.slice(0, 4);
     const last = value.slice(-4);
-    const masked = '*'.repeat(Math.min(value.length - 8, 16));
+    const masked = "*".repeat(Math.min(value.length - 8, 16));
     return `${first}${masked}${last}`;
   }
 
   if (value.length <= 2) {
-    return '*'.repeat(value.length);
+    return "*".repeat(value.length);
   }
 
   const first = value.slice(0, 2);
-  const masked = '*'.repeat(value.length - 2);
+  const masked = "*".repeat(value.length - 2);
   return `${first}${masked}`;
 }
 
@@ -152,8 +153,8 @@ export function maskSecret(value: string): string {
  * Context lines are dimmed.
  */
 export function formatDiff(before: string, after: string): string {
-  const beforeLines = before.split('\n');
-  const afterLines = after.split('\n');
+  const beforeLines = before.split("\n");
+  const afterLines = after.split("\n");
   const output: string[] = [];
 
   // Build a simple LCS-based diff
@@ -175,11 +176,17 @@ export function formatDiff(before: string, after: string): string {
       bi++;
       ai++;
       li++;
-    } else if (bi < beforeLines.length && (li >= lcs.length || beforeLines[bi] !== lcs[li])) {
+    } else if (
+      bi < beforeLines.length &&
+      (li >= lcs.length || beforeLines[bi] !== lcs[li])
+    ) {
       // Removed line
       output.push(chalk.red(`- ${beforeLines[bi]}`));
       bi++;
-    } else if (ai < afterLines.length && (li >= lcs.length || afterLines[ai] !== lcs[li])) {
+    } else if (
+      ai < afterLines.length &&
+      (li >= lcs.length || afterLines[ai] !== lcs[li])
+    ) {
       // Added line
       output.push(chalk.green(`+ ${afterLines[ai]}`));
       ai++;
@@ -189,7 +196,7 @@ export function formatDiff(before: string, after: string): string {
     }
   }
 
-  return output.join('\n');
+  return output.join("\n");
 }
 
 /**

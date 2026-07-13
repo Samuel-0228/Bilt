@@ -1,30 +1,40 @@
 // ─── Scan Command ────────────────────────────────────────────────────────────
 // Orchestrates all scanning passes and produces a unified ScanResult.
 
-import path from 'node:path';
-import { promises as fs } from 'node:fs';
-import fg from 'fast-glob';
+import path from "node:path";
+import { promises as fs } from "node:fs";
+import fg from "fast-glob";
 import type {
   ScanResult,
   ScanFinding,
   ScanOptions,
   FrameworkInfo,
   Severity,
-} from '../types/index.js';
-import { loadConfig } from '../config/config.js';
-import { parseEnvFile, findEnvFiles, diffEnvFiles, scanCodeForEnvRefs, findMissingEnvVars, findUnusedEnvVars } from '../core/scan/env.js';
-import { checkEnvFilesIgnoredWithGit } from '../core/scan/gitignore.js';
-import { scanFileForSecrets, scanGitHistory } from '../core/scan/secrets.js';
-import { detectFramework, checkClientExposedSecrets } from '../core/scan/framework.js';
-import { calculateHealthScore } from '../core/score/health.js';
-import { loadPlugins } from '../plugins/loader.js';
-import { createPluginContext } from '../plugins/interface.js';
-import { SECRET_RULES } from '../core/rules/secret-rules.js';
+} from "../types/index.js";
+import { loadConfig } from "../config/config.js";
+import {
+  parseEnvFile,
+  findEnvFiles,
+  diffEnvFiles,
+  scanCodeForEnvRefs,
+  findMissingEnvVars,
+  findUnusedEnvVars,
+} from "../core/scan/env.js";
+import { checkEnvFilesIgnoredWithGit } from "../core/scan/gitignore.js";
+import { scanFileForSecrets, scanGitHistory } from "../core/scan/secrets.js";
+import {
+  detectFramework,
+  checkClientExposedSecrets,
+} from "../core/scan/framework.js";
+import { calculateHealthScore } from "../core/score/health.js";
+import { loadPlugins } from "../plugins/loader.js";
+import { createPluginContext } from "../plugins/interface.js";
+import { SECRET_RULES } from "../core/rules/secret-rules.js";
 import {
   reportScanStart,
   reportScanProgress,
   reportScanResults,
-} from '../ui/reporter.js';
+} from "../ui/reporter.js";
 
 /**
  * Execute a full project scan, returning a ScanResult.
@@ -54,13 +64,13 @@ export async function executeScan(
 
   try {
     // ── 1. Find & parse .env files ──────────────────────────────────────
-    if (spinner) reportScanProgress(spinner, 'Parsing .env files…');
+    if (spinner) reportScanProgress(spinner, "Parsing .env files…");
 
     const envFiles = await findEnvFiles(rootDir);
     const parsedEnvFiles = [];
     for (const envFile of envFiles) {
       try {
-        const content = await fs.readFile(envFile, 'utf-8');
+        const content = await fs.readFile(envFile, "utf-8");
         const parsed = parseEnvFile(content, envFile);
         parsedEnvFiles.push(parsed);
       } catch {
@@ -69,11 +79,11 @@ export async function executeScan(
     }
 
     // ── 2. Env mismatch detection ───────────────────────────────────────
-    if (spinner) reportScanProgress(spinner, 'Checking env variable usage…');
+    if (spinner) reportScanProgress(spinner, "Checking env variable usage…");
 
     // Find code files
     const codeFiles = await fg(
-      ['**/*.ts', '**/*.js', '**/*.tsx', '**/*.jsx', '**/*.py', '**/*.rb'],
+      ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx", "**/*.py", "**/*.rb"],
       {
         cwd: rootDir,
         ignore: config.ignore,
@@ -89,7 +99,7 @@ export async function executeScan(
 
     for (const codeFile of codeFiles) {
       try {
-        const content = await fs.readFile(codeFile, 'utf-8');
+        const content = await fs.readFile(codeFile, "utf-8");
         const refs = scanCodeForEnvRefs(content, codeFile);
         for (const ref of refs) envRefs.add(ref);
 
@@ -123,11 +133,14 @@ export async function executeScan(
     }
 
     // ── 3. Check .gitignore coverage ────────────────────────────────────
-    if (spinner) reportScanProgress(spinner, 'Checking .gitignore…');
+    if (spinner) reportScanProgress(spinner, "Checking .gitignore…");
 
-    let gitignoreContent = '';
+    let gitignoreContent = "";
     try {
-      gitignoreContent = await fs.readFile(path.join(rootDir, '.gitignore'), 'utf-8');
+      gitignoreContent = await fs.readFile(
+        path.join(rootDir, ".gitignore"),
+        "utf-8",
+      );
     } catch {}
 
     const gitignoreFindings = await checkEnvFilesIgnoredWithGit(
@@ -137,9 +150,9 @@ export async function executeScan(
     findings.push(...gitignoreFindings);
 
     // ── 4. Scan working tree for secrets ────────────────────────────────
-    if (spinner) reportScanProgress(spinner, 'Scanning for secrets…');
+    if (spinner) reportScanProgress(spinner, "Scanning for secrets…");
 
-    const scanTargets = await fg(['**/*'], {
+    const scanTargets = await fg(["**/*"], {
       cwd: rootDir,
       ignore: config.ignore,
       onlyFiles: true,
@@ -147,13 +160,38 @@ export async function executeScan(
 
     // Filter to text-like files only
     const textExtensions = new Set([
-      '.ts', '.js', '.tsx', '.jsx', '.mjs', '.cjs',
-      '.py', '.rb', '.go', '.rs', '.java', '.kt',
-      '.json', '.yaml', '.yml', '.toml', '.xml',
-      '.env', '.cfg', '.conf', '.ini', '.properties',
-      '.sh', '.bash', '.zsh', '.fish',
-      '.tf', '.hcl', '.dockerfile',
-      '.md', '.txt', '.csv',
+      ".ts",
+      ".js",
+      ".tsx",
+      ".jsx",
+      ".mjs",
+      ".cjs",
+      ".py",
+      ".rb",
+      ".go",
+      ".rs",
+      ".java",
+      ".kt",
+      ".json",
+      ".yaml",
+      ".yml",
+      ".toml",
+      ".xml",
+      ".env",
+      ".cfg",
+      ".conf",
+      ".ini",
+      ".properties",
+      ".sh",
+      ".bash",
+      ".zsh",
+      ".fish",
+      ".tf",
+      ".hcl",
+      ".dockerfile",
+      ".md",
+      ".txt",
+      ".csv",
     ]);
 
     let scannedFiles = 0;
@@ -162,8 +200,8 @@ export async function executeScan(
       const basename = path.basename(file).toLowerCase();
 
       // Include dotfiles like .env, .env.local etc.
-      const isEnvFile = basename.startsWith('.env');
-      if (!isEnvFile && !textExtensions.has(ext) && ext !== '') continue;
+      const isEnvFile = basename.startsWith(".env");
+      if (!isEnvFile && !textExtensions.has(ext) && ext !== "") continue;
 
       const fullPath = path.join(rootDir, file);
       try {
@@ -171,7 +209,7 @@ export async function executeScan(
         // Skip files > 1MB
         if (stat.size > 1_048_576) continue;
 
-        const content = await fs.readFile(fullPath, 'utf-8');
+        const content = await fs.readFile(fullPath, "utf-8");
         const secretFindings = scanFileForSecrets(
           content,
           file,
@@ -186,7 +224,7 @@ export async function executeScan(
     }
 
     // ── 5. Scan git history ─────────────────────────────────────────────
-    if (spinner) reportScanProgress(spinner, 'Scanning git history…');
+    if (spinner) reportScanProgress(spinner, "Scanning git history…");
 
     try {
       const depth = options.fullHistory ? undefined : config.historyDepth;
@@ -202,7 +240,7 @@ export async function executeScan(
     }
 
     // ── 6. Detect framework & client-exposed secrets ────────────────────
-    if (spinner) reportScanProgress(spinner, 'Detecting framework…');
+    if (spinner) reportScanProgress(spinner, "Detecting framework…");
 
     let framework: FrameworkInfo | undefined;
     try {
@@ -222,7 +260,7 @@ export async function executeScan(
     }
 
     // ── 7. Load and run plugins ─────────────────────────────────────────
-    if (spinner) reportScanProgress(spinner, 'Running plugins…');
+    if (spinner) reportScanProgress(spinner, "Running plugins…");
 
     try {
       const plugins = await loadPlugins(config, rootDir);
@@ -254,7 +292,11 @@ export async function executeScan(
     // ── 9. Filter by severity if requested ──────────────────────────────
     let filteredFindings = findings;
     if (options.severity) {
-      const severityOrder: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
+      const severityOrder: Record<Severity, number> = {
+        critical: 0,
+        warning: 1,
+        info: 2,
+      };
       const minLevel = severityOrder[options.severity];
       filteredFindings = findings.filter(
         (f) => severityOrder[f.severity] <= minLevel,
@@ -289,7 +331,7 @@ export async function executeScan(
 
     return result;
   } catch (error) {
-    if (spinner) spinner.fail('Scan failed');
+    if (spinner) spinner.fail("Scan failed");
     throw error;
   }
 }

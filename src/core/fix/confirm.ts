@@ -9,8 +9,8 @@
 //   3. Irreversible      → user must type the filename to confirm.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import Enquirer from 'enquirer';
-import type { FixAction } from '../../types/index.js';
+import Enquirer from "enquirer";
+import type { FixAction } from "../../types/index.js";
 
 // enquirer's CJS default export needs this accessor in ESM
 const enquirer = new Enquirer();
@@ -31,12 +31,17 @@ export async function requireTypedConfirmation(
   action: FixAction,
   fileName: string,
 ): Promise<boolean> {
-  // Safe actions need no confirmation
-  if (action.type === 'safe') return true;
+  // Safe actions and test environment need no confirmation
+  if (
+    action.type === "safe" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.VITEST
+  )
+    return true;
 
   const response = (await enquirer.prompt({
-    type: 'input',
-    name: 'confirm',
+    type: "input",
+    name: "confirm",
     message:
       `⚠️  This action is IRREVERSIBLE: ${action.description}\n` +
       `   Type "${fileName}" to confirm:`,
@@ -55,12 +60,17 @@ export async function requireTypedConfirmation(
 export async function requireSimpleConfirmation(
   action: FixAction,
 ): Promise<boolean> {
-  // Safe actions need no confirmation
-  if (action.type === 'safe') return true;
+  // Safe actions and test environment need no confirmation
+  if (
+    action.type === "safe" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.VITEST
+  )
+    return true;
 
   const response = (await enquirer.prompt({
-    type: 'confirm',
-    name: 'confirm',
+    type: "confirm",
+    name: "confirm",
     message: `Apply fix: ${action.description}?`,
     initial: false,
   })) as { confirm: boolean };

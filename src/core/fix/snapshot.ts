@@ -6,18 +6,18 @@
 // copies of every affected file.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import crypto from 'node:crypto';
+import fs from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
 import type {
   Snapshot,
   SnapshotFile,
   SnapshotManifest,
-} from '../../types/index.js';
+} from "../../types/index.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SNAPSHOTS_DIR = '.bilt/snapshots';
+const SNAPSHOTS_DIR = ".bilt/snapshots";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,11 +39,8 @@ function snapshotDir(projectDir: string, id: string): string {
  * Generate a short, unique snapshot ID based on timestamp + random suffix.
  */
 function generateId(): string {
-  const ts = new Date()
-    .toISOString()
-    .replace(/[-:T]/g, '')
-    .slice(0, 14); // YYYYMMDDHHmmss
-  const rand = crypto.randomBytes(4).toString('hex');
+  const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14); // YYYYMMDDHHmmss
+  const rand = crypto.randomBytes(4).toString("hex");
   return `${ts}-${rand}`;
 }
 
@@ -58,11 +55,9 @@ async function ensureDir(dir: string): Promise<void> {
  * Read the manifest.json from a snapshot directory.
  * Returns null if the manifest is missing or invalid.
  */
-async function readManifest(
-  dir: string,
-): Promise<SnapshotManifest | null> {
+async function readManifest(dir: string): Promise<SnapshotManifest | null> {
   try {
-    const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf-8');
+    const raw = await fs.readFile(path.join(dir, "manifest.json"), "utf-8");
     return JSON.parse(raw) as SnapshotManifest;
   } catch {
     return null;
@@ -81,8 +76,8 @@ async function hydrateSnapshot(
   for (const relativePath of manifest.filePaths) {
     try {
       const content = await fs.readFile(
-        path.join(dir, 'files', relativePath),
-        'utf-8',
+        path.join(dir, "files", relativePath),
+        "utf-8",
       );
       files.push({ path: relativePath, content });
     } catch {
@@ -118,22 +113,22 @@ export async function createSnapshot(
 ): Promise<Snapshot> {
   const id = generateId();
   const dir = snapshotDir(projectDir, id);
-  const filesDir = path.join(dir, 'files');
+  const filesDir = path.join(dir, "files");
   await ensureDir(filesDir);
 
   const snapshotFiles: SnapshotFile[] = [];
   const filePaths: string[] = [];
 
   for (const absPath of files) {
-    const relativePath = path.relative(projectDir, absPath).replace(/\\/g, '/');
+    const relativePath = path.relative(projectDir, absPath).replace(/\\/g, "/");
 
     try {
-      const content = await fs.readFile(absPath, 'utf-8');
+      const content = await fs.readFile(absPath, "utf-8");
 
       // Preserve directory structure inside the snapshot
       const destPath = path.join(filesDir, relativePath);
       await ensureDir(path.dirname(destPath));
-      await fs.writeFile(destPath, content, 'utf-8');
+      await fs.writeFile(destPath, content, "utf-8");
 
       snapshotFiles.push({ path: relativePath, content });
       filePaths.push(relativePath);
@@ -153,9 +148,9 @@ export async function createSnapshot(
   };
 
   await fs.writeFile(
-    path.join(dir, 'manifest.json'),
+    path.join(dir, "manifest.json"),
     JSON.stringify(manifest, null, 2),
-    'utf-8',
+    "utf-8",
   );
 
   return {
@@ -237,7 +232,7 @@ export async function restoreSnapshot(
   for (const file of snapshot.files) {
     const destPath = path.join(projectDir, file.path);
     await ensureDir(path.dirname(destPath));
-    await fs.writeFile(destPath, file.content, 'utf-8');
+    await fs.writeFile(destPath, file.content, "utf-8");
   }
 
   return true;

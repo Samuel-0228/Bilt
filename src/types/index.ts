@@ -1,16 +1,16 @@
 // ─── Severity & Categories ───────────────────────────────────────────────────
 
-export type Severity = 'critical' | 'warning' | 'info';
+export type Severity = "critical" | "warning" | "info";
 
 export type FindingCategory =
-  | 'secret-detected'
-  | 'env-missing'
-  | 'env-unused'
-  | 'env-mismatch'
-  | 'env-exposed'
-  | 'gitignore-missing'
-  | 'framework-warning'
-  | 'plugin-finding';
+  | "secret-detected"
+  | "env-missing"
+  | "env-unused"
+  | "env-mismatch"
+  | "env-exposed"
+  | "gitignore-missing"
+  | "framework-warning"
+  | "plugin-finding";
 
 // ─── Scan Finding ────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export interface ProviderInfo {
 
 // ─── Fix Actions ─────────────────────────────────────────────────────────────
 
-export type FixType = 'safe' | 'destructive' | 'irreversible';
+export type FixType = "safe" | "destructive" | "irreversible";
 
 export interface FixAction {
   id: string;
@@ -163,7 +163,7 @@ export interface PluginManifest {
 // ─── Watch Events ────────────────────────────────────────────────────────────
 
 export interface WatchEvent {
-  type: 'add' | 'change' | 'unlink';
+  type: "add" | "change" | "unlink";
   file: string;
   findings: ScanFinding[];
   timestamp: Date;

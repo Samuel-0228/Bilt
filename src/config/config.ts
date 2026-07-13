@@ -1,23 +1,23 @@
-import { cosmiconfig } from 'cosmiconfig';
-import type { BiltConfig } from '../types/index.js';
+import { cosmiconfig } from "cosmiconfig";
+import type { BiltConfig } from "../types/index.js";
 
 // ─── Default Configuration (Zero-Config) ────────────────────────────────────
 
 export const DEFAULT_CONFIG: BiltConfig = {
   ignore: [
-    'node_modules/**',
-    '.git/**',
-    'dist/**',
-    'build/**',
-    'coverage/**',
-    '.bilt/**',
-    '*.min.js',
-    '*.min.css',
-    '*.map',
-    '*.lock',
-    'package-lock.json',
-    'yarn.lock',
-    'pnpm-lock.yaml',
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    ".bilt/**",
+    "*.min.js",
+    "*.min.css",
+    "*.map",
+    "*.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
   ],
   severityOverrides: {},
   plugins: [],
@@ -29,19 +29,19 @@ export const DEFAULT_CONFIG: BiltConfig = {
 
 // ─── Config Loader ───────────────────────────────────────────────────────────
 
-const explorer = cosmiconfig('bilt', {
+const explorer = cosmiconfig("bilt", {
   searchPlaces: [
-    '.biltrc',
-    '.biltrc.json',
-    '.biltrc.yaml',
-    '.biltrc.yml',
-    '.biltrc.js',
-    '.biltrc.cjs',
-    '.biltrc.mjs',
-    'bilt.config.js',
-    'bilt.config.cjs',
-    'bilt.config.mjs',
-    'bilt.config.ts',
+    ".biltrc",
+    ".biltrc.json",
+    ".biltrc.yaml",
+    ".biltrc.yml",
+    ".biltrc.js",
+    ".biltrc.cjs",
+    ".biltrc.mjs",
+    "bilt.config.js",
+    "bilt.config.cjs",
+    "bilt.config.mjs",
+    "bilt.config.ts",
   ],
 });
 

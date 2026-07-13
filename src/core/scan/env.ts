@@ -8,12 +8,12 @@
 //   • Finding missing and unused env vars
 // ─────────────────────────────────────────────────────────────────────────────
 
-import fg from 'fast-glob';
+import fg from "fast-glob";
 import type {
   ParsedEnvEntry,
   ParsedEnvFile,
   ScanFinding,
-} from '../../types/index.js';
+} from "../../types/index.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ function unquote(raw: string): string {
   const first = trimmed[0];
   const last = trimmed[trimmed.length - 1];
 
-  if ((first === '"' || first === "'" || first === '`') && first === last) {
+  if ((first === '"' || first === "'" || first === "`") && first === last) {
     return trimmed.slice(1, -1);
   }
   return trimmed;
@@ -78,7 +78,7 @@ const ENV_REF_PATTERNS: RegExp[] = [
  */
 export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
   const entries = new Map<string, ParsedEnvEntry>();
-  const rawLines = content.split('\n');
+  const rawLines = content.split("\n");
 
   let i = 0;
   while (i < rawLines.length) {
@@ -86,18 +86,18 @@ export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
     const trimmed = rawLine.trim();
 
     // Skip empty lines and pure comment lines
-    if (trimmed === '' || trimmed.startsWith('#')) {
+    if (trimmed === "" || trimmed.startsWith("#")) {
       i++;
       continue;
     }
 
     // Strip optional `export ` prefix
-    const line = trimmed.startsWith('export ')
+    const line = trimmed.startsWith("export ")
       ? trimmed.slice(7).trim()
       : trimmed;
 
     // Find the first `=`
-    const eqIdx = line.indexOf('=');
+    const eqIdx = line.indexOf("=");
     if (eqIdx === -1) {
       i++;
       continue;
@@ -113,7 +113,7 @@ export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
     if (
       valueTrimmed.startsWith('"') ||
       valueTrimmed.startsWith("'") ||
-      valueTrimmed.startsWith('`')
+      valueTrimmed.startsWith("`")
     ) {
       const quote = valueTrimmed[0]!;
 
@@ -128,10 +128,10 @@ export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
           const nextLine = rawLines[i]!;
           const endIdx = nextLine.indexOf('"');
           if (endIdx !== -1) {
-            multiValue += '\n' + nextLine.slice(0, endIdx);
+            multiValue += "\n" + nextLine.slice(0, endIdx);
             break;
           }
-          multiValue += '\n' + nextLine;
+          multiValue += "\n" + nextLine;
           i++;
         }
         valueRaw = multiValue;
@@ -140,7 +140,7 @@ export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
       }
     } else {
       // Unquoted — look for inline comment
-      const hashIdx = valueTrimmed.indexOf(' #');
+      const hashIdx = valueTrimmed.indexOf(" #");
       if (hashIdx !== -1) {
         comment = valueTrimmed.slice(hashIdx + 2).trim();
         valueRaw = valueTrimmed.slice(0, hashIdx);
@@ -149,7 +149,7 @@ export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
       }
     }
 
-    const value = typeof valueRaw === 'string' ? valueRaw.trim() : '';
+    const value = typeof valueRaw === "string" ? valueRaw.trim() : "";
 
     entries.set(key, {
       key,
@@ -171,15 +171,14 @@ export function parseEnvFile(content: string, filePath: string): ParsedEnvFile {
  * Excludes `node_modules`, `.git`, `dist`, and `build` directories.
  */
 export async function findEnvFiles(dir: string): Promise<string[]> {
-  const normalized = dir.replace(/\\/g, '/');
-  const matches = await fg([`${normalized}/**/.env`, `${normalized}/**/.env.*`], {
+  const matches = await fg(["**/.env", "**/.env.*"], {
+    cwd: dir,
     dot: true,
-    ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**"],
     absolute: true,
     onlyFiles: true,
   });
-
-  return matches.map((f) => f.replace(/\//g, '\\'));
+  return matches;
 }
 
 /**
@@ -196,13 +195,15 @@ export function diffEnvFiles(
 ): ScanFinding[] {
   const files = Array.isArray(filesOrFileA)
     ? filesOrFileA
-    : (fileB ? [filesOrFileA, fileB] : [filesOrFileA]);
+    : fileB
+      ? [filesOrFileA, fileB]
+      : [filesOrFileA];
 
   if (files.length < 2) return [];
 
   const findings: ScanFinding[] = [];
 
-  const templateSuffixes = ['.example', '.template', '.sample'];
+  const templateSuffixes = [".example", ".template", ".sample"];
 
   const isTemplate = (fp: string): boolean =>
     templateSuffixes.some((s) => fp.endsWith(s));
@@ -217,13 +218,13 @@ export function diffEnvFiles(
 
       for (const key of fileA.entries.keys()) {
         if (!fileB.entries.has(key)) {
-          const severity = isTemplate(fileA.filePath) ? 'warning' : 'info';
+          const severity = isTemplate(fileA.filePath) ? "warning" : "info";
           const baseName = (fp: string) => fp.split(/[\\/]/).pop() ?? fp;
 
           findings.push({
-            id: nextId('env-mismatch'),
+            id: nextId("env-mismatch"),
             severity,
-            category: 'env-mismatch',
+            category: "env-mismatch",
             message: `Variable "${key}" is defined in ${baseName(fileA.filePath)} but missing from ${baseName(fileB.filePath)}`,
             file: fileB.filePath,
             suggestion: `Add ${key} to ${baseName(fileB.filePath)}`,
@@ -251,7 +252,7 @@ export function scanCodeForEnvRefs(
     pattern.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(content)) !== null) {
-      const key = match.groups?.['key'];
+      const key = match.groups?.["key"];
       if (key) refs.add(key);
     }
   }
@@ -275,15 +276,23 @@ export function findMissingEnvVars(
   const findings: ScanFinding[] = [];
 
   // Built-in Node/framework vars that don't need to be in .env
-  const builtins = new Set(['NODE_ENV', 'PORT', 'PWD', 'HOME', 'PATH', 'CI', 'TZ']);
+  const builtins = new Set([
+    "NODE_ENV",
+    "PORT",
+    "PWD",
+    "HOME",
+    "PATH",
+    "CI",
+    "TZ",
+  ]);
 
   for (const ref of refs) {
     if (defined.has(ref) || builtins.has(ref)) continue;
 
     findings.push({
-      id: nextId('env-missing'),
-      severity: 'warning',
-      category: 'env-missing',
+      id: nextId("env-missing"),
+      severity: "warning",
+      category: "env-missing",
       message: `Code references process.env.${ref} but it is not defined in any .env file`,
       file: codeFile,
       suggestion: `Add ${ref}= to your .env file`,
@@ -308,7 +317,8 @@ export function findUnusedEnvVars(
   if (firstArg instanceof Set) {
     // Test case format: firstArg is definedKeys (Set), secondArg is envRefs (Set)
     const definedKeys = firstArg;
-    referenced = secondArg instanceof Set ? secondArg : new Set(secondArg as any);
+    referenced =
+      secondArg instanceof Set ? secondArg : new Set(secondArg as any);
     entriesList = [...definedKeys].map((key) => ({ key, line: 1 }));
   } else {
     // Normal format: firstArg is codeRefs (string[]), secondArg is envEntries (ParsedEnvEntry[])
@@ -320,26 +330,26 @@ export function findUnusedEnvVars(
 
   // Common vars that may be used implicitly by runtimes / libraries
   const implicit = new Set([
-    'NODE_ENV',
-    'PORT',
-    'HOST',
-    'TZ',
-    'DEBUG',
-    'LOG_LEVEL',
-    'DATABASE_URL',
-    'REDIS_URL',
-    'ALLOWED_HOSTS',
-    'SECRET_KEY',
-    'DJANGO_SETTINGS_MODULE',
+    "NODE_ENV",
+    "PORT",
+    "HOST",
+    "TZ",
+    "DEBUG",
+    "LOG_LEVEL",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "ALLOWED_HOSTS",
+    "SECRET_KEY",
+    "DJANGO_SETTINGS_MODULE",
   ]);
 
   for (const entry of entriesList) {
     if (referenced.has(entry.key) || implicit.has(entry.key)) continue;
 
     findings.push({
-      id: nextId('env-unused'),
-      severity: 'info',
-      category: 'env-unused',
+      id: nextId("env-unused"),
+      severity: "info",
+      category: "env-unused",
       message: `Variable "${entry.key}" is defined in .env but not referenced in scanned code`,
       file: envFile,
       line: entry.line,

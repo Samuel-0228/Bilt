@@ -1,19 +1,26 @@
 // ─── Fix Command ─────────────────────────────────────────────────────────────
 // Scans for issues, generates fix actions, and applies them interactively.
 
-import path from 'node:path';
-import chalk from 'chalk';
-import Enquirer from 'enquirer';
-import { promises as fs } from 'node:fs';
-import type { FixOptions, FixAction, ScanFinding } from '../types/index.js';
-import { executeScan } from './scan.js';
-import { loadConfig } from '../config/config.js';
-import { createSnapshot } from '../core/fix/snapshot.js';
-import { addToGitignore, generateEnvExample, addMissingEnvVars } from '../core/fix/env-fix.js';
-import { requireTypedConfirmation, requireSimpleConfirmation } from '../core/fix/confirm.js';
-import { reportFixPreview, reportFixComplete } from '../ui/reporter.js';
-import { parseEnvFile } from '../core/scan/env.js';
-import { SECRET_RULES } from '../core/rules/secret-rules.js';
+import path from "node:path";
+import chalk from "chalk";
+import Enquirer from "enquirer";
+import { promises as fs } from "node:fs";
+import type { FixOptions, FixAction, ScanFinding } from "../types/index.js";
+import { executeScan } from "./scan.js";
+import { loadConfig } from "../config/config.js";
+import { createSnapshot } from "../core/fix/snapshot.js";
+import {
+  addToGitignore,
+  generateEnvExample,
+  addMissingEnvVars,
+} from "../core/fix/env-fix.js";
+import {
+  requireTypedConfirmation,
+  requireSimpleConfirmation,
+} from "../core/fix/confirm.js";
+import { reportFixPreview, reportFixComplete } from "../ui/reporter.js";
+import { parseEnvFile } from "../core/scan/env.js";
+import { SECRET_RULES } from "../core/rules/secret-rules.js";
 
 /**
  * Execute the `bilt fix` command.
@@ -37,11 +44,9 @@ export async function executeFix(
   });
 
   if (result.findings.length === 0) {
-    console.log('');
-    console.log(
-      chalk.green.bold('  ✨ No issues found — nothing to fix!'),
-    );
-    console.log('');
+    console.log("");
+    console.log(chalk.green.bold("  ✨ No issues found — nothing to fix!"));
+    console.log("");
     return;
   }
 
@@ -49,21 +54,21 @@ export async function executeFix(
   const actions = await generateFixActions(rootDir, result.findings);
 
   if (actions.length === 0) {
-    console.log('');
+    console.log("");
     console.log(
       chalk.yellow(
-        '  ⚠ Issues found but no automated fixes available. Review manually.',
+        "  ⚠ Issues found but no automated fixes available. Review manually.",
       ),
     );
-    console.log('');
+    console.log("");
     return;
   }
 
   // ── Dry-run: preview only ───────────────────────────────────────────
   if (options.dryRun) {
     reportFixPreview(actions);
-    console.log(chalk.dim('  (Dry run — no changes applied)'));
-    console.log('');
+    console.log(chalk.dim("  (Dry run — no changes applied)"));
+    console.log("");
     return;
   }
 
@@ -71,14 +76,14 @@ export async function executeFix(
   const affectedFiles = new Set<string>();
   for (const action of actions) {
     // Extract file from finding ID heuristic
-    affectedFiles.add('.gitignore');
-    affectedFiles.add('.env');
-    affectedFiles.add('.env.example');
+    affectedFiles.add(".gitignore");
+    affectedFiles.add(".env");
+    affectedFiles.add(".env.example");
   }
 
   try {
     await createSnapshot(
-      [...affectedFiles].map(f => path.join(rootDir, f)),
+      [...affectedFiles].map((f) => path.join(rootDir, f)),
       `Pre-fix snapshot (${actions.length} fixes)`,
       rootDir,
     );
@@ -88,13 +93,15 @@ export async function executeFix(
 
   // ── Safe mode: auto-apply safe fixes only ───────────────────────────
   if (options.safe) {
-    const safeActions = actions.filter((a) => a.type === 'safe');
+    const safeActions = actions.filter((a) => a.type === "safe");
     if (safeActions.length === 0) {
-      console.log('');
+      console.log("");
       console.log(
-        chalk.yellow('  ⚠ No safe fixes available. Run without --safe for interactive mode.'),
+        chalk.yellow(
+          "  ⚠ No safe fixes available. Run without --safe for interactive mode.",
+        ),
       );
-      console.log('');
+      console.log("");
       return;
     }
 
@@ -117,9 +124,10 @@ export async function executeFix(
       } catch (error) {
         skipped++;
         if (options.verbose) {
-          const msg =
-            error instanceof Error ? error.message : String(error);
-          console.log(chalk.red(`    ✗ Failed: ${action.description} (${msg})`));
+          const msg = error instanceof Error ? error.message : String(error);
+          console.log(
+            chalk.red(`    ✗ Failed: ${action.description} (${msg})`),
+          );
         }
       }
     }
@@ -135,30 +143,21 @@ export async function executeFix(
   let skipped = 0;
 
   for (const action of actions) {
-    console.log('');
-    console.log(
-      chalk.bold(`  ${action.description}`),
-    );
+    console.log("");
+    console.log(chalk.bold(`  ${action.description}`));
     if (action.preview) {
       console.log(chalk.dim(`  ${action.preview}`));
     }
 
     let shouldApply = false;
 
-    if (action.type === 'safe') {
-      shouldApply = await requireSimpleConfirmation(
-        action,
-      );
-    } else if (action.type === 'destructive') {
-      shouldApply = await requireSimpleConfirmation(
-        action,
-      );
+    if (action.type === "safe") {
+      shouldApply = await requireSimpleConfirmation(action);
+    } else if (action.type === "destructive") {
+      shouldApply = await requireSimpleConfirmation(action);
     } else {
       // Irreversible — require typed confirmation
-      shouldApply = await requireTypedConfirmation(
-        action,
-        'confirm',
-      );
+      shouldApply = await requireTypedConfirmation(action, "confirm");
     }
 
     if (shouldApply) {
@@ -166,20 +165,19 @@ export async function executeFix(
         const success = await action.apply();
         if (success) {
           applied++;
-          console.log(chalk.green('    ✓ Applied'));
+          console.log(chalk.green("    ✓ Applied"));
         } else {
           skipped++;
-          console.log(chalk.yellow('    ⏭  Skipped (failed to apply)'));
+          console.log(chalk.yellow("    ⏭  Skipped (failed to apply)"));
         }
       } catch (error) {
         skipped++;
-        const msg =
-          error instanceof Error ? error.message : String(error);
+        const msg = error instanceof Error ? error.message : String(error);
         console.log(chalk.red(`    ✗ Error: ${msg}`));
       }
     } else {
       skipped++;
-      console.log(chalk.dim('    ⏭  Skipped'));
+      console.log(chalk.dim("    ⏭  Skipped"));
     }
   }
 
@@ -201,27 +199,22 @@ async function generateFixActions(
 
   for (const finding of findings) {
     switch (finding.category) {
-      case 'gitignore-missing': {
-        if (!addedTypes.has('gitignore')) {
-          addedTypes.add('gitignore');
+      case "gitignore-missing": {
+        if (!addedTypes.has("gitignore")) {
+          addedTypes.add("gitignore");
           actions.push({
             id: `fix-gitignore-${Date.now()}`,
-            description: 'Add .env patterns to .gitignore',
-            type: 'safe',
+            description: "Add .env patterns to .gitignore",
+            type: "safe",
             findingId: finding.id,
-            preview: 'Will append .env, .env.*, .env.local to .gitignore',
+            preview: "Will append .env, .env.*, .env.local to .gitignore",
             apply: async () => {
-              const gitignorePath = path.join(rootDir, '.gitignore');
+              const gitignorePath = path.join(rootDir, ".gitignore");
               const newContent = await addToGitignore(
-                [
-                  '.env',
-                  '.env.*',
-                  '.env.local',
-                  '.env.*.local',
-                ],
+                [".env", ".env.*", ".env.local", ".env.*.local", ".bilt/"],
                 gitignorePath,
               );
-              await fs.writeFile(gitignorePath, newContent, 'utf-8');
+              await fs.writeFile(gitignorePath, newContent, "utf-8");
               return true;
             },
           });
@@ -229,8 +222,9 @@ async function generateFixActions(
         break;
       }
 
-      case 'env-missing': {
-        const key = finding.message.match(/["']([^"']+)["']/)?.[1] ??
+      case "env-missing": {
+        const key =
+          finding.message.match(/["']([^"']+)["']/)?.[1] ??
           finding.message.match(/`([^`]+)`/)?.[1] ??
           finding.message.match(/(\w+)/)?.[1];
 
@@ -239,20 +233,17 @@ async function generateFixActions(
           actions.push({
             id: `fix-env-missing-${key}-${Date.now()}`,
             description: `Add missing env var ${key} to ${finding.file}`,
-            type: 'safe',
+            type: "safe",
             findingId: finding.id,
             preview: `Will append ${key}= to ${finding.file}`,
             apply: async () => {
               const envFilePath = path.join(rootDir, finding.file);
-              let content = '';
+              let content = "";
               try {
-                content = await fs.readFile(envFilePath, 'utf-8');
+                content = await fs.readFile(envFilePath, "utf-8");
               } catch {}
-              const newContent = addMissingEnvVars(
-                content,
-                [key],
-              );
-              await fs.writeFile(envFilePath, newContent, 'utf-8');
+              const newContent = addMissingEnvVars(content, [key]);
+              await fs.writeFile(envFilePath, newContent, "utf-8");
               return true;
             },
           });
@@ -260,20 +251,20 @@ async function generateFixActions(
         break;
       }
 
-      case 'env-mismatch': {
-        if (!addedTypes.has('env-example')) {
-          addedTypes.add('env-example');
+      case "env-mismatch": {
+        if (!addedTypes.has("env-example")) {
+          addedTypes.add("env-example");
           actions.push({
             id: `fix-env-example-${Date.now()}`,
-            description: 'Generate .env.example with all required keys',
-            type: 'safe',
+            description: "Generate .env.example with all required keys",
+            type: "safe",
             findingId: finding.id,
-            preview: 'Will create .env.example with placeholder values',
+            preview: "Will create .env.example with placeholder values",
             apply: async () => {
-              const envFilePath = path.join(rootDir, '.env');
-              let content = '';
+              const envFilePath = path.join(rootDir, ".env");
+              let content = "";
               try {
-                content = await fs.readFile(envFilePath, 'utf-8');
+                content = await fs.readFile(envFilePath, "utf-8");
               } catch {
                 return false;
               }
@@ -284,9 +275,9 @@ async function generateFixActions(
                 config.entropyThreshold,
               );
               await fs.writeFile(
-                path.join(rootDir, '.env.example'),
+                path.join(rootDir, ".env.example"),
                 exampleContent,
-                'utf-8',
+                "utf-8",
               );
               return true;
             },
@@ -295,14 +286,16 @@ async function generateFixActions(
         break;
       }
 
-      case 'secret-detected': {
+      case "secret-detected": {
         // Secrets can't be auto-fixed — provide guidance
         actions.push({
           id: `fix-secret-${finding.id}`,
-          description: `Remove secret from ${finding.file}${finding.line ? `:${finding.line}` : ''}`,
-          type: 'destructive',
+          description: `Remove secret from ${finding.file}${finding.line ? `:${finding.line}` : ""}`,
+          type: "destructive",
           findingId: finding.id,
-          preview: finding.suggestion ?? 'Move secret to env var and add to .gitignore',
+          preview:
+            finding.suggestion ??
+            "Move secret to env var and add to .gitignore",
           apply: async () => {
             // We can't auto-remove secrets safely — this needs manual review
             // But we can offer to add the file to .gitignore
@@ -322,16 +315,16 @@ async function generateFixActions(
         break;
       }
 
-      case 'framework-warning':
-      case 'env-exposed': {
+      case "framework-warning":
+      case "env-exposed": {
         actions.push({
           id: `fix-exposed-${finding.id}`,
           description: `Review client-exposed secret in ${finding.file}`,
-          type: 'destructive',
+          type: "destructive",
           findingId: finding.id,
           preview:
             finding.suggestion ??
-            'Ensure this env var should be exposed to the client bundle',
+            "Ensure this env var should be exposed to the client bundle",
           apply: async () => {
             console.log(
               chalk.yellow(

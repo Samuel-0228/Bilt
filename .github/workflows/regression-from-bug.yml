@@ -1,0 +1,26 @@
+name: Bug Regression Check
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  remind-regression:
+    name: Remind Regression Test
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'bug')
+    steps:
+      - name: Create Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Thanks for fixing this bug!
+              
+              ⚠️ **Bilt QA Guideline Reminder:** Every bug fix must include a permanent regression test in the \`tests/regression/\` directory to prevent future occurrences.
+              
+              Please ensure that a corresponding test case was added to protect this fix in releases.`
+            })

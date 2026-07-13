@@ -5,15 +5,11 @@
 // file watching with 300ms debouncing.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import chokidar from 'chokidar';
-import fs from 'node:fs/promises';
-import { scanFileForSecrets } from '../scan/secrets.js';
-import { SECRET_RULES } from '../rules/secret-rules.js';
-import type {
-  BiltConfig,
-  ScanFinding,
-  WatchEvent,
-} from '../../types/index.js';
+import chokidar from "chokidar";
+import fs from "node:fs/promises";
+import { scanFileForSecrets } from "../scan/secrets.js";
+import { SECRET_RULES } from "../rules/secret-rules.js";
+import type { BiltConfig, ScanFinding, WatchEvent } from "../../types/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,26 +24,53 @@ const DEFAULT_DEBOUNCE_MS = 300;
 
 /** Directories and file patterns to always ignore. */
 const IGNORED_PATTERNS = [
-  '**/node_modules/**',
-  '**/.git/**',
-  '**/.bilt/**',
-  '**/dist/**',
-  '**/build/**',
-  '**/.next/**',
-  '**/.nuxt/**',
-  '**/.svelte-kit/**',
-  '**/__pycache__/**',
+  "**/node_modules/**",
+  "**/.git/**",
+  "**/.bilt/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/.next/**",
+  "**/.nuxt/**",
+  "**/.svelte-kit/**",
+  "**/__pycache__/**",
 ];
 
 /** Binary file extensions to skip. */
 const BINARY_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.svg',
-  '.mp3', '.mp4', '.avi', '.mov', '.webm',
-  '.zip', '.tar', '.gz', '.rar', '.7z',
-  '.exe', '.dll', '.so', '.dylib',
-  '.woff', '.woff2', '.ttf', '.eot', '.otf',
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
-  '.lock', '.map',
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".bmp",
+  ".ico",
+  ".webp",
+  ".svg",
+  ".mp3",
+  ".mp4",
+  ".avi",
+  ".mov",
+  ".webm",
+  ".zip",
+  ".tar",
+  ".gz",
+  ".rar",
+  ".7z",
+  ".exe",
+  ".dll",
+  ".so",
+  ".dylib",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".eot",
+  ".otf",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".lock",
+  ".map",
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -56,7 +79,7 @@ const BINARY_EXTENSIONS = new Set([
  * Check if a file path has a binary extension.
  */
 function isBinaryFile(filePath: string): boolean {
-  const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
   return BINARY_EXTENSIONS.has(ext);
 }
 
@@ -123,7 +146,7 @@ export function startWatcher(
    * Process a single file event.
    */
   const processFile = async (
-    eventType: 'add' | 'change',
+    eventType: "add" | "change",
     filePath: string,
   ): Promise<void> => {
     // Skip binary files
@@ -131,7 +154,7 @@ export function startWatcher(
 
     let content: string;
     try {
-      content = await fs.readFile(filePath, 'utf-8');
+      content = await fs.readFile(filePath, "utf-8");
     } catch {
       // File may have been deleted between the event and the read
       return;
@@ -156,24 +179,24 @@ export function startWatcher(
 
   // Create debounced handler
   const debouncedProcess = debounce(
-    (eventType: 'add' | 'change', filePath: string) => {
+    (eventType: "add" | "change", filePath: string) => {
       void processFile(eventType, filePath);
     },
     DEFAULT_DEBOUNCE_MS,
   );
 
   // Attach event handlers
-  watcher.on('add', (filePath: string) => {
-    debouncedProcess('add', filePath);
+  watcher.on("add", (filePath: string) => {
+    debouncedProcess("add", filePath);
   });
 
-  watcher.on('change', (filePath: string) => {
-    debouncedProcess('change', filePath);
+  watcher.on("change", (filePath: string) => {
+    debouncedProcess("change", filePath);
   });
 
-  watcher.on('unlink', (filePath: string) => {
+  watcher.on("unlink", (filePath: string) => {
     const event: WatchEvent = {
-      type: 'unlink',
+      type: "unlink",
       file: filePath,
       findings: [],
       timestamp: new Date(),
@@ -193,8 +216,6 @@ export function startWatcher(
  *
  * @param watcher The watcher handle returned by `startWatcher`.
  */
-export async function stopWatcher(
-  watcher: WatcherHandle,
-): Promise<void> {
+export async function stopWatcher(watcher: WatcherHandle): Promise<void> {
   await watcher.close();
 }
