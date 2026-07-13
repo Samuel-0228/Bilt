@@ -27,7 +27,7 @@ export const SECRET_RULES: SecretRule[] = [
   {
     id: 'aws-secret-key',
     name: 'AWS Secret Access Key',
-    pattern: /(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])/g,
+    pattern: /(?<![A-Za-z0-9/+=])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])/g,
     provider: 'aws',
     severity: 'critical',
     description: 'AWS Secret Access Keys are 40-character base64 strings.',
