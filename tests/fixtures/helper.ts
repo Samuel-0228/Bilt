@@ -15,9 +15,14 @@ const jwtVal =
   "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3ZXJ0eSJ9." +
   "signature";
 
+// Clean up Git environment variables that could leak from GitHub Actions runner environment
+delete process.env.GIT_DIR;
+delete process.env.GIT_WORK_TREE;
+delete process.env.GIT_INDEX_FILE;
+delete process.env.GIT_OBJECT_DIRECTORY;
+delete process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+
 const cleanEnv = { ...process.env };
-delete cleanEnv.GIT_DIR;
-delete cleanEnv.GIT_WORK_TREE;
 
 export async function createLeakyFixtureProject(
   targetDir: string,
@@ -58,7 +63,7 @@ export async function createLeakyFixtureProject(
   await fs.writeFile(path.join(targetDir, ".env"), envContent, "utf-8");
 
   let envProdContent = await fs.readFile(
-    path.join(sourceDir, ".env.production-source"),
+    path.join(sourceDir, ".env-production-source"),
     "utf-8",
   );
   await fs.writeFile(

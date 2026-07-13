@@ -63,7 +63,7 @@ describe("CLI Binary Integration Tests", () => {
       path.join(tmpDir, "src/index.ts"),
     );
     await fs.copyFile(
-      path.join(cleanSource, ".env"),
+      path.join(cleanSource, ".env-source"),
       path.join(tmpDir, ".env"),
     );
     await fs.copyFile(
