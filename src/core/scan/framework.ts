@@ -244,6 +244,17 @@ export function checkClientExposedSecrets(
       const value = entry.value;
       if (!value || value.length === 0) continue;
 
+      // Skip known safe client-exposed variables (false positives)
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey.includes('anon_key') ||
+        lowerKey.includes('publishable_key') ||
+        lowerKey.includes('public_key') ||
+        lowerKey.includes('app_id')
+      ) {
+        continue;
+      }
+
       // Check against every secret rule
       let matchedRule = false;
       for (const rule of rules) {

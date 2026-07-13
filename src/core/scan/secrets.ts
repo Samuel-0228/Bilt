@@ -155,8 +155,17 @@ export function scanFileForSecrets(
 
       const line = lineNumberAt(content, match.index);
 
-      // Check for inline ignore comments (e.g. gitleaks:allow or bilt:allow)
+      // Check for known public assignments (e.g. ANON_KEY, PUBLISHABLE_KEY)
       const matchedLine = fileLines[line - 1];
+      if (matchedLine) {
+        const isPublicAssignment =
+          /^[a-z0-9_]*(anon_key|publishable_key|public_key|app_id)[a-z0-9_]*\s*=/i.test(
+            matchedLine.trim(),
+          );
+        if (isPublicAssignment) continue;
+      }
+
+      // Check for inline ignore comments (e.g. gitleaks:allow or bilt:allow)
       const previousLine = line > 1 ? fileLines[line - 2] : undefined;
       const isAllowed =
         (matchedLine &&
