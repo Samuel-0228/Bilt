@@ -117,6 +117,9 @@ export function scanFileForSecrets(
 
   const findings: ScanFinding[] = [];
 
+  // Split content into lines for ignore-comment checks
+  const fileLines = content.split('\n');
+
   // Track matches we've already reported to avoid duplicates when
   // multiple rules match the same span.
   const seen = new Set<string>();
@@ -151,6 +154,19 @@ export function scanFileForSecrets(
       }
 
       const line = lineNumberAt(content, match.index);
+
+      // Check for inline ignore comments (e.g. gitleaks:allow or bilt:allow)
+      const matchedLine = fileLines[line - 1];
+      const previousLine = line > 1 ? fileLines[line - 2] : undefined;
+      const isAllowed =
+        (matchedLine &&
+          (matchedLine.includes('gitleaks:allow') ||
+            matchedLine.includes('bilt:allow'))) ||
+        (previousLine &&
+          (previousLine.includes('gitleaks:allow') ||
+            previousLine.includes('bilt:allow')));
+
+      if (isAllowed) continue;
       const provider = detectProvider(matchedValue, rule.id) ?? undefined;
 
       findings.push({

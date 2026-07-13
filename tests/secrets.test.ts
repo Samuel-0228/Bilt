@@ -214,4 +214,16 @@ describe('scanFileForSecrets', () => {
       expect(finding.file).toBe('src/config.ts');
     }
   });
+
+  it('should ignore findings with bilt:allow or gitleaks:allow on the same line', () => {
+    const content = `const key = "AKIAIOSFODNN7EXAMPLE"; // bilt:allow\nconst key2 = "AKIAIOSFODNN7EXAMPLE"; # gitleaks:allow`;
+    const findings = scanFileForSecrets(content, 'src/config.ts', DEFAULT_CONFIG);
+    expect(findings.length).toBe(0);
+  });
+
+  it('should ignore findings with bilt:allow or gitleaks:allow on the previous line', () => {
+    const content = `// bilt:allow\nconst key = "AKIAIOSFODNN7EXAMPLE";\n# gitleaks:allow\nconst key2 = "AKIAIOSFODNN7EXAMPLE";`;
+    const findings = scanFileForSecrets(content, 'src/config.ts', DEFAULT_CONFIG);
+    expect(findings.length).toBe(0);
+  });
 });
