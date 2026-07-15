@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.bilt
+*.log
+.git
+.github
+.vscode
+.agents
+.gemini
+*.ipynb

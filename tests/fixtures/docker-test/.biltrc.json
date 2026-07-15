@@ -1,0 +1,3 @@
+{
+  "plugins": ["../../../dist/plugins/official/docker.js"]
+}
