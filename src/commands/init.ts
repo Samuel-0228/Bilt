@@ -2,8 +2,7 @@
 // Zero-friction onboarding: scan, auto-fix safe issues, show health card.
 
 import path from "node:path";
-import chalk from "chalk";
-import boxen from "boxen";
+import { colors, glyphs, banner, text } from "../ui/theme.js";
 import { promises as fs } from "node:fs";
 import { executeScan } from "./scan.js";
 import { createSnapshot } from "../core/fix/snapshot.js";
@@ -28,18 +27,11 @@ export async function executeInit(projectDir: string): Promise<void> {
   const config = await loadConfig(rootDir);
 
   // ── Welcome banner ──────────────────────────────────────────────────
-  const banner = boxen(
-    `\n${chalk.bold.cyan("  🏗️  BILT — Project Health Toolkit")}\n\n` +
-      chalk.dim("  Zero-configuration setup. One command to a healthy repo.\n"),
-    {
-      padding: 0,
-      margin: { top: 1, bottom: 0, left: 1, right: 1 },
-      borderStyle: "round",
-      borderColor: "cyan",
-    },
-  );
-  console.log(banner);
   console.log("");
+  console.log(banner());
+  console.log("");
+  console.log(colors.vitalTeal.bold("  BILT \u2014 Project Health Toolkit"));
+  console.log(colors.slateDim.dim("  Zero-configuration setup. One command to a healthy repo."));
 
   // ── Run full scan ───────────────────────────────────────────────────
   const result = await executeScan(rootDir, {
@@ -93,7 +85,7 @@ export async function executeInit(projectDir: string): Promise<void> {
       const newContent = await addToGitignore(envPatterns, gitignorePath);
       await fs.writeFile(gitignorePath, newContent, "utf-8");
       fixesApplied++;
-      console.log(chalk.green("  ✅ Added .env patterns to .gitignore"));
+      console.log(colors.mintClear.apply("  " + glyphs.fixed + " Added .env patterns to .gitignore"));
     } catch {
       // Failed to update .gitignore — non-critical
     }
@@ -116,7 +108,7 @@ export async function executeInit(projectDir: string): Promise<void> {
         "utf-8",
       );
       fixesApplied++;
-      console.log(chalk.green("  ✅ Generated .env.example"));
+      console.log(colors.mintClear.apply("  " + glyphs.fixed + " Generated .env.example"));
     } catch {
       // Failed to generate .env.example — non-critical
     }

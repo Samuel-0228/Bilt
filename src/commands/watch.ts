@@ -2,7 +2,7 @@
 // Real-time file monitoring with instant secret & env scanning.
 
 import path from "node:path";
-import chalk from "chalk";
+import { colors, glyphs, text, sectionHeader } from "../ui/theme.js";
 import type { WatchOptions, WatchEvent } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
 import { startWatcher, stopWatcher } from "../core/watch/watcher.js";
@@ -25,9 +25,9 @@ export async function executeWatch(
   // ── Status banner ───────────────────────────────────────────────────
   if (!options.quiet) {
     console.log("");
-    console.log(chalk.cyan.bold("  👁️  Bilt Watch Mode"));
-    console.log(chalk.dim(`  Monitoring ${rootDir} for changes…`));
-    console.log(chalk.dim("  Press Ctrl+C to stop."));
+    console.log(colors.vitalTeal.bold("  " + glyphs.info + " Bilt Watch Mode"));
+    console.log(colors.slateDim.dim("  Monitoring " + rootDir + " for changes\u2026"));
+    console.log(colors.slateDim.dim("  Press Ctrl+C to stop."));
     console.log("");
   }
 
@@ -54,11 +54,11 @@ export async function executeWatch(
   const cleanup = async (): Promise<void> => {
     if (!options.quiet) {
       console.log("");
-      console.log(chalk.dim("  Stopping watcher…"));
+      console.log(colors.slateDim.dim("  Stopping watcher\u2026"));
     }
     await stopWatcher(watcher);
     if (!options.quiet) {
-      console.log(chalk.green("  ✓ Watcher stopped."));
+      console.log(colors.mintClear.apply("  " + glyphs.fixed + " Watcher stopped."));
       console.log("");
     }
     process.exit(0);

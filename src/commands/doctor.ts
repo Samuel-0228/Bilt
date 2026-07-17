@@ -2,11 +2,10 @@
 // Comprehensive health report with detailed breakdown and recommendations.
 
 import path from "node:path";
-import chalk from "chalk";
-import boxen from "boxen";
 import type { ScanFinding, Severity, FindingCategory } from "../types/index.js";
 import { executeScan } from "./scan.js";
-import { formatHealthScore, severityIcon } from "../ui/format.js";
+import { formatHealthScore, severityIcon, formatFinding } from "../ui/format.js";
+import { colors, glyphs, banner, pulseBar, sectionHeader, divider, summaryBox, styledGlyph, severityColor, text, ruleLine } from "../ui/theme.js";
 
 /**
  * Execute the `bilt doctor` command.
@@ -45,25 +44,18 @@ export async function executeDoctor(
 
   // ── Header ──────────────────────────────────────────────────────────
   console.log("");
-  const header = boxen(
-    `\n${chalk.bold.cyan("  🏗️  BILT DOCTOR — Comprehensive Health Report")}\n`,
-    {
-      padding: 0,
-      margin: { top: 0, bottom: 0, left: 1, right: 1 },
-      borderStyle: "round",
-      borderColor: "cyan",
-    },
-  );
-  console.log(header);
+  console.log(banner());
+  console.log("");
+  console.log(colors.vitalTeal.bold("  BILT DOCTOR \u2014 Comprehensive Health Report"));
   console.log("");
 
   // ── Overall score ───────────────────────────────────────────────────
-  console.log(chalk.bold("  📊 Overall Health"));
+  console.log(sectionHeader("Overall Health"));
   console.log("");
-  console.log(`  ${formatHealthScore(healthScore, grade)}`);
+  console.log(`  ${formatHealthScore(healthScore)}`);
   console.log("");
   console.log(
-    chalk.dim(
+    colors.slateDim.dim(
       `  Scanned ${scannedFiles} files in ${duration}ms${framework ? ` • Framework: ${framework.displayName}` : ""}`,
     ),
   );
@@ -73,35 +65,35 @@ export async function executeDoctor(
   if (options.fun) {
     if (healthScore === 100) {
       console.log(
-        chalk.bold.green("  🎉🏆🎉 PERFECT SCORE! You absolute legend! 🎉🏆🎉"),
+        colors.mintClear.bold("  Perfect score! You absolute legend!"),
       );
       console.log("");
     } else if (healthScore >= 90) {
-      console.log(chalk.green("  🔥 So close to perfection — you got this!"));
+      console.log(colors.mintClear.apply("  So close to perfection — you got this!"));
       console.log("");
     }
   }
 
   // ── Category breakdown ──────────────────────────────────────────────
-  console.log(chalk.bold("  📋 Category Breakdown"));
+  console.log(sectionHeader("Category Breakdown"));
   console.log("");
 
-  const categories: { key: FindingCategory; label: string; icon: string }[] = [
-    { key: "secret-detected", label: "Secret Detection", icon: "🔐" },
-    { key: "env-missing", label: "Missing Env Vars", icon: "📦" },
-    { key: "env-unused", label: "Unused Env Vars", icon: "🗑️" },
-    { key: "env-mismatch", label: "Env Mismatches", icon: "🔀" },
-    { key: "env-exposed", label: "Client-Exposed Secrets", icon: "🌐" },
-    { key: "gitignore-missing", label: ".gitignore Coverage", icon: "📄" },
-    { key: "framework-warning", label: "Framework Warnings", icon: "⚙️" },
-    { key: "plugin-finding", label: "Plugin Findings", icon: "🔌" },
+  const categories: { key: FindingCategory; label: string }[] = [
+    { key: "secret-detected", label: "Secret Detection" },
+    { key: "env-missing", label: "Missing Env Vars" },
+    { key: "env-unused", label: "Unused Env Vars" },
+    { key: "env-mismatch", label: "Env Mismatches" },
+    { key: "env-exposed", label: "Client-Exposed Secrets" },
+    { key: "gitignore-missing", label: ".gitignore Coverage" },
+    { key: "framework-warning", label: "Framework Warnings" },
+    { key: "plugin-finding", label: "Plugin Findings" },
   ];
 
   for (const cat of categories) {
     const catFindings = findings.filter((f) => f.category === cat.key);
     if (catFindings.length === 0) {
       console.log(
-        chalk.green(`  ${cat.icon} ${cat.label}: ${chalk.bold("Clean")} ✓`),
+        colors.mintClear.apply(`  ${colors.slateDim.apply(glyphs.info)} ${cat.label}: ${text.bold("Clean")} ${glyphs.fixed}`),
       );
     } else {
       const critCount = catFindings.filter(
@@ -113,12 +105,12 @@ export async function executeDoctor(
       const infoCount = catFindings.filter((f) => f.severity === "info").length;
 
       const parts: string[] = [];
-      if (critCount > 0) parts.push(chalk.red(`${critCount} critical`));
-      if (warnCount > 0) parts.push(chalk.yellow(`${warnCount} warning`));
-      if (infoCount > 0) parts.push(chalk.cyan(`${infoCount} info`));
+      if (critCount > 0) parts.push(colors.pulseCoral.apply(`${critCount} critical`));
+      if (warnCount > 0) parts.push(colors.amberFlag.apply(`${warnCount} warning`));
+      if (infoCount > 0) parts.push(colors.vitalTeal.apply(`${infoCount} info`));
 
       console.log(
-        `  ${cat.icon} ${cat.label}: ${parts.join(", ")} ${chalk.dim(`(${catFindings.length} total)`)}`,
+        `  ${colors.slateDim.apply(glyphs.info)} ${cat.label}: ${parts.join(", ")} ${colors.slateDim.dim(`(${catFindings.length} total)`)}`,
       );
     }
   }
@@ -127,7 +119,7 @@ export async function executeDoctor(
 
   // ── Detailed findings ───────────────────────────────────────────────
   if (findings.length > 0) {
-    console.log(chalk.bold("  🔍 Detailed Findings"));
+    console.log(sectionHeader("Detailed Findings"));
     console.log("");
 
     const order: Severity[] = ["critical", "warning", "info"];
@@ -137,14 +129,14 @@ export async function executeDoctor(
 
       const icon = severityIcon(sev);
       console.log(
-        `  ${icon} ${chalk.bold(sev.charAt(0).toUpperCase() + sev.slice(1))}`,
+        `  ${icon} ${text.bold(sev.charAt(0).toUpperCase() + sev.slice(1))}`,
       );
 
       for (const f of sevFindings) {
         const loc = f.line ? `${f.file}:${f.line}` : f.file;
-        console.log(`     ${chalk.dim("›")} ${f.message}  ${chalk.dim(loc)}`);
+        console.log(`     ${colors.slateDim.dim("›")} ${f.message}  ${colors.slateDim.dim(loc)}`);
         if (f.suggestion) {
-          console.log(chalk.dim(`       💡 ${f.suggestion}`));
+          console.log(colors.slateDim.dim(`       ${glyphs.arrow} ${f.suggestion}`));
         }
       }
       console.log("");
@@ -152,37 +144,40 @@ export async function executeDoctor(
   }
 
   // ── Recommendations ─────────────────────────────────────────────────
-  console.log(chalk.bold("  💡 Recommendations"));
+  console.log(sectionHeader("Recommendations"));
   console.log("");
 
   const recommendations = generateRecommendations(findings);
   if (recommendations.length === 0) {
     console.log(
-      chalk.green("  Everything looks great! No recommendations needed."),
+      colors.mintClear.apply("  Everything looks great! No recommendations needed."),
     );
   } else {
     for (let i = 0; i < recommendations.length; i++) {
-      console.log(`  ${chalk.cyan(`${i + 1}.`)} ${recommendations[i]}`);
+      console.log(`  ${colors.vitalTeal.apply(`${i + 1}.`)} ${recommendations[i]}`);
     }
   }
 
   console.log("");
 
   // ── Footer ──────────────────────────────────────────────────────────
-  const footer = boxen(
-    chalk.dim(
-      `\n  Run ${chalk.white("bilt fix --safe")} to auto-fix safe issues\n` +
-        `  Run ${chalk.white("bilt fix")} for interactive fix mode\n` +
-        `  Run ${chalk.white("bilt watch")} for real-time monitoring\n`,
+  console.log(divider());
+  console.log("");
+  console.log(
+    colors.slateDim.dim(
+      `  Run ${text.bold("bilt fix --safe")} to auto-fix safe issues`,
     ),
-    {
-      padding: 0,
-      margin: { top: 0, bottom: 0, left: 1, right: 1 },
-      borderStyle: "round",
-      borderColor: "gray",
-    },
   );
-  console.log(footer);
+  console.log(
+    colors.slateDim.dim(
+      `  Run ${text.bold("bilt fix")} for interactive fix mode`,
+    ),
+  );
+  console.log(
+    colors.slateDim.dim(
+      `  Run ${text.bold("bilt watch")} for real-time monitoring`,
+    ),
+  );
   console.log("");
 }
 
@@ -256,7 +251,7 @@ function generateMarkdownCard(
   const barWidth = 20;
   const filled = Math.round((score / 100) * barWidth);
   const empty = barWidth - filled;
-  const bar = "█".repeat(filled) + "░".repeat(empty);
+  const bar = "\u2588".repeat(filled) + "\u2591".repeat(empty);
 
   let md = "# 🏗️ Bilt Health Report\n\n";
   md += `**Score:** ${score}/100 — **${grade}**\n\n`;
@@ -266,9 +261,9 @@ function generateMarkdownCard(
   md += "## Summary\n\n";
   md += `| Metric | Count |\n`;
   md += `|--------|-------|\n`;
-  md += `| 🔴 Critical | ${criticals} |\n`;
-  md += `| 🟡 Warning | ${warnings} |\n`;
-  md += `| 🔵 Info | ${infos} |\n`;
+  md += `| [CRITICAL] | ${criticals} |\n`;
+  md += `| [WARNING] | ${warnings} |\n`;
+  md += `| [INFO] | ${infos} |\n`;
 
   if (frameworkName) {
     md += `\n**Framework:** ${frameworkName}\n`;

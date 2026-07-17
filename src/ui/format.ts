@@ -1,108 +1,234 @@
 // ─── UI Format Utilities ─────────────────────────────────────────────────────
 // Atomic formatters used across the entire CLI output layer.
+// All color/glyph usage goes through theme.ts — no direct chalk calls here.
 
-import chalk from "chalk";
+import {
+  colors,
+  glyphs,
+  styledGlyph,
+  severityColor as themeSeverityColor,
+  severityGlyph,
+  truncatePath,
+  isPlainMode,
+  text,
+} from "./theme.js";
 import type { ScanFinding, Severity, ProviderInfo } from "../types/index.js";
 
 // ─── Severity Helpers ────────────────────────────────────────────────────────
 
 /**
- * Return the emoji icon for a severity level.
+ * Return the themed glyph for a severity level.
+ *
+ * - critical → ✖  (Pulse Coral)
+ * - warning  → ▲  (Amber Flag)
+ * - info     → ◆  (Slate Dim)
  */
 export function severityIcon(severity: Severity): string {
-  switch (severity) {
-    case "critical":
-      return "🔴";
-    case "warning":
-      return "🟡";
-    case "info":
-      return "🔵";
-  }
+  return severityGlyph(severity);
 }
 
 /**
- * Return the chalk color function for a severity level.
+ * Return the theme color function for a severity level.
+ */
+export function severityColorFn(
+  severity: Severity,
+): (text: string) => string {
+  return themeSeverityColor(severity).apply;
+}
+
+/**
+ * Compatibility wrapper returning a styling function.
  */
 export function severityColor(severity: Severity): (text: string) => string {
-  switch (severity) {
-    case "critical":
-      return (t: string) => chalk.red(t);
-    case "warning":
-      return (t: string) => chalk.yellow(t);
-    case "info":
-      return (t: string) => chalk.cyan(t);
+  return themeSeverityColor(severity).apply;
+}
+
+function getFindingHeadlineAndDetail(finding: ScanFinding): { headline: string; detail: string } {
+  const file = truncatePath(finding.file);
+  const loc = finding.line ? `${file}:${finding.line}` : file;
+
+  if (finding.severity === "passed") {
+    return {
+      headline: finding.message,
+      detail: finding.suggestion || "",
+    };
+  }
+
+  const baseName = (fp: string) => fp.split(/[\\/]/).pop() ?? fp;
+
+  switch (finding.category) {
+    case "secret-detected": {
+      const headline = finding.message;
+      let detail = loc;
+      if (finding.provider) {
+        detail += ` ${glyphs.arrow} rotate at ${finding.provider.rotationUrl}`;
+      } else if (finding.suggestion) {
+        detail += ` ${glyphs.arrow} ${finding.suggestion}`;
+      }
+      return { headline, detail };
+    }
+
+    case "env-missing": {
+      const match = finding.message.match(/process\.env\.(?<key>[A-Z_][A-Z0-9_]*)/);
+      const key = match?.groups?.["key"] ?? "Unknown key";
+      return {
+        headline: `${key} missing from env`,
+        detail: `referenced in ${loc}`,
+      };
+    }
+
+    case "env-unused": {
+      const match = finding.message.match(/Variable "(?<key>[A-Z_][A-Z0-9_]*)"/);
+      const key = match?.groups?.["key"] ?? "Unknown key";
+      return {
+        headline: `${key} defined but unused`,
+        detail: `defined in ${loc}`,
+      };
+    }
+
+    case "env-mismatch": {
+      const match = finding.message.match(/Variable "(?<key>[A-Z_][A-Z0-9_]*)" is defined in (?<fileA>[^\s]+) but missing from (?<fileB>[^\s]+)/);
+      if (match?.groups) {
+        const { key, fileA, fileB } = match.groups as { key: string; fileA: string; fileB: string };
+        return {
+          headline: `${key} missing from ${baseName(fileB)}`,
+          detail: `defined in ${baseName(fileA)}, absent from ${baseName(fileB)}`,
+        };
+      }
+      return {
+        headline: finding.message,
+        detail: `in ${loc}`,
+      };
+    }
+
+    case "env-exposed": {
+      const match = finding.message.match(/Variable "(?<key>[A-Z_][A-Z0-9_]*)" is exposed to the client bundle via (?<framework>[^\n]+) and contains a secret \((?<ruleName>[^\)]+)\)/);
+      if (match?.groups) {
+        const { key, framework, ruleName } = match.groups as { key: string; framework: string; ruleName: string };
+        return {
+          headline: `${key} exposed to client`,
+          detail: `via ${framework}, contains secret (${ruleName})`,
+        };
+      }
+      return {
+        headline: finding.message,
+        detail: `exposed in ${loc}`,
+      };
+    }
+
+    case "gitignore-missing": {
+      return {
+        headline: `${baseName(finding.file)} not ignored`,
+        detail: `secrets may be committed. Add env patterns to ${file}`,
+      };
+    }
+
+    case "plugin-finding": {
+      if (finding.id.startsWith("docker-no-dockerignore")) {
+        return {
+          headline: `No .dockerignore found`,
+          detail: `.env files may be copied into Docker image. Create one and add .env*`,
+        };
+      }
+      if (finding.id.startsWith("docker-dockerignore-env")) {
+        return {
+          headline: `.dockerignore misses .env`,
+          detail: `.dockerignore does not exclude .env files. Add .env*`,
+        };
+      }
+      if (finding.id.startsWith("docker-env-secret")) {
+        return {
+          headline: `Hardcoded key in Dockerfile`,
+          detail: `in ${loc}. Use ARG/--build-arg or mount secrets instead`,
+        };
+      }
+      if (finding.id.startsWith("terraform-gitignore-tfvars")) {
+        return {
+          headline: `*.tfvars files not ignored`,
+          detail: `in .gitignore. Add *.tfvars and *.tfvars.json to prevent commits`,
+        };
+      }
+      if (finding.id.startsWith("terraform-gitignore-dir")) {
+        return {
+          headline: `.terraform/ not ignored`,
+          detail: `in .gitignore. Add .terraform/ to exclude local state/providers`,
+        };
+      }
+      if (finding.id.startsWith("terraform-hardcoded")) {
+        return {
+          headline: `Hardcoded key in Terraform`,
+          detail: `in ${loc}. Use variables or env vars instead of hardcoding`,
+        };
+      }
+      return {
+        headline: finding.message,
+        detail: `in ${loc}`,
+      };
+    }
+
+    default: {
+      return {
+        headline: finding.message,
+        detail: `in ${loc}`,
+      };
+    }
   }
 }
 
-// ─── Finding Formatter ───────────────────────────────────────────────────────
-
 /**
- * Format a single finding as a one-line string with severity icon,
- * colored message, and file:line reference.
- *
- * Example: 🔴 AWS access key detected  config.js:12
+ * Format a single finding in either headline or detail mode.
  */
-export function formatFinding(finding: ScanFinding): string {
-  const icon = severityIcon(finding.severity);
-  const colorFn = severityColor(finding.severity);
-  const location = finding.line
-    ? chalk.dim(`${finding.file}:${finding.line}`)
-    : chalk.dim(finding.file);
-  const message = colorFn(finding.message);
+export function formatFinding(
+  finding: ScanFinding,
+  mode: "headline" | "detail" = "headline",
+): string {
+  const { headline, detail } = getFindingHeadlineAndDetail(finding);
+  const icon = styledGlyph(finding.severity);
+  const color = themeSeverityColor(finding.severity);
+  const headlineStr = `  ${icon}  ${color.bold(headline)}`;
 
-  let line = `  ${icon} ${message}  ${location}`;
-
-  if (finding.preview) {
-    line += `  ${chalk.dim(`[${finding.preview}]`)}`;
+  if (mode === "headline") {
+    return headlineStr;
+  } else {
+    const detailStr = colors.slateDim.apply(`     ${detail}`);
+    return `${headlineStr}\n${detailStr}`;
   }
-
-  return line;
 }
 
 // ─── Health Score Formatter ──────────────────────────────────────────────────
 
 /**
- * Format a health score as a colored ASCII progress bar with grade.
+ * Format a health score using the Pulse Bar.
  *
- * Example:  ████████████████████░░░  92%  A
+ * Example:  Health  ████████████████████░░░  92/100
+ *
+ * Score-color mapping:
+ *   0-39   Pulse Coral
+ *   40-74  Amber Flag
+ *   75-100 Mint Clear
  */
-export function formatHealthScore(score: number, grade: string): string {
+export function formatHealthScore(score: number): string {
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
-  const barWidth = 25;
-  const filled = Math.round((clamped / 100) * barWidth);
-  const empty = barWidth - filled;
+  const width = 25;
+  const filled = Math.round((clamped / 100) * width);
+  const empty = width - filled;
 
-  const filledChar = "█";
-  const emptyChar = "░";
-
-  const gradeColorFn = gradeColor(grade);
-  const bar =
-    gradeColorFn(filledChar.repeat(filled)) +
-    chalk.dim(emptyChar.repeat(empty));
-  const pct = gradeColorFn(`${clamped}%`);
-  const gradeLabel = gradeColorFn(chalk.bold(grade));
-
-  return `${bar}  ${pct}  ${gradeLabel}`;
-}
-
-/**
- * Determine chalk color for a letter grade.
- */
-function gradeColor(grade: string): (text: string) => string {
-  const letter = grade.charAt(0).toUpperCase();
-  switch (letter) {
-    case "A":
-      return (t: string) => chalk.green(t);
-    case "B":
-      return (t: string) => chalk.blue(t);
-    case "C":
-      return (t: string) => chalk.yellow(t);
-    case "D":
-    case "F":
-      return (t: string) => chalk.red(t);
-    default:
-      return (t: string) => chalk.white(t);
+  if (isPlainMode()) {
+    return `Health  ${"#".repeat(filled)}${".".repeat(empty)}  ${clamped}/100`;
   }
+
+  const fillColor =
+    clamped <= 39
+      ? colors.pulseCoral
+      : clamped <= 74
+        ? colors.amberFlag
+        : colors.mintClear;
+
+  const filledStr = fillColor.apply(glyphs.filledBlock.repeat(filled));
+  const emptyStr = colors.slateDim.dim(glyphs.emptyBlock.repeat(empty));
+  const scoreStr = fillColor.bold(`${clamped}/100`);
+
+  return `${filledStr}${emptyStr}  ${scoreStr}`;
 }
 
 // ─── Provider Link Formatter ─────────────────────────────────────────────────
@@ -113,10 +239,9 @@ function gradeColor(grade: string): (text: string) => string {
  * Terminals that support OSC 8 will render this as a clickable link.
  */
 export function formatProviderLink(provider: ProviderInfo): string {
-  const icon = provider.icon || "🔑";
   // OSC 8 hyperlink: \e]8;;URL\e\\LABEL\e]8;;\e\\
-  const link = `\u001B]8;;${provider.rotationUrl}\u001B\\${chalk.underline.cyan(provider.rotationUrl)}\u001B]8;;\u001B\\`;
-  return `  ${icon} ${chalk.bold(provider.displayName)}  →  Rotate: ${link}`;
+  const link = `\u001B]8;;${provider.rotationUrl}\u001B\\${colors.vitalTeal.apply(provider.rotationUrl)}\u001B]8;;\u001B\\`;
+  return `  ${colors.slateDim.apply(glyphs.info)} ${text.bold(provider.displayName)}  ${glyphs.arrow}  Rotate: ${link}`;
 }
 
 // ─── Secret Masker ───────────────────────────────────────────────────────────
@@ -148,8 +273,8 @@ export function maskSecret(value: string): string {
 
 /**
  * Simple colored diff between two strings.
- * Lines prefixed with - are colored red (removed).
- * Lines prefixed with + are colored green (added).
+ * Lines prefixed with - are colored Pulse Coral (removed).
+ * Lines prefixed with + are colored Mint Clear (added).
  * Context lines are dimmed.
  */
 export function formatDiff(before: string, after: string): string {
@@ -172,7 +297,7 @@ export function formatDiff(before: string, after: string): string {
       afterLines[ai] === lcs[li]
     ) {
       // Context line — common to both
-      output.push(chalk.dim(`  ${beforeLines[bi]}`));
+      output.push(colors.slateDim.dim(`  ${beforeLines[bi]}`));
       bi++;
       ai++;
       li++;
@@ -181,14 +306,14 @@ export function formatDiff(before: string, after: string): string {
       (li >= lcs.length || beforeLines[bi] !== lcs[li])
     ) {
       // Removed line
-      output.push(chalk.red(`- ${beforeLines[bi]}`));
+      output.push(colors.pulseCoral.apply(`- ${beforeLines[bi]}`));
       bi++;
     } else if (
       ai < afterLines.length &&
       (li >= lcs.length || afterLines[ai] !== lcs[li])
     ) {
       // Added line
-      output.push(chalk.green(`+ ${afterLines[ai]}`));
+      output.push(colors.mintClear.apply(`+ ${afterLines[ai]}`));
       ai++;
     } else {
       // Fallback safety — shouldn't happen

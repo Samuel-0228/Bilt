@@ -1,6 +1,6 @@
 // ─── Severity & Categories ───────────────────────────────────────────────────
 
-export type Severity = "critical" | "warning" | "info";
+export type Severity = "critical" | "warning" | "info" | "passed";
 
 export type FindingCategory =
   | "secret-detected"
@@ -197,6 +197,7 @@ export interface ScanOptions {
   quiet?: boolean;
   dryRun?: boolean;
   fun?: boolean;
+  details?: boolean;
 }
 
 export interface FixOptions {

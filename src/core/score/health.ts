@@ -16,6 +16,7 @@ const SEVERITY_COST: Record<Severity, number> = {
   critical: 15,
   warning: 5,
   info: 1,
+  passed: 0,
 };
 
 // ─── Grade Thresholds ────────────────────────────────────────────────────────

@@ -9,10 +9,10 @@ import {
 
 describe("UI Format Utilities", () => {
   describe("severityIcon", () => {
-    it("should return correct emojis", () => {
-      expect(severityIcon("critical")).toBe("🔴");
-      expect(severityIcon("warning")).toBe("🟡");
-      expect(severityIcon("info")).toBe("🔵");
+    it("should return correct glyphs", () => {
+      expect(severityIcon("critical")).toBe("✖");
+      expect(severityIcon("warning")).toBe("▲");
+      expect(severityIcon("info")).toBe("◆");
     });
   });
 
@@ -50,9 +50,8 @@ describe("UI Format Utilities", () => {
 
   describe("formatHealthScore", () => {
     it("should generate valid colored score bar strings", () => {
-      const output = formatHealthScore(100, "A+");
-      expect(output).toContain("100%");
-      expect(output).toContain("A+");
+      const output = formatHealthScore(100);
+      expect(output).toContain("100/100");
     });
   });
 
