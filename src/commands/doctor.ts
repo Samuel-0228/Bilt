@@ -5,7 +5,7 @@ import path from "node:path";
 import type { ScanFinding, Severity, FindingCategory } from "../types/index.js";
 import { executeScan } from "./scan.js";
 import { formatHealthScore, severityIcon, formatFinding } from "../ui/format.js";
-import { colors, glyphs, banner, pulseBar, sectionHeader, divider, summaryBox, styledGlyph, severityColor, text, ruleLine } from "../ui/theme.js";
+import { colors, glyphs, banner, pulseBar, sectionHeader, divider, summaryBox, styledGlyph, severityColor, text, ruleLine, isPlainMode } from "../ui/theme.js";
 
 /**
  * Execute the `bilt doctor` command.
@@ -42,23 +42,35 @@ export async function executeDoctor(
     return;
   }
 
+  const isPlain = isPlainMode();
+  const maybeSleep = async () => {
+    if (!isPlain) {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+  };
+
   // ── Header ──────────────────────────────────────────────────────────
   console.log("");
   console.log(banner());
+  await maybeSleep();
   console.log("");
   console.log(colors.vitalTeal.bold("  BILT DOCTOR \u2014 Comprehensive Health Report"));
+  await maybeSleep();
   console.log("");
 
   // ── Overall score ───────────────────────────────────────────────────
   console.log(sectionHeader("Overall Health"));
+  await maybeSleep();
   console.log("");
   console.log(`  ${formatHealthScore(healthScore)}`);
+  await maybeSleep();
   console.log("");
   console.log(
     colors.slateDim.dim(
       `  Scanned ${scannedFiles} files in ${duration}ms${framework ? ` • Framework: ${framework.displayName}` : ""}`,
     ),
   );
+  await maybeSleep();
   console.log("");
 
   // ── Fun mode ────────────────────────────────────────────────────────
@@ -67,15 +79,18 @@ export async function executeDoctor(
       console.log(
         colors.mintClear.bold("  Perfect score! You absolute legend!"),
       );
+      await maybeSleep();
       console.log("");
     } else if (healthScore >= 90) {
       console.log(colors.mintClear.apply("  So close to perfection — you got this!"));
+      await maybeSleep();
       console.log("");
     }
   }
 
   // ── Category breakdown ──────────────────────────────────────────────
   console.log(sectionHeader("Category Breakdown"));
+  await maybeSleep();
   console.log("");
 
   const categories: { key: FindingCategory; label: string }[] = [
@@ -113,6 +128,7 @@ export async function executeDoctor(
         `  ${colors.slateDim.apply(glyphs.info)} ${cat.label}: ${parts.join(", ")} ${colors.slateDim.dim(`(${catFindings.length} total)`)}`,
       );
     }
+    await maybeSleep();
   }
 
   console.log("");
@@ -120,6 +136,7 @@ export async function executeDoctor(
   // ── Detailed findings ───────────────────────────────────────────────
   if (findings.length > 0) {
     console.log(sectionHeader("Detailed Findings"));
+    await maybeSleep();
     console.log("");
 
     const order: Severity[] = ["critical", "warning", "info"];
@@ -131,12 +148,15 @@ export async function executeDoctor(
       console.log(
         `  ${icon} ${text.bold(sev.charAt(0).toUpperCase() + sev.slice(1))}`,
       );
+      await maybeSleep();
 
       for (const f of sevFindings) {
         const loc = f.line ? `${f.file}:${f.line}` : f.file;
         console.log(`     ${colors.slateDim.dim("›")} ${f.message}  ${colors.slateDim.dim(loc)}`);
+        await maybeSleep();
         if (f.suggestion) {
           console.log(colors.slateDim.dim(`       ${glyphs.arrow} ${f.suggestion}`));
+          await maybeSleep();
         }
       }
       console.log("");
@@ -145,6 +165,7 @@ export async function executeDoctor(
 
   // ── Recommendations ─────────────────────────────────────────────────
   console.log(sectionHeader("Recommendations"));
+  await maybeSleep();
   console.log("");
 
   const recommendations = generateRecommendations(findings);
@@ -155,6 +176,7 @@ export async function executeDoctor(
   } else {
     for (let i = 0; i < recommendations.length; i++) {
       console.log(`  ${colors.vitalTeal.apply(`${i + 1}.`)} ${recommendations[i]}`);
+      await maybeSleep();
     }
   }
 
@@ -162,22 +184,26 @@ export async function executeDoctor(
 
   // ── Footer ──────────────────────────────────────────────────────────
   console.log(divider());
+  await maybeSleep();
   console.log("");
   console.log(
     colors.slateDim.dim(
       `  Run ${text.bold("bilt fix --safe")} to auto-fix safe issues`,
     ),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(
       `  Run ${text.bold("bilt fix")} for interactive fix mode`,
     ),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(
       `  Run ${text.bold("bilt watch")} for real-time monitoring`,
     ),
   );
+  await maybeSleep();
   console.log("");
 }
 

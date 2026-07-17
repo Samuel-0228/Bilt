@@ -109,5 +109,5 @@ export async function executeUndo(projectDir: string): Promise<void> {
   // ── Restore ─────────────────────────────────────────────────────────
   await restoreSnapshot(snapshot.id, rootDir);
 
-  reportUndoComplete(snapshot);
+  await reportUndoComplete(snapshot);
 }

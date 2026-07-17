@@ -66,7 +66,7 @@ export async function executeFix(
 
   // ── Dry-run: preview only ───────────────────────────────────────────
   if (options.dryRun) {
-    reportFixPreview(actions);
+    await reportFixPreview(actions);
     console.log(colors.slateDim.dim("  (Dry run \u2014 no changes applied)"));
     console.log("");
     return;
@@ -105,7 +105,7 @@ export async function executeFix(
       return;
     }
 
-    reportFixPreview(safeActions);
+    await reportFixPreview(safeActions);
 
     let applied = 0;
     let skipped = 0;
@@ -132,12 +132,12 @@ export async function executeFix(
       }
     }
 
-    reportFixComplete(applied, skipped);
+    await reportFixComplete(applied, skipped);
     return;
   }
 
   // ── Interactive mode ────────────────────────────────────────────────
-  reportFixPreview(actions);
+  await reportFixPreview(actions);
 
   let applied = 0;
   let skipped = 0;
@@ -181,7 +181,7 @@ export async function executeFix(
     }
   }
 
-  reportFixComplete(applied, skipped);
+  await reportFixComplete(applied, skipped);
 }
 
 // ─── Fix Action Generator ────────────────────────────────────────────────────

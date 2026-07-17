@@ -2,7 +2,7 @@
 // Real-time file monitoring with instant secret & env scanning.
 
 import path from "node:path";
-import { colors, glyphs, text, sectionHeader } from "../ui/theme.js";
+import { colors, glyphs, text, sectionHeader, isPlainMode } from "../ui/theme.js";
 import type { WatchOptions, WatchEvent } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
 import { startWatcher, stopWatcher } from "../core/watch/watcher.js";
@@ -26,13 +26,16 @@ export async function executeWatch(
   if (!options.quiet) {
     console.log("");
     console.log(colors.vitalTeal.bold("  " + glyphs.info + " Bilt Watch Mode"));
+    if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
     console.log(colors.slateDim.dim("  Monitoring " + rootDir + " for changes\u2026"));
+    if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
     console.log(colors.slateDim.dim("  Press Ctrl+C to stop."));
+    if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
     console.log("");
   }
 
   // ── Start watcher ──────────────────────────────────────────────────
-  const watcher = startWatcher(rootDir, config, (event: WatchEvent) => {
+  const watcher = startWatcher(rootDir, config, async (event: WatchEvent) => {
     // Only report if there are findings or the file was deleted
     if (event.findings.length > 0 || event.type === "unlink") {
       // Map absolute path back to relative path for formatting
@@ -42,7 +45,7 @@ export async function executeWatch(
         file: path.relative(rootDir, f.file),
       }));
 
-      reportWatchEvent({
+      await reportWatchEvent({
         ...event,
         file: relativePath,
         findings: relativeFindings,

@@ -74,16 +74,34 @@ export function reportScanProgress(spinner: Spinner, message: string): void {
  * 4. Provider rotation links
  * 5. Divider + summary line + CTA
  */
-export function reportScanResults(
+// ─── Scan Results ────────────────────────────────────────────────────────────
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function maybeSleep() {
+  if (!isPlainMode()) {
+    await sleep(80);
+  }
+}
+
+/**
+ * Print the full Pulse-styled scan report:
+ * 1. Banner (BILT wordmark)
+ * 2. Pulse Bar (health score)
+ * 3. Findings
+ * 4. Summary line + CTA
+ */
+export async function reportScanResults(
   result: ScanResult,
   options: { verbose?: boolean; details?: boolean } = {},
-): void {
+): Promise<void> {
   const { findings, healthScore } = result;
 
   console.log("");
 
   // ── Banner ─────────────────────────────────────────────────────────
   console.log(banner());
+  await maybeSleep();
   console.log("");
 
   const mode = (options.verbose || options.details || isPlainMode()) ? "detail" : "headline";
@@ -93,16 +111,20 @@ export function reportScanResults(
     console.log(
       `  ${colors.mintClear.apply(glyphs.passed)} ${colors.mintClear.bold("No issues found \u2014 your project is clean")}`,
     );
+    await maybeSleep();
     console.log("");
   } else {
     for (const f of findings) {
       console.log(formatFinding(f, mode));
+      await maybeSleep();
       console.log("");
+      await maybeSleep();
     }
   }
 
   // ── Pulse Bar ──────────────────────────────────────────────────────
   console.log(pulseBar(healthScore));
+  await maybeSleep();
   console.log("");
 
   // ── Summary & CTA ──────────────────────────────────────────────────
@@ -127,6 +149,7 @@ export function reportScanResults(
   }
 
   console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
+  await maybeSleep();
   console.log("");
 }
 
@@ -135,7 +158,7 @@ export function reportScanResults(
 /**
  * Print a real-time watch notification for a file event.
  */
-export function reportWatchEvent(event: WatchEvent): void {
+export async function reportWatchEvent(event: WatchEvent): Promise<void> {
   const ts = colors.slateDim.dim(
     event.timestamp.toLocaleTimeString("en-US", { hour12: false }),
   );
@@ -144,6 +167,7 @@ export function reportWatchEvent(event: WatchEvent): void {
     console.log(
       `${ts} ${colors.mintClear.apply(glyphs.passed)} ${colors.slateDim.apply(event.file)} \u2014 clean`,
     );
+    await maybeSleep();
     return;
   }
 
@@ -153,6 +177,7 @@ export function reportWatchEvent(event: WatchEvent): void {
       `${event.file}${f.line ? `:${f.line}` : ""}`,
     );
     console.log(`${ts} ${icon} ${text.bold(f.message)}  ${loc}`);
+    await maybeSleep();
   }
 }
 
@@ -161,9 +186,10 @@ export function reportWatchEvent(event: WatchEvent): void {
 /**
  * Show a preview of all fix actions that will be applied.
  */
-export function reportFixPreview(actions: FixAction[]): void {
+export async function reportFixPreview(actions: FixAction[]): Promise<void> {
   console.log("");
   console.log(sectionHeader("Fix plan"));
+  await maybeSleep();
   console.log("");
 
   for (const action of actions) {
@@ -175,8 +201,10 @@ export function reportFixPreview(actions: FixAction[]): void {
           : colors.pulseCoral.apply(glyphs.critical);
     const typeLabel = colors.slateDim.dim(`[${action.type}]`);
     console.log(`  ${typeGlyph} ${action.description}  ${typeLabel}`);
+    await maybeSleep();
     if (action.preview) {
       console.log(colors.slateDim.dim(`      ${action.preview}`));
+      await maybeSleep();
     }
   }
 
@@ -186,13 +214,14 @@ export function reportFixPreview(actions: FixAction[]): void {
       `  ${colors.mintClear.apply(glyphs.passed)} safe  ${colors.amberFlag.apply(glyphs.warning)} destructive  ${colors.pulseCoral.apply(glyphs.critical)} irreversible`,
     ),
   );
+  await maybeSleep();
   console.log("");
 }
 
 /**
  * Report fix application summary.
  */
-export function reportFixComplete(applied: number, skipped: number): void {
+export async function reportFixComplete(applied: number, skipped: number): Promise<void> {
   console.log("");
   if (applied > 0) {
     console.log(
@@ -200,6 +229,7 @@ export function reportFixComplete(applied: number, skipped: number): void {
         `  ${glyphs.fixed} ${applied} fix${applied !== 1 ? "es" : ""} applied successfully`,
       ),
     );
+    await maybeSleep();
   }
   if (skipped > 0) {
     console.log(
@@ -207,6 +237,7 @@ export function reportFixComplete(applied: number, skipped: number): void {
         `  ${glyphs.info} ${skipped} fix${skipped !== 1 ? "es" : ""} skipped`,
       ),
     );
+    await maybeSleep();
   }
   if (applied > 0) {
     console.log(
@@ -214,6 +245,7 @@ export function reportFixComplete(applied: number, skipped: number): void {
         `  A snapshot was saved \u2014 run ${text.bold("bilt undo")} to revert`,
       ),
     );
+    await maybeSleep();
   }
   console.log("");
 }
@@ -223,21 +255,24 @@ export function reportFixComplete(applied: number, skipped: number): void {
 /**
  * Report a successful undo (snapshot restore).
  */
-export function reportUndoComplete(snapshot: Snapshot): void {
+export async function reportUndoComplete(snapshot: Snapshot): Promise<void> {
   console.log("");
   console.log(
     colors.mintClear.bold(`  ${glyphs.fixed} Undo successful`),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(
       `  Restored snapshot ${text.bold(snapshot.id)} (${snapshot.description})`,
     ),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(
       `  ${snapshot.files.length} file${snapshot.files.length !== 1 ? "s" : ""} restored`,
     ),
   );
+  await maybeSleep();
   console.log("");
 }
 
@@ -246,24 +281,23 @@ export function reportUndoComplete(snapshot: Snapshot): void {
 /**
  * Print the zero-friction onboarding summary after `bilt init`.
  */
-export function reportInitComplete(
+export async function reportInitComplete(
   result: ScanResult,
   fixesApplied: number,
-): void {
+): Promise<void> {
   console.log("");
 
-  // Banner
-  console.log(banner());
-  console.log("");
-  console.log(
-    `  ${colors.vitalTeal.bold("Welcome to Bilt")}`,
-  );
+  // Welcome text
+  console.log(colors.vitalTeal.bold("  Welcome to Bilt"));
+  await maybeSleep();
   console.log(
     colors.slateDim.dim("  Your project has been scanned and hardened."),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim("  Zero configuration needed."),
   );
+  await maybeSleep();
   console.log("");
 
   if (fixesApplied > 0) {
@@ -272,24 +306,30 @@ export function reportInitComplete(
         `  ${glyphs.fixed} ${fixesApplied} safe fix${fixesApplied !== 1 ? "es" : ""} applied automatically`,
       ),
     );
+    await maybeSleep();
   }
 
   // Delegate to the main scan results display
-  reportScanResults(result);
+  await reportScanResults(result);
 
   // Next steps
   console.log(sectionHeader("Next steps"));
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(`     ${text.bold("bilt scan")}     Full project scan`),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(`     ${text.bold("bilt fix")}      Auto-fix issues`),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(`     ${text.bold("bilt watch")}    Real-time monitoring`),
   );
+  await maybeSleep();
   console.log(
     colors.slateDim.dim(`     ${text.bold("bilt doctor")}   Detailed health report`),
   );
+  await maybeSleep();
   console.log("");
 }

@@ -2,7 +2,7 @@
 // Zero-friction onboarding: scan, auto-fix safe issues, show health card.
 
 import path from "node:path";
-import { colors, glyphs, banner, text } from "../ui/theme.js";
+import { colors, glyphs, banner, text, isPlainMode } from "../ui/theme.js";
 import { promises as fs } from "node:fs";
 import { executeScan } from "./scan.js";
 import { createSnapshot } from "../core/fix/snapshot.js";
@@ -27,11 +27,15 @@ export async function executeInit(projectDir: string): Promise<void> {
   const config = await loadConfig(rootDir);
 
   // ── Welcome banner ──────────────────────────────────────────────────
+  const isPlain = isPlainMode();
   console.log("");
   console.log(banner());
+  if (!isPlain) await new Promise((resolve) => setTimeout(resolve, 80));
   console.log("");
   console.log(colors.vitalTeal.bold("  BILT \u2014 Project Health Toolkit"));
+  if (!isPlain) await new Promise((resolve) => setTimeout(resolve, 80));
   console.log(colors.slateDim.dim("  Zero-configuration setup. One command to a healthy repo."));
+  if (!isPlain) await new Promise((resolve) => setTimeout(resolve, 80));
 
   // ── Run full scan ───────────────────────────────────────────────────
   const result = await executeScan(rootDir, {
@@ -119,5 +123,5 @@ export async function executeInit(projectDir: string): Promise<void> {
     fixesApplied > 0 ? await executeScan(rootDir, { quiet: true }) : result;
 
   // ── Report ──────────────────────────────────────────────────────────
-  reportInitComplete(updatedResult, fixesApplied);
+  await reportInitComplete(updatedResult, fixesApplied);
 }
