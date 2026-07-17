@@ -2,7 +2,7 @@
 // Restore the latest snapshot to revert changes made by `bilt fix`.
 
 import path from "node:path";
-import { colors, glyphs, text } from "../ui/theme.js";
+import { colors, glyphs, text, sectionHeader, divider } from "../ui/theme.js";
 import {
   getLatestSnapshot,
   listSnapshots,
@@ -23,11 +23,35 @@ import { promises as fs } from "node:fs";
  * 5. Restore snapshot
  * 6. Report success
  */
-export async function executeUndo(projectDir: string): Promise<void> {
+export async function executeUndo(
+  projectDir: string,
+  options: { list?: boolean } = {},
+): Promise<void> {
   const rootDir = path.resolve(projectDir);
 
   // ── List snapshots ──────────────────────────────────────────────────
   const snapshots = await listSnapshots(rootDir);
+
+  if (options.list) {
+    console.log("");
+    console.log(sectionHeader("Snapshots History (last 10)"));
+    console.log(divider());
+    if (snapshots.length === 0) {
+      console.log(colors.slateDim.dim("  No snapshots found."));
+      console.log("");
+      return;
+    }
+    const count = Math.min(snapshots.length, 10);
+    for (let i = 0; i < count; i++) {
+      const snap = snapshots[i]!;
+      const ts = new Date(snap.timestamp).toISOString().replace("T", " ").slice(0, 19);
+      console.log(
+        `  ${colors.vitalTeal.apply(snap.id)}  ${colors.slateDim.apply(ts)}  ${snap.description}`
+      );
+    }
+    console.log("");
+    return;
+  }
 
   if (snapshots.length === 0) {
     console.log("");

@@ -57,8 +57,8 @@ describe("Fix and Undo Integration Tests", () => {
     // Run undo command
     await executeUndo(tmpDir);
 
-    // Verify .gitignore is reverted back to its original content
+    // Verify .gitignore is reverted back to its original content (with .bilt/ preserved)
     const gitignoreContentAfterUndo = await fs.readFile(gitignorePath, "utf-8");
-    expect(gitignoreContentAfterUndo.trim()).toBe("node_modules");
+    expect(gitignoreContentAfterUndo.trim().replace(/\r?\n/g, "\n")).toBe("node_modules\n.bilt/");
   });
 });

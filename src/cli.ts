@@ -64,6 +64,7 @@ program
   .option("--details", "Show detailed output under each headline")
   .option("--quiet", "Suppress all output except errors")
   .option("--dry-run", "Show what would be scanned without scanning")
+  .option("--no-verify", "Disable live credential verification calls")
   .option("--fun", "Enable fun mode with celebrations")
   .action(
     async (
@@ -77,6 +78,7 @@ program
         quiet?: boolean;
         dryRun?: boolean;
         fun?: boolean;
+        verify?: boolean;
       },
     ) => {
       try {
@@ -89,6 +91,7 @@ program
           quiet: opts.quiet,
           dryRun: opts.dryRun,
           fun: opts.fun,
+          noVerify: opts.verify === false,
         });
 
         // Exit code based on findings
@@ -162,9 +165,10 @@ program
   .command("undo")
   .description("Undo the last set of changes made by bilt fix")
   .argument("[dir]", "Project directory", ".")
-  .action(async (dir: string) => {
+  .option("--list", "List the last 10 snapshots")
+  .action(async (dir: string, opts: { list?: boolean }) => {
     try {
-      await executeUndo(dir);
+      await executeUndo(dir, { list: opts.list });
     } catch (error) {
       printError(error);
       process.exitCode = 2;

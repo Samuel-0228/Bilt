@@ -22,6 +22,18 @@ import { reportFixPreview, reportFixComplete } from "../ui/reporter.js";
 import { parseEnvFile } from "../core/scan/env.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
 
+function touchesGitHistory(action: FixAction): boolean {
+  if ((action as any).touchesGitHistory) return true;
+  const desc = action.description.toLowerCase();
+  const preview = (action.preview || "").toLowerCase();
+  return (
+    desc.includes("git history") ||
+    desc.includes("rewrite history") ||
+    preview.includes("git history") ||
+    preview.includes("rewrite history")
+  );
+}
+
 /**
  * Execute the `bilt fix` command.
  *
@@ -151,7 +163,9 @@ export async function executeFix(
 
     let shouldApply = false;
 
-    if (action.type === "safe") {
+    if (touchesGitHistory(action)) {
+      shouldApply = await requireTypedConfirmation(action, "confirm");
+    } else if (action.type === "safe") {
       shouldApply = await requireSimpleConfirmation(action);
     } else if (action.type === "destructive") {
       shouldApply = await requireSimpleConfirmation(action);

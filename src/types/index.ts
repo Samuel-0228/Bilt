@@ -12,7 +12,7 @@ export type FindingCategory =
   | "framework-warning"
   | "plugin-finding";
 
-// ─── Scan Finding ────────────────────────────────────────────────────────────
+export type VerificationState = "verified-live" | "verified-dead" | "unverified";
 
 export interface ScanFinding {
   id: string;
@@ -27,6 +27,10 @@ export interface ScanFinding {
   ruleId?: string;
   /** Masked preview of the detected value */
   preview?: string;
+  /** Liveness verification state of a detected credential */
+  verificationState?: VerificationState;
+  /** Raw secret value (removed before serializing to user-facing results) */
+  secret?: string;
 }
 
 // ─── Scan Result ─────────────────────────────────────────────────────────────
@@ -198,6 +202,7 @@ export interface ScanOptions {
   dryRun?: boolean;
   fun?: boolean;
   details?: boolean;
+  noVerify?: boolean;
 }
 
 export interface FixOptions {

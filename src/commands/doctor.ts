@@ -5,7 +5,8 @@ import path from "node:path";
 import type { ScanFinding, Severity, FindingCategory } from "../types/index.js";
 import { executeScan } from "./scan.js";
 import { formatHealthScore, severityIcon, formatFinding } from "../ui/format.js";
-import { colors, glyphs, banner, pulseBar, sectionHeader, divider, summaryBox, styledGlyph, severityColor, text, ruleLine, isPlainMode } from "../ui/theme.js";
+import { colors, glyphs, banner, pulseBar, sectionHeader, divider, summaryBox, styledGlyph, severityColor, text, ruleLine, isPlainMode, showBliptBanner } from "../ui/theme.js";
+import { createRequire } from "node:module";
 
 /**
  * Execute the `bilt doctor` command.
@@ -30,15 +31,67 @@ export async function executeDoctor(
   const { findings, healthScore, grade, scannedFiles, duration, framework } =
     result;
 
-  // ── Markdown card mode ──────────────────────────────────────────────
+  // ── PNG card mode ──────────────────────────────────────────────────
   if (options.card) {
-    const md = generateMarkdownCard(
-      result.healthScore,
-      result.grade,
-      findings,
-      framework?.displayName,
-    );
-    console.log(md);
+    const repoName = path.basename(rootDir);
+    const filledWidth = Math.max(0, Math.min(800, (healthScore / 100) * 800));
+    const fillColor =
+      healthScore <= 39
+        ? "#FB7185" // Pulse Coral
+        : healthScore <= 74
+          ? "#FBBF24" // Amber Flag
+          : "#34D399"; // Mint Clear
+
+    const cardSvg = `
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0D1117" />
+  <rect x="20" y="20" width="1160" height="590" rx="20" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.15" />
+  <circle cx="150" cy="480" r="250" fill="#5EEAD4" opacity="0.03" />
+  <circle cx="1000" cy="150" r="300" fill="#5EEAD4" opacity="0.02" />
+  <text x="100" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="800" fill="#5EEAD4">
+    ${repoName}
+  </text>
+  <text x="100" y="310" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#64748B">
+    HEALTH
+  </text>
+  <rect x="100" y="340" width="800" height="40" rx="8" fill="#1E293B" />
+  <rect x="100" y="340" width="${filledWidth}" height="40" rx="8" fill="${fillColor}" />
+  <text x="930" y="374" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="${fillColor}">
+    ${healthScore}/100
+  </text>
+  <g transform="translate(100, 440) scale(0.6)">
+    <rect width="200" height="200" rx="16" fill="#0D1117" />
+    <circle cx="100" cy="100" r="80" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.15" stroke-dasharray="4 4" />
+    <circle cx="100" cy="100" r="60" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.3" />
+    <circle cx="100" cy="100" r="40" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.5" />
+    <line x1="100" y1="100" x2="156" y2="44" stroke="#5EEAD4" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+    <circle cx="100" cy="100" r="30" fill="#5EEAD4" />
+    <circle cx="90" cy="95" r="3.5" fill="#0D1117" />
+    <circle cx="110" cy="95" r="3.5" fill="#0D1117" />
+    <path d="M 88,108 L 92,108 L 95,102 L 98,114 L 102,98 L 105,110 L 108,108 L 112,108" fill="none" stroke="#0D1117" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+  <text x="240" y="515" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#64748B">
+    Scanned with Bilt
+  </text>
+  <text x="1100" y="570" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#64748B" opacity="0.4">
+    bilt.dev
+  </text>
+</svg>
+    `.trim();
+
+    try {
+      const sharp = (await import("sharp")).default;
+      const outputPath = path.join(rootDir, "bilt-health-card.png");
+      await sharp(Buffer.from(cardSvg)).png().toFile(outputPath);
+      console.log("");
+      console.log(colors.mintClear.apply("  " + glyphs.fixed + " Generated card: " + outputPath));
+      console.log("");
+      console.log(colors.slateDim.apply("  Share this card on social media:"));
+      console.log(colors.vitalTeal.bold(`  Score: ${healthScore}/100 — scanned with bilt \u2192 bilt.dev`));
+      console.log("");
+    } catch (err: any) {
+      console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Failed to generate card PNG: " + err.message));
+    }
     return;
   }
 
@@ -51,7 +104,9 @@ export async function executeDoctor(
 
   // ── Header ──────────────────────────────────────────────────────────
   console.log("");
-  console.log(banner());
+  const require = createRequire(import.meta.url);
+  const pkg = require("../../package.json") as { version: string };
+  showBliptBanner(pkg.version);
   await maybeSleep();
   console.log("");
   console.log(colors.vitalTeal.bold("  BILT DOCTOR \u2014 Comprehensive Health Report"));

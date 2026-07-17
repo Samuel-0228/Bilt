@@ -37,8 +37,11 @@ import {
   pulseBar,
   isPlainMode,
   Spinner,
+  showBliptBanner,
 } from "../ui/theme.js";
 import { formatFinding } from "../ui/format.js";
+import { VERIFIERS } from "../core/scan/verifiers/index.js";
+import { createRequire } from "node:module";
 
 // Helper to run a scan step and stream findings
 async function runScanStep(
@@ -125,8 +128,9 @@ export async function executeScan(
 
   if (!isQuiet && !isJson) {
     console.log("");
-    console.log(banner());
-    console.log("");
+    const require = createRequire(import.meta.url);
+    const pkg = require("../../package.json") as { version: string };
+    showBliptBanner(pkg.version);
   }
 
   let scannedFiles = 0;
@@ -317,6 +321,32 @@ export async function executeScan(
           // Skip
         }
 
+        // Liveness verification
+        if (options.noVerify && !isQuiet && !isJson) {
+          console.log(`  ${colors.slateDim.apply(glyphs.info)} Offline mode — live verification skipped`);
+        }
+
+        for (const finding of stepFindings) {
+          if (finding.category === "secret-detected" && finding.secret) {
+            if (options.noVerify) {
+              finding.verificationState = "unverified";
+            } else {
+              const providerName = finding.provider?.name;
+              if (providerName && VERIFIERS[providerName]) {
+                try {
+                  const state = await VERIFIERS[providerName](finding.secret);
+                  finding.verificationState = state;
+                } catch {
+                  finding.verificationState = "unverified";
+                }
+              } else {
+                finding.verificationState = "unverified";
+              }
+            }
+            delete finding.secret;
+          }
+        }
+
         return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
       },
       detailsEnabled,
@@ -350,6 +380,15 @@ export async function executeScan(
       detailsEnabled,
     );
     findings.push(...pluginsStepFindings);
+
+    // Sort verified-live findings first
+    findings.sort((a, b) => {
+      const aLive = a.category === "secret-detected" && a.verificationState === "verified-live";
+      const bLive = b.category === "secret-detected" && b.verificationState === "verified-live";
+      if (aLive && !bLive) return -1;
+      if (!aLive && bLive) return 1;
+      return 0;
+    });
 
     // Calculate final score
     // Passed findings don't count towards point deductions

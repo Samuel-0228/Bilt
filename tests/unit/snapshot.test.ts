@@ -75,4 +75,30 @@ describe("Snapshot System", () => {
     const restored = await restoreSnapshot("invalid-id", tmpDir);
     expect(restored).toBe(false);
   });
+
+  it("should automatically add .bilt/ to .gitignore", async () => {
+    const file1 = path.join(tmpDir, "test1.txt");
+    await fs.writeFile(file1, "content 1", "utf-8");
+
+    const gitignorePath = path.join(tmpDir, ".gitignore");
+    await fs.writeFile(gitignorePath, "node_modules\n", "utf-8");
+
+    await createSnapshot([file1], "Test Gitignore Auto-add", tmpDir);
+
+    const gitignoreContent = await fs.readFile(gitignorePath, "utf-8");
+    expect(gitignoreContent).toContain(".bilt/");
+  });
+
+  it("should prune snapshots keeping last 10", async () => {
+    const file1 = path.join(tmpDir, "test1.txt");
+    await fs.writeFile(file1, "content 1", "utf-8");
+
+    for (let i = 0; i < 12; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await createSnapshot([file1], `Snapshot ${i}`, tmpDir);
+    }
+
+    const all = await listSnapshots(tmpDir);
+    expect(all.length).toBe(10);
+  });
 });

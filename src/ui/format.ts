@@ -183,6 +183,31 @@ export function formatFinding(
   mode: "headline" | "detail" = "headline",
 ): string {
   const { headline, detail } = getFindingHeadlineAndDetail(finding);
+
+  if (finding.category === "secret-detected" && finding.verificationState) {
+    const state = finding.verificationState;
+    if (state === "verified-live") {
+      const icon = colors.pulseCoral.apply(glyphs.critical);
+      const boldText = colors.pulseCoral.bold(`${headline} [verified-live]`);
+      const headlineStr = `  ${icon}  ${boldText}`;
+      if (mode === "headline") return headlineStr;
+      return `${headlineStr}\n${colors.slateDim.apply(`     ${detail}`)}`;
+    } else if (state === "unverified") {
+      const icon = colors.pulseCoral.dim(glyphs.critical);
+      const boldText = colors.pulseCoral.dim(`${headline} [unverified]`);
+      const headlineStr = `  ${icon}  ${boldText}`;
+      if (mode === "headline") return headlineStr;
+      const detailStr = colors.slateDim.dim(`     ${detail}\n     (detection could not confirm liveness)`);
+      return `${headlineStr}\n${detailStr}`;
+    } else if (state === "verified-dead") {
+      const icon = colors.slateDim.dim(glyphs.critical);
+      const boldText = colors.slateDim.dim(`${headline} [verified-dead]`);
+      const headlineStr = `  ${icon}  ${boldText}`;
+      if (mode === "headline") return headlineStr;
+      return `${headlineStr}\n${colors.slateDim.dim(`     ${detail}`)}`;
+    }
+  }
+
   const icon = styledGlyph(finding.severity);
   const color = themeSeverityColor(finding.severity);
   const headlineStr = `  ${icon}  ${color.bold(headline)}`;

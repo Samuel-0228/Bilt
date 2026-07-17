@@ -158,6 +158,39 @@ export function banner(): string {
   return BANNER_LINES.map((line) => colors.vitalTeal.bold(line)).join("\n");
 }
 
+// ─── BliptBanner Mascot Startup Glyph ────────────────────────────────────────
+
+let _bliptBannerShown = false;
+
+export function resetBliptBannerSeen(): void {
+  _bliptBannerShown = false;
+}
+
+export function showBliptBanner(version: string): void {
+  if (_bliptBannerShown || _plainMode) return;
+  _bliptBannerShown = true;
+  console.log(bliptBanner(version));
+  console.log("");
+}
+
+export function bliptBanner(version: string): string {
+  if (_plainMode) {
+    return `bilt v${version} · scanning your project…`;
+  }
+  const teal = colors.vitalTeal;
+  const dim = colors.slateDim;
+  const lines = [
+    `    ${teal.apply("╭─────╮")}`,
+    `   ${teal.apply("⟨ ◉   ◉ ⟩")}    ${teal.bold("bilt")}`,
+    `    ${teal.apply("╰╌◡╌╌╯")}      ${dim.apply(`v${version} · scanning your project…`)}`,
+  ];
+  return lines.join("\n");
+}
+
+// Copy strings
+export const SNAPSHOT_NOTICE = "A snapshot will be saved — undo anytime with 'bilt undo'.";
+
+
 // ─── Pulse Bar ───────────────────────────────────────────────────────────────
 // Segmented health-score meter. Filled segments color-shift by score range:
 // 0-39 Pulse Coral, 40-74 Amber Flag, 75-100 Mint Clear.
