@@ -158,7 +158,7 @@ export function banner(): string {
   return BANNER_LINES.map((line) => colors.vitalTeal.bold(line)).join("\n");
 }
 
-// ─── BliptBanner Mascot Startup Glyph ────────────────────────────────────────
+// ─── Startup Banner seen tracking ───────────────────────────────────────────
 
 let _bliptBannerShown = false;
 
@@ -169,22 +169,8 @@ export function resetBliptBannerSeen(): void {
 export function showBliptBanner(version: string): void {
   if (_bliptBannerShown || _plainMode) return;
   _bliptBannerShown = true;
-  console.log(bliptBanner(version));
+  console.log(banner());
   console.log("");
-}
-
-export function bliptBanner(version: string): string {
-  if (_plainMode) {
-    return `bilt v${version} · scanning your project…`;
-  }
-  const teal = colors.vitalTeal;
-  const dim = colors.slateDim;
-  const lines = [
-    `    ${teal.apply("╭─────╮")}`,
-    `   ${teal.apply("⟨ ◉   ◉ ⟩")}    ${teal.bold("bilt")}`,
-    `    ${teal.apply("╰╌◡╌╌╯")}      ${dim.apply(`v${version} · scanning your project…`)}`,
-  ];
-  return lines.join("\n");
 }
 
 // Copy strings

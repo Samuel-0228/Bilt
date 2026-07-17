@@ -59,20 +59,6 @@ export async function executeDoctor(
   <text x="930" y="374" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="${fillColor}">
     ${healthScore}/100
   </text>
-  <g transform="translate(100, 440) scale(0.6)">
-    <rect width="200" height="200" rx="16" fill="#0D1117" />
-    <circle cx="100" cy="100" r="80" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.15" stroke-dasharray="4 4" />
-    <circle cx="100" cy="100" r="60" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.3" />
-    <circle cx="100" cy="100" r="40" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.5" />
-    <line x1="100" y1="100" x2="156" y2="44" stroke="#5EEAD4" stroke-width="2" stroke-linecap="round" opacity="0.8" />
-    <circle cx="100" cy="100" r="30" fill="#5EEAD4" />
-    <circle cx="90" cy="95" r="3.5" fill="#0D1117" />
-    <circle cx="110" cy="95" r="3.5" fill="#0D1117" />
-    <path d="M 88,108 L 92,108 L 95,102 L 98,114 L 102,98 L 105,110 L 108,108 L 112,108" fill="none" stroke="#0D1117" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-  </g>
-  <text x="240" y="515" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#64748B">
-    Scanned with Bilt
-  </text>
   <text x="1100" y="570" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#64748B" opacity="0.4">
     bilt.dev
   </text>
