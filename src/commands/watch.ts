@@ -2,7 +2,7 @@
 // Real-time file monitoring with instant secret & env scanning.
 
 import path from "node:path";
-import chalk from "chalk";
+import { colors, glyphs, text, sectionHeader, isPlainMode } from "../ui/theme.js";
 import type { WatchOptions, WatchEvent } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
 import { startWatcher, stopWatcher } from "../core/watch/watcher.js";
@@ -25,40 +25,51 @@ export async function executeWatch(
   // ── Status banner ───────────────────────────────────────────────────
   if (!options.quiet) {
     console.log("");
-    console.log(chalk.cyan.bold("  👁️  Bilt Watch Mode"));
-    console.log(chalk.dim(`  Monitoring ${rootDir} for changes…`));
-    console.log(chalk.dim("  Press Ctrl+C to stop."));
+    console.log(colors.vitalTeal.bold("  " + glyphs.info + " Bilt Watch Mode"));
+    if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
+    console.log(colors.slateDim.dim("  Monitoring " + rootDir + " for changes\u2026"));
+    if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
+    console.log(colors.slateDim.dim("  Press Ctrl+C to stop."));
+    if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
     console.log("");
   }
 
   // ── Start watcher ──────────────────────────────────────────────────
-  const watcher = startWatcher(rootDir, config, (event: WatchEvent) => {
-    // Only report if there are findings or the file was deleted
-    if (event.findings.length > 0 || event.type === "unlink") {
-      // Map absolute path back to relative path for formatting
-      const relativePath = path.relative(rootDir, event.file);
-      const relativeFindings = event.findings.map((f) => ({
-        ...f,
-        file: path.relative(rootDir, f.file),
-      }));
+  const watcher = startWatcher(
+    rootDir,
+    config,
+    async (event: WatchEvent) => {
+      // Only report if there are findings or the file was deleted
+      if (event.findings.length > 0 || event.type === "unlink") {
+        // Map absolute path back to relative path for formatting
+        const relativePath = path.relative(rootDir, event.file);
+        const relativeFindings = event.findings.map((f) => ({
+          ...f,
+          file: path.relative(rootDir, f.file),
+        }));
 
-      reportWatchEvent({
-        ...event,
-        file: relativePath,
-        findings: relativeFindings,
-      });
-    }
-  });
+        await reportWatchEvent({
+          ...event,
+          file: relativePath,
+          findings: relativeFindings,
+        });
+      }
+    },
+    {
+      debounce: options.debounce,
+      poll: options.poll,
+    },
+  );
 
   // ── Graceful shutdown ──────────────────────────────────────────────
   const cleanup = async (): Promise<void> => {
     if (!options.quiet) {
       console.log("");
-      console.log(chalk.dim("  Stopping watcher…"));
+      console.log(colors.slateDim.dim("  Stopping watcher\u2026"));
     }
     await stopWatcher(watcher);
     if (!options.quiet) {
-      console.log(chalk.green("  ✓ Watcher stopped."));
+      console.log(colors.mintClear.apply("  " + glyphs.fixed + " Watcher stopped."));
       console.log("");
     }
     process.exit(0);

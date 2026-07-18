@@ -11,6 +11,7 @@
 
 import Enquirer from "enquirer";
 import type { FixAction } from "../../types/index.js";
+import { SNAPSHOT_NOTICE } from "../../ui/theme.js";
 
 // enquirer's CJS default export needs this accessor in ESM
 const enquirer = new Enquirer();
@@ -44,6 +45,7 @@ export async function requireTypedConfirmation(
     name: "confirm",
     message:
       `⚠️  This action is IRREVERSIBLE: ${action.description}\n` +
+      `   ${SNAPSHOT_NOTICE}\n` +
       `   Type "${fileName}" to confirm:`,
   })) as { confirm: string };
 
@@ -71,7 +73,7 @@ export async function requireSimpleConfirmation(
   const response = (await enquirer.prompt({
     type: "confirm",
     name: "confirm",
-    message: `Apply fix: ${action.description}?`,
+    message: `Apply fix: ${action.description}?\n  ${SNAPSHOT_NOTICE}`,
     initial: false,
   })) as { confirm: boolean };
 

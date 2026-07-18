@@ -2,11 +2,11 @@
 // Comprehensive health report with detailed breakdown and recommendations.
 
 import path from "node:path";
-import chalk from "chalk";
-import boxen from "boxen";
 import type { ScanFinding, Severity, FindingCategory } from "../types/index.js";
 import { executeScan } from "./scan.js";
-import { formatHealthScore, severityIcon } from "../ui/format.js";
+import { formatHealthScore, severityIcon, formatFinding } from "../ui/format.js";
+import { colors, glyphs, banner, pulseBar, sectionHeader, divider, summaryBox, styledGlyph, severityColor, text, ruleLine, isPlainMode, showBliptBanner } from "../ui/theme.js";
+import { createRequire } from "node:module";
 
 /**
  * Execute the `bilt doctor` command.
@@ -31,77 +31,125 @@ export async function executeDoctor(
   const { findings, healthScore, grade, scannedFiles, duration, framework } =
     result;
 
-  // ── Markdown card mode ──────────────────────────────────────────────
+  // ── PNG card mode ──────────────────────────────────────────────────
   if (options.card) {
-    const md = generateMarkdownCard(
-      result.healthScore,
-      result.grade,
-      findings,
-      framework?.displayName,
-    );
-    console.log(md);
+    const repoName = path.basename(rootDir);
+    const filledWidth = Math.max(0, Math.min(800, (healthScore / 100) * 800));
+    const fillColor =
+      healthScore <= 39
+        ? "#FB7185" // Pulse Coral
+        : healthScore <= 74
+          ? "#FBBF24" // Amber Flag
+          : "#34D399"; // Mint Clear
+
+    const cardSvg = `
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0D1117" />
+  <rect x="20" y="20" width="1160" height="590" rx="20" fill="none" stroke="#5EEAD4" stroke-width="1.5" stroke-opacity="0.15" />
+  <circle cx="150" cy="480" r="250" fill="#5EEAD4" opacity="0.03" />
+  <circle cx="1000" cy="150" r="300" fill="#5EEAD4" opacity="0.02" />
+  <text x="100" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="800" fill="#5EEAD4">
+    ${repoName}
+  </text>
+  <text x="100" y="310" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#64748B">
+    HEALTH
+  </text>
+  <rect x="100" y="340" width="800" height="40" rx="8" fill="#1E293B" />
+  <rect x="100" y="340" width="${filledWidth}" height="40" rx="8" fill="${fillColor}" />
+  <text x="930" y="374" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="${fillColor}">
+    ${healthScore}/100
+  </text>
+  <text x="1100" y="570" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#64748B" opacity="0.4">
+    bilt.dev
+  </text>
+</svg>
+    `.trim();
+
+    try {
+      const sharp = (await import("sharp")).default;
+      const outputPath = path.join(rootDir, "bilt-health-card.png");
+      await sharp(Buffer.from(cardSvg)).png().toFile(outputPath);
+      console.log("");
+      console.log(colors.mintClear.apply("  " + glyphs.fixed + " Generated card: " + outputPath));
+      console.log("");
+      console.log(colors.slateDim.apply("  Share this card on social media:"));
+      console.log(colors.vitalTeal.bold(`  Score: ${healthScore}/100 — scanned with bilt \u2192 bilt.dev`));
+      console.log("");
+    } catch (err: any) {
+      console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Failed to generate card PNG: " + err.message));
+    }
     return;
   }
 
+  const isPlain = isPlainMode();
+  const maybeSleep = async () => {
+    if (!isPlain) {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+  };
+
   // ── Header ──────────────────────────────────────────────────────────
   console.log("");
-  const header = boxen(
-    `\n${chalk.bold.cyan("  🏗️  BILT DOCTOR — Comprehensive Health Report")}\n`,
-    {
-      padding: 0,
-      margin: { top: 0, bottom: 0, left: 1, right: 1 },
-      borderStyle: "round",
-      borderColor: "cyan",
-    },
-  );
-  console.log(header);
+  const require = createRequire(import.meta.url);
+  const pkg = require("../../package.json") as { version: string };
+  showBliptBanner(pkg.version);
+  await maybeSleep();
+  console.log("");
+  console.log(colors.vitalTeal.bold("  BILT DOCTOR \u2014 Comprehensive Health Report"));
+  await maybeSleep();
   console.log("");
 
   // ── Overall score ───────────────────────────────────────────────────
-  console.log(chalk.bold("  📊 Overall Health"));
+  console.log(sectionHeader("Overall Health"));
+  await maybeSleep();
   console.log("");
-  console.log(`  ${formatHealthScore(healthScore, grade)}`);
+  console.log(`  ${formatHealthScore(healthScore)}`);
+  await maybeSleep();
   console.log("");
   console.log(
-    chalk.dim(
+    colors.slateDim.dim(
       `  Scanned ${scannedFiles} files in ${duration}ms${framework ? ` • Framework: ${framework.displayName}` : ""}`,
     ),
   );
+  await maybeSleep();
   console.log("");
 
   // ── Fun mode ────────────────────────────────────────────────────────
   if (options.fun) {
     if (healthScore === 100) {
       console.log(
-        chalk.bold.green("  🎉🏆🎉 PERFECT SCORE! You absolute legend! 🎉🏆🎉"),
+        colors.mintClear.bold("  Perfect score! You absolute legend!"),
       );
+      await maybeSleep();
       console.log("");
     } else if (healthScore >= 90) {
-      console.log(chalk.green("  🔥 So close to perfection — you got this!"));
+      console.log(colors.mintClear.apply("  So close to perfection — you got this!"));
+      await maybeSleep();
       console.log("");
     }
   }
 
   // ── Category breakdown ──────────────────────────────────────────────
-  console.log(chalk.bold("  📋 Category Breakdown"));
+  console.log(sectionHeader("Category Breakdown"));
+  await maybeSleep();
   console.log("");
 
-  const categories: { key: FindingCategory; label: string; icon: string }[] = [
-    { key: "secret-detected", label: "Secret Detection", icon: "🔐" },
-    { key: "env-missing", label: "Missing Env Vars", icon: "📦" },
-    { key: "env-unused", label: "Unused Env Vars", icon: "🗑️" },
-    { key: "env-mismatch", label: "Env Mismatches", icon: "🔀" },
-    { key: "env-exposed", label: "Client-Exposed Secrets", icon: "🌐" },
-    { key: "gitignore-missing", label: ".gitignore Coverage", icon: "📄" },
-    { key: "framework-warning", label: "Framework Warnings", icon: "⚙️" },
-    { key: "plugin-finding", label: "Plugin Findings", icon: "🔌" },
+  const categories: { key: FindingCategory; label: string }[] = [
+    { key: "secret-detected", label: "Secret Detection" },
+    { key: "env-missing", label: "Missing Env Vars" },
+    { key: "env-unused", label: "Unused Env Vars" },
+    { key: "env-mismatch", label: "Env Mismatches" },
+    { key: "env-exposed", label: "Client-Exposed Secrets" },
+    { key: "gitignore-missing", label: ".gitignore Coverage" },
+    { key: "framework-warning", label: "Framework Warnings" },
+    { key: "plugin-finding", label: "Plugin Findings" },
   ];
 
   for (const cat of categories) {
     const catFindings = findings.filter((f) => f.category === cat.key);
     if (catFindings.length === 0) {
       console.log(
-        chalk.green(`  ${cat.icon} ${cat.label}: ${chalk.bold("Clean")} ✓`),
+        colors.mintClear.apply(`  ${colors.slateDim.apply(glyphs.info)} ${cat.label}: ${text.bold("Clean")} ${glyphs.fixed}`),
       );
     } else {
       const critCount = catFindings.filter(
@@ -113,21 +161,23 @@ export async function executeDoctor(
       const infoCount = catFindings.filter((f) => f.severity === "info").length;
 
       const parts: string[] = [];
-      if (critCount > 0) parts.push(chalk.red(`${critCount} critical`));
-      if (warnCount > 0) parts.push(chalk.yellow(`${warnCount} warning`));
-      if (infoCount > 0) parts.push(chalk.cyan(`${infoCount} info`));
+      if (critCount > 0) parts.push(colors.pulseCoral.apply(`${critCount} critical`));
+      if (warnCount > 0) parts.push(colors.amberFlag.apply(`${warnCount} warning`));
+      if (infoCount > 0) parts.push(colors.vitalTeal.apply(`${infoCount} info`));
 
       console.log(
-        `  ${cat.icon} ${cat.label}: ${parts.join(", ")} ${chalk.dim(`(${catFindings.length} total)`)}`,
+        `  ${colors.slateDim.apply(glyphs.info)} ${cat.label}: ${parts.join(", ")} ${colors.slateDim.dim(`(${catFindings.length} total)`)}`,
       );
     }
+    await maybeSleep();
   }
 
   console.log("");
 
   // ── Detailed findings ───────────────────────────────────────────────
   if (findings.length > 0) {
-    console.log(chalk.bold("  🔍 Detailed Findings"));
+    console.log(sectionHeader("Detailed Findings"));
+    await maybeSleep();
     console.log("");
 
     const order: Severity[] = ["critical", "warning", "info"];
@@ -137,14 +187,17 @@ export async function executeDoctor(
 
       const icon = severityIcon(sev);
       console.log(
-        `  ${icon} ${chalk.bold(sev.charAt(0).toUpperCase() + sev.slice(1))}`,
+        `  ${icon} ${text.bold(sev.charAt(0).toUpperCase() + sev.slice(1))}`,
       );
+      await maybeSleep();
 
       for (const f of sevFindings) {
         const loc = f.line ? `${f.file}:${f.line}` : f.file;
-        console.log(`     ${chalk.dim("›")} ${f.message}  ${chalk.dim(loc)}`);
+        console.log(`     ${colors.slateDim.dim("›")} ${f.message}  ${colors.slateDim.dim(loc)}`);
+        await maybeSleep();
         if (f.suggestion) {
-          console.log(chalk.dim(`       💡 ${f.suggestion}`));
+          console.log(colors.slateDim.dim(`       ${glyphs.arrow} ${f.suggestion}`));
+          await maybeSleep();
         }
       }
       console.log("");
@@ -152,37 +205,46 @@ export async function executeDoctor(
   }
 
   // ── Recommendations ─────────────────────────────────────────────────
-  console.log(chalk.bold("  💡 Recommendations"));
+  console.log(sectionHeader("Recommendations"));
+  await maybeSleep();
   console.log("");
 
   const recommendations = generateRecommendations(findings);
   if (recommendations.length === 0) {
     console.log(
-      chalk.green("  Everything looks great! No recommendations needed."),
+      colors.mintClear.apply("  Everything looks great! No recommendations needed."),
     );
   } else {
     for (let i = 0; i < recommendations.length; i++) {
-      console.log(`  ${chalk.cyan(`${i + 1}.`)} ${recommendations[i]}`);
+      console.log(`  ${colors.vitalTeal.apply(`${i + 1}.`)} ${recommendations[i]}`);
+      await maybeSleep();
     }
   }
 
   console.log("");
 
   // ── Footer ──────────────────────────────────────────────────────────
-  const footer = boxen(
-    chalk.dim(
-      `\n  Run ${chalk.white("bilt fix --safe")} to auto-fix safe issues\n` +
-        `  Run ${chalk.white("bilt fix")} for interactive fix mode\n` +
-        `  Run ${chalk.white("bilt watch")} for real-time monitoring\n`,
+  console.log(divider());
+  await maybeSleep();
+  console.log("");
+  console.log(
+    colors.slateDim.dim(
+      `  Run ${text.bold("bilt fix --safe")} to auto-fix safe issues`,
     ),
-    {
-      padding: 0,
-      margin: { top: 0, bottom: 0, left: 1, right: 1 },
-      borderStyle: "round",
-      borderColor: "gray",
-    },
   );
-  console.log(footer);
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(
+      `  Run ${text.bold("bilt fix")} for interactive fix mode`,
+    ),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(
+      `  Run ${text.bold("bilt watch")} for real-time monitoring`,
+    ),
+  );
+  await maybeSleep();
   console.log("");
 }
 
@@ -256,7 +318,7 @@ function generateMarkdownCard(
   const barWidth = 20;
   const filled = Math.round((score / 100) * barWidth);
   const empty = barWidth - filled;
-  const bar = "█".repeat(filled) + "░".repeat(empty);
+  const bar = "\u2588".repeat(filled) + "\u2591".repeat(empty);
 
   let md = "# 🏗️ Bilt Health Report\n\n";
   md += `**Score:** ${score}/100 — **${grade}**\n\n`;
@@ -266,9 +328,9 @@ function generateMarkdownCard(
   md += "## Summary\n\n";
   md += `| Metric | Count |\n`;
   md += `|--------|-------|\n`;
-  md += `| 🔴 Critical | ${criticals} |\n`;
-  md += `| 🟡 Warning | ${warnings} |\n`;
-  md += `| 🔵 Info | ${infos} |\n`;
+  md += `| [CRITICAL] | ${criticals} |\n`;
+  md += `| [WARNING] | ${warnings} |\n`;
+  md += `| [INFO] | ${infos} |\n`;
 
   if (frameworkName) {
     md += `\n**Framework:** ${frameworkName}\n`;

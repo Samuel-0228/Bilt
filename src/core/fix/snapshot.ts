@@ -106,11 +106,75 @@ async function hydrateSnapshot(
  * @param projectDir  Root directory of the project.
  * @returns The created Snapshot.
  */
+async function ensureGitignored(projectDir: string): Promise<void> {
+  const gitignorePath = path.join(projectDir, ".gitignore");
+  let content = "";
+  try {
+    content = await fs.readFile(gitignorePath, "utf-8");
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
+  }
+
+  const lines = content.split(/\r?\n/);
+  const hasBilt = lines.some((line) => {
+    const trimmed = line.trim();
+    return (
+      trimmed === ".bilt" ||
+      trimmed === ".bilt/" ||
+      trimmed === "**/.bilt" ||
+      trimmed === "**/.bilt/"
+    );
+  });
+
+  if (!hasBilt) {
+    const suffix = content.endsWith("\n") || content === "" ? "" : "\n";
+    await fs.writeFile(gitignorePath, content + suffix + ".bilt/\n", "utf-8");
+  }
+}
+
+async function pruneSnapshots(projectDir: string): Promise<void> {
+  const snapshots = await listSnapshots(projectDir);
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+  for (let i = 0; i < snapshots.length; i++) {
+    const snapshot = snapshots[i]!;
+    const age = new Date(snapshot.timestamp).getTime();
+    const dir = snapshotDir(projectDir, snapshot.id);
+
+    if (age < sevenDaysAgo || i >= 10) {
+      try {
+        await fs.rm(dir, { recursive: true, force: true });
+      } catch {
+        // Ignore deletion failure
+      }
+    }
+  }
+}
+
+/**
+ * Create a snapshot of the specified files.
+ *
+ * Copies each file into `.bilt/snapshots/<id>/files/` preserving relative
+ * paths, and writes a `manifest.json` describing the snapshot.
+ *
+ * @param files       Absolute paths of files to snapshot.
+ * @param description Human-readable description (e.g. "Before gitignore fix").
+ * @param projectDir  Root directory of the project.
+ * @returns The created Snapshot.
+ */
 export async function createSnapshot(
   files: string[],
   description: string,
   projectDir: string,
 ): Promise<Snapshot> {
+  // Ensure the snapshots directory is in .gitignore
+  try {
+    await ensureGitignored(projectDir);
+  } catch {
+    // Ignore gitignore writing failures
+  }
+
   const id = generateId();
   const dir = snapshotDir(projectDir, id);
   const filesDir = path.join(dir, "files");
@@ -153,12 +217,21 @@ export async function createSnapshot(
     "utf-8",
   );
 
-  return {
+  const created: Snapshot = {
     id,
     timestamp,
     description,
     files: snapshotFiles,
   };
+
+  // Prune snapshots (keeps last 10, deletes anything older than 7 days)
+  try {
+    await pruneSnapshots(projectDir);
+  } catch {
+    // Ignore pruning failure
+  }
+
+  return created;
 }
 
 /**

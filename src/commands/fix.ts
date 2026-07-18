@@ -2,7 +2,7 @@
 // Scans for issues, generates fix actions, and applies them interactively.
 
 import path from "node:path";
-import chalk from "chalk";
+import { colors, glyphs, sectionHeader, text } from "../ui/theme.js";
 import Enquirer from "enquirer";
 import { promises as fs } from "node:fs";
 import type { FixOptions, FixAction, ScanFinding } from "../types/index.js";
@@ -21,6 +21,18 @@ import {
 import { reportFixPreview, reportFixComplete } from "../ui/reporter.js";
 import { parseEnvFile } from "../core/scan/env.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
+
+function touchesGitHistory(action: FixAction): boolean {
+  if ((action as any).touchesGitHistory) return true;
+  const desc = action.description.toLowerCase();
+  const preview = (action.preview || "").toLowerCase();
+  return (
+    desc.includes("git history") ||
+    desc.includes("rewrite history") ||
+    preview.includes("git history") ||
+    preview.includes("rewrite history")
+  );
+}
 
 /**
  * Execute the `bilt fix` command.
@@ -45,7 +57,7 @@ export async function executeFix(
 
   if (result.findings.length === 0) {
     console.log("");
-    console.log(chalk.green.bold("  ✨ No issues found — nothing to fix!"));
+    console.log(colors.mintClear.bold("  " + glyphs.passed + " No issues found \u2014 nothing to fix"));
     console.log("");
     return;
   }
@@ -56,8 +68,8 @@ export async function executeFix(
   if (actions.length === 0) {
     console.log("");
     console.log(
-      chalk.yellow(
-        "  ⚠ Issues found but no automated fixes available. Review manually.",
+      colors.amberFlag.apply(
+        "  " + glyphs.warning + " Issues found but no automated fixes available. Review manually.",
       ),
     );
     console.log("");
@@ -66,8 +78,8 @@ export async function executeFix(
 
   // ── Dry-run: preview only ───────────────────────────────────────────
   if (options.dryRun) {
-    reportFixPreview(actions);
-    console.log(chalk.dim("  (Dry run — no changes applied)"));
+    await reportFixPreview(actions);
+    console.log(colors.slateDim.dim("  (Dry run \u2014 no changes applied)"));
     console.log("");
     return;
   }
@@ -97,15 +109,15 @@ export async function executeFix(
     if (safeActions.length === 0) {
       console.log("");
       console.log(
-        chalk.yellow(
-          "  ⚠ No safe fixes available. Run without --safe for interactive mode.",
+        colors.amberFlag.apply(
+          "  " + glyphs.warning + " No safe fixes available. Run without --safe for interactive mode.",
         ),
       );
       console.log("");
       return;
     }
 
-    reportFixPreview(safeActions);
+    await reportFixPreview(safeActions);
 
     let applied = 0;
     let skipped = 0;
@@ -116,7 +128,7 @@ export async function executeFix(
         if (success) {
           applied++;
           if (options.verbose) {
-            console.log(chalk.green(`    ✓ ${action.description}`));
+            console.log(colors.mintClear.apply("    " + glyphs.fixed + " " + action.description));
           }
         } else {
           skipped++;
@@ -126,32 +138,34 @@ export async function executeFix(
         if (options.verbose) {
           const msg = error instanceof Error ? error.message : String(error);
           console.log(
-            chalk.red(`    ✗ Failed: ${action.description} (${msg})`),
+            colors.pulseCoral.apply("    " + glyphs.critical + " Failed: " + action.description + " (" + msg + ")"),
           );
         }
       }
     }
 
-    reportFixComplete(applied, skipped);
+    await reportFixComplete(applied, skipped);
     return;
   }
 
   // ── Interactive mode ────────────────────────────────────────────────
-  reportFixPreview(actions);
+  await reportFixPreview(actions);
 
   let applied = 0;
   let skipped = 0;
 
   for (const action of actions) {
     console.log("");
-    console.log(chalk.bold(`  ${action.description}`));
+    console.log(text.bold("  " + action.description));
     if (action.preview) {
-      console.log(chalk.dim(`  ${action.preview}`));
+      console.log(colors.slateDim.dim("  " + action.preview));
     }
 
     let shouldApply = false;
 
-    if (action.type === "safe") {
+    if (touchesGitHistory(action)) {
+      shouldApply = await requireTypedConfirmation(action, "confirm");
+    } else if (action.type === "safe") {
       shouldApply = await requireSimpleConfirmation(action);
     } else if (action.type === "destructive") {
       shouldApply = await requireSimpleConfirmation(action);
@@ -165,23 +179,23 @@ export async function executeFix(
         const success = await action.apply();
         if (success) {
           applied++;
-          console.log(chalk.green("    ✓ Applied"));
+          console.log(colors.mintClear.apply("    " + glyphs.fixed + " Applied"));
         } else {
           skipped++;
-          console.log(chalk.yellow("    ⏭  Skipped (failed to apply)"));
+          console.log(colors.amberFlag.apply("    " + glyphs.info + " Skipped (failed to apply)"));
         }
       } catch (error) {
         skipped++;
         const msg = error instanceof Error ? error.message : String(error);
-        console.log(chalk.red(`    ✗ Error: ${msg}`));
+        console.log(colors.pulseCoral.apply("    " + glyphs.critical + " Error: " + msg));
       }
     } else {
       skipped++;
-      console.log(chalk.dim("    ⏭  Skipped"));
+      console.log(colors.slateDim.dim("    " + glyphs.info + " Skipped"));
     }
   }
 
-  reportFixComplete(applied, skipped);
+  await reportFixComplete(applied, skipped);
 }
 
 // ─── Fix Action Generator ────────────────────────────────────────────────────
@@ -300,13 +314,13 @@ async function generateFixActions(
             // We can't auto-remove secrets safely — this needs manual review
             // But we can offer to add the file to .gitignore
             console.log(
-              chalk.yellow(
-                `    ℹ  Please manually remove the secret from ${finding.file}`,
+              colors.amberFlag.apply(
+                "    " + glyphs.info + "  Please manually remove the secret from " + finding.file,
               ),
             );
             console.log(
-              chalk.dim(
-                `    Move the value to a .env file and reference it via an environment variable.`,
+              colors.slateDim.dim(
+                "    Move the value to a .env file and reference it via an environment variable.",
               ),
             );
             return true;
@@ -327,8 +341,8 @@ async function generateFixActions(
             "Ensure this env var should be exposed to the client bundle",
           apply: async () => {
             console.log(
-              chalk.yellow(
-                `    ℹ  Review ${finding.file} — this value is exposed to the client.`,
+              colors.amberFlag.apply(
+                "    " + glyphs.info + "  Review " + finding.file + " \u2014 this value is exposed to the client.",
               ),
             );
             return true;

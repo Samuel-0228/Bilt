@@ -193,6 +193,7 @@ export function scanFileForSecrets(
         provider,
         ruleId: rule.id,
         preview: maskValue(matchedValue),
+        secret: matchedValue,
       });
     }
   }

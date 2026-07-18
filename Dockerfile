@@ -19,8 +19,8 @@ RUN npm run build
 # ─── Production Stage ──────────────────────────────────────────────────────────
 FROM node:20-alpine
 
-# Install git, which is required for history scanning in bilt
-RUN apk add --no-cache git
+# Install git, which is required for history scanning in bilt (with retries for network resilience)
+RUN apk add --no-cache git || (sleep 5 && apk add --no-cache git) || (sleep 10 && apk add --no-cache git)
 
 WORKDIR /app
 

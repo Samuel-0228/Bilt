@@ -86,7 +86,7 @@ describe("CLI Binary Integration Tests", () => {
       expect(true).toBe(false);
     } catch (err: any) {
       expect(err.exitCode).toBe(1);
-      expect(err.stdout).toContain("Critical");
+      expect(err.stdout).toContain("issue");
     }
   });
 });

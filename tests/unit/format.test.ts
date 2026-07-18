@@ -5,14 +5,15 @@ import {
   maskSecret,
   formatHealthScore,
   formatProviderLink,
+  formatFinding,
 } from "../../src/ui/format.js";
 
 describe("UI Format Utilities", () => {
   describe("severityIcon", () => {
-    it("should return correct emojis", () => {
-      expect(severityIcon("critical")).toBe("🔴");
-      expect(severityIcon("warning")).toBe("🟡");
-      expect(severityIcon("info")).toBe("🔵");
+    it("should return correct glyphs", () => {
+      expect(severityIcon("critical")).toBe("✖");
+      expect(severityIcon("warning")).toBe("▲");
+      expect(severityIcon("info")).toBe("◆");
     });
   });
 
@@ -50,9 +51,8 @@ describe("UI Format Utilities", () => {
 
   describe("formatHealthScore", () => {
     it("should generate valid colored score bar strings", () => {
-      const output = formatHealthScore(100, "A+");
-      expect(output).toContain("100%");
-      expect(output).toContain("A+");
+      const output = formatHealthScore(100);
+      expect(output).toContain("100/100");
     });
   });
 
@@ -68,6 +68,68 @@ describe("UI Format Utilities", () => {
       const output = formatProviderLink(provider);
       expect(output).toContain("Stripe");
       expect(output).toContain("https://dashboard.stripe.com/apikeys");
+    });
+  });
+
+  describe("formatFinding", () => {
+    const mockFinding = {
+      id: "env-missing-production",
+      file: ".env",
+      line: 5,
+      severity: "warning" as const,
+      category: "env-mismatch" as const,
+      message: "STRIPE_KEY missing from .env.production",
+      matchedValue: "STRIPE_KEY",
+    };
+
+    it("should format standard finding headline", () => {
+      const result = formatFinding(mockFinding, "headline");
+      expect(result).toContain("STRIPE_KEY missing from .env.production");
+    });
+
+    it("should format standard finding detail", () => {
+      const result = formatFinding(mockFinding, "detail");
+      expect(result).toContain("STRIPE_KEY missing from .env.production");
+      expect(result).toContain(".env");
+    });
+
+    it("should format verified-live secret", () => {
+      const secretFinding = {
+        ...mockFinding,
+        category: "secret-detected" as const,
+        verificationState: "verified-live" as const,
+      };
+      const result1 = formatFinding(secretFinding, "headline");
+      expect(result1).toContain("[verified-live]");
+
+      const result2 = formatFinding(secretFinding, "detail");
+      expect(result2).toContain("[verified-live]");
+    });
+
+    it("should format unverified secret", () => {
+      const secretFinding = {
+        ...mockFinding,
+        category: "secret-detected" as const,
+        verificationState: "unverified" as const,
+      };
+      const result1 = formatFinding(secretFinding, "headline");
+      expect(result1).toContain("[unverified]");
+
+      const result2 = formatFinding(secretFinding, "detail");
+      expect(result2).toContain("[unverified]");
+    });
+
+    it("should format verified-dead secret", () => {
+      const secretFinding = {
+        ...mockFinding,
+        category: "secret-detected" as const,
+        verificationState: "verified-dead" as const,
+      };
+      const result1 = formatFinding(secretFinding, "headline");
+      expect(result1).toContain("[verified-dead]");
+
+      const result2 = formatFinding(secretFinding, "detail");
+      expect(result2).toContain("[verified-dead]");
     });
   });
 });

@@ -1,10 +1,22 @@
-// ─── Reporter — Stunning Terminal Output ─────────────────────────────────────
-// Renders every piece of user-visible CLI output.
+// ─── Reporter — Pulse Terminal Output ────────────────────────────────────────
+// Renders every piece of user-visible CLI output using the Pulse design system.
+// No direct chalk/boxen/ora calls — everything goes through theme.ts.
 
-import chalk from "chalk";
-import ora from "ora";
-import boxen from "boxen";
-import type { Ora } from "ora";
+import {
+  colors,
+  glyphs,
+  banner,
+  pulseBar,
+  sectionHeader,
+  ruleLine,
+  divider,
+  summaryBox,
+  styledGlyph,
+  severityColor,
+  text,
+  Spinner,
+  isPlainMode,
+} from "./theme.js";
 import type {
   ScanResult,
   ScanFinding,
@@ -12,190 +24,132 @@ import type {
   FixAction,
   Snapshot,
   Severity,
+  FindingCategory,
 } from "../types/index.js";
-import {
-  formatFinding,
-  formatHealthScore,
-  formatProviderLink,
-  severityIcon,
-} from "./format.js";
+import { formatFinding, formatProviderLink } from "./format.js";
+
+// ─── Category Display Config ─────────────────────────────────────────────────
+
+interface CategoryGroup {
+  label: string;
+  categories: FindingCategory[];
+}
+
+const CATEGORY_GROUPS: CategoryGroup[] = [
+  {
+    label: "Environment variables",
+    categories: ["env-missing", "env-unused", "env-mismatch", "env-exposed"],
+  },
+  { label: "Secrets", categories: ["secret-detected"] },
+  { label: ".gitignore", categories: ["gitignore-missing"] },
+  { label: "Framework", categories: ["framework-warning"] },
+  { label: "Plugins", categories: ["plugin-finding"] },
+];
 
 // ─── Scan Lifecycle ──────────────────────────────────────────────────────────
 
 /**
- * Start a scan spinner — returns the ora instance for later updates.
+ * Start a scan spinner — returns a Spinner instance for later updates.
  */
-export function reportScanStart(projectDir: string): Ora {
-  const spinner = ora({
-    text: chalk.cyan(`Scanning project ${chalk.bold(projectDir)}…`),
-    spinner: "dots12",
-    color: "cyan",
-  }).start();
+export function reportScanStart(projectDir: string): Spinner {
+  const spinner = new Spinner(`Scanning project ${projectDir}\u2026`);
+  spinner.start();
   return spinner;
 }
 
 /**
  * Update the spinner text mid-scan.
  */
-export function reportScanProgress(spinner: Ora, message: string): void {
-  spinner.text = chalk.cyan(message);
+export function reportScanProgress(spinner: Spinner, message: string): void {
+  spinner.text = message;
 }
 
 // ─── Scan Results ────────────────────────────────────────────────────────────
 
 /**
- * Print a comprehensive, beautiful scan report with findings grouped by
- * severity and a framed health card.
+ * Print the full Pulse-styled scan report:
+ * 1. Banner (BILT wordmark)
+ * 2. Pulse Bar (health score)
+ * 3. Findings grouped by category
+ * 4. Provider rotation links
+ * 5. Divider + summary line + CTA
  */
-export function reportScanResults(
+// ─── Scan Results ────────────────────────────────────────────────────────────
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function maybeSleep() {
+  if (!isPlainMode()) {
+    await sleep(80);
+  }
+}
+
+/**
+ * Print the full Pulse-styled scan report:
+ * 1. Banner (BILT wordmark)
+ * 2. Pulse Bar (health score)
+ * 3. Findings
+ * 4. Summary line + CTA
+ */
+export async function reportScanResults(
   result: ScanResult,
-  options: { fun?: boolean; verbose?: boolean } = {},
-): void {
-  const { findings, healthScore, grade, scannedFiles, duration, framework } =
-    result;
+  options: { verbose?: boolean; details?: boolean } = {},
+): Promise<void> {
+  const { findings, healthScore } = result;
 
   console.log("");
 
-  // ── Group findings by severity ───────────────────────────────────────
-  const grouped = groupBySeverity(findings);
+  // ── Banner ─────────────────────────────────────────────────────────
+  console.log(banner());
+  await maybeSleep();
+  console.log("");
 
+  const mode = (options.verbose || options.details || isPlainMode()) ? "detail" : "headline";
+
+  // ── Findings ───────────────────────────────────────────────────────
   if (findings.length === 0) {
     console.log(
-      chalk.green.bold("  ✨ No issues found — your project is squeaky clean!"),
+      `  ${colors.mintClear.apply(glyphs.passed)} ${colors.mintClear.bold("No issues found \u2014 your project is clean")}`,
     );
+    await maybeSleep();
     console.log("");
   } else {
-    // Print critical first, then warning, then info
-    const order: Severity[] = ["critical", "warning", "info"];
-    for (const sev of order) {
-      const group = grouped.get(sev);
-      if (!group || group.length === 0) continue;
-
-      const icon = severityIcon(sev);
-      const label = sev.charAt(0).toUpperCase() + sev.slice(1);
-      console.log(
-        `  ${icon} ${chalk.bold(label)} ${chalk.dim(`(${group.length})`)}`,
-      );
-
-      for (const f of group) {
-        console.log(formatFinding(f));
-        if (options.verbose && f.suggestion) {
-          console.log(chalk.dim(`      💡 ${f.suggestion}`));
-        }
-      }
+    for (const f of findings) {
+      console.log(formatFinding(f, mode));
+      await maybeSleep();
       console.log("");
+      await maybeSleep();
     }
   }
 
-  // ── Provider rotation links for secrets ──────────────────────────────
-  const providers = new Map<string, ScanFinding>();
-  for (const f of findings) {
-    if (f.provider && !providers.has(f.provider.name)) {
-      providers.set(f.provider.name, f);
-    }
-  }
-  if (providers.size > 0) {
-    console.log(chalk.bold("  🔑 Rotate compromised keys:"));
-    for (const [, f] of providers) {
-      if (f.provider) {
-        console.log(formatProviderLink(f.provider));
-      }
-    }
-    console.log("");
-  }
+  // ── Pulse Bar ──────────────────────────────────────────────────────
+  console.log(pulseBar(healthScore));
+  await maybeSleep();
+  console.log("");
 
-  // ── Health card ──────────────────────────────────────────────────────
-  const healthBar = formatHealthScore(healthScore, grade);
-
-  const criticalCount = grouped.get("critical")?.length ?? 0;
-  const warningCount = grouped.get("warning")?.length ?? 0;
-  const envMissing = findings.filter(
-    (f) => f.category === "env-missing",
+  // ── Summary & CTA ──────────────────────────────────────────────────
+  const criticalCount = findings.filter(
+    (f) => f.severity === "critical",
   ).length;
-  const gitignoreOk =
-    findings.filter((f) => f.category === "gitignore-missing").length === 0;
-  const secretsClean = criticalCount === 0;
+  const warningCount = findings.filter(
+    (f) => f.severity === "warning",
+  ).length;
+  const issuesCount = criticalCount + warningCount;
 
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(chalk.bold("  🏗️  BILT HEALTH REPORT"));
-  lines.push("");
-  lines.push(
-    `  Score: ${chalk.bold(String(healthScore))}/100              ${chalk.bold(grade)}`,
-  );
-  lines.push(`  ${healthBar}`);
-  lines.push("");
-
-  // Status lines
-  if (secretsClean) {
-    lines.push(chalk.green("  ✓ Secrets: Clean"));
+  const parts: string[] = [];
+  if (issuesCount === 0) {
+    parts.push(colors.mintClear.apply("all clear"));
   } else {
-    lines.push(chalk.red(`  ✗ Secrets: ${criticalCount} found`));
+    parts.push(colors.pulseCoral.apply(`${issuesCount} issue${issuesCount > 1 ? "s" : ""}`));
   }
 
-  if (envMissing === 0) {
-    lines.push(chalk.green("  ✓ Env vars: All present"));
-  } else {
-    lines.push(chalk.yellow(`  ⚠ Env vars: ${envMissing} missing`));
+  parts.push(colors.slateDim.apply("bilt fix"));
+  if (mode !== "detail") {
+    parts.push(colors.slateDim.apply("bilt scan --details"));
   }
 
-  if (gitignoreOk) {
-    lines.push(chalk.green("  ✓ .gitignore: OK"));
-  } else {
-    lines.push(chalk.yellow("  ⚠ .gitignore: Needs attention"));
-  }
-
-  if (framework) {
-    lines.push(chalk.green(`  ✓ Framework: ${framework.displayName} detected`));
-  }
-
-  lines.push("");
-  lines.push(chalk.dim(`  Scanned ${scannedFiles} files in ${duration}ms`));
-  lines.push("");
-
-  // Fun mode extras
-  if (options.fun) {
-    if (healthScore === 100) {
-      lines.push(
-        chalk.bold.green(
-          "  🎉🎉🎉 PERFECT SCORE! You are a security legend! 🎉🎉🎉",
-        ),
-      );
-      lines.push("");
-    } else if (healthScore >= 90) {
-      lines.push(chalk.green("  🔥 Almost there — keep the streak alive!"));
-      lines.push("");
-    } else if (healthScore >= 70) {
-      lines.push(
-        chalk.yellow("  💪 Not bad! A few tweaks and you'll be golden."),
-      );
-      lines.push("");
-    } else {
-      lines.push(chalk.red("  🩹 Time to roll up those sleeves."));
-      lines.push("");
-    }
-  }
-
-  if (warningCount > 0 && criticalCount === 0) {
-    lines.push(chalk.dim("  Run `bilt fix` to auto-fix safe issues."));
-    lines.push("");
-  } else if (criticalCount > 0) {
-    lines.push(
-      chalk.dim("  Run `bilt fix --safe` to fix what can be safely automated."),
-    );
-    lines.push("");
-  }
-
-  const card = boxen(lines.join("\n"), {
-    padding: 0,
-    margin: { top: 0, bottom: 0, left: 1, right: 1 },
-    borderStyle: "round",
-    borderColor:
-      healthScore >= 90 ? "green" : healthScore >= 70 ? "yellow" : "red",
-    dimBorder: false,
-  });
-
-  console.log(card);
+  console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
+  await maybeSleep();
   console.log("");
 }
 
@@ -204,21 +158,26 @@ export function reportScanResults(
 /**
  * Print a real-time watch notification for a file event.
  */
-export function reportWatchEvent(event: WatchEvent): void {
-  const ts = chalk.dim(
+export async function reportWatchEvent(event: WatchEvent): Promise<void> {
+  const ts = colors.slateDim.dim(
     event.timestamp.toLocaleTimeString("en-US", { hour12: false }),
   );
 
   if (event.findings.length === 0) {
-    console.log(`${ts} ${chalk.green("✓")} ${chalk.dim(event.file)} — clean`);
+    console.log(
+      `${ts} ${colors.mintClear.apply(glyphs.passed)} ${colors.slateDim.apply(event.file)} \u2014 clean`,
+    );
+    await maybeSleep();
     return;
   }
 
   for (const f of event.findings) {
-    const icon = severityIcon(f.severity);
-    console.log(
-      `${ts} ${icon} ${chalk.bold(f.message)}  ${chalk.dim(`${event.file}${f.line ? `:${f.line}` : ""}`)}`,
+    const icon = styledGlyph(f.severity);
+    const loc = colors.slateDim.apply(
+      `${event.file}${f.line ? `:${f.line}` : ""}`,
     );
+    console.log(`${ts} ${icon} ${text.bold(f.message)}  ${loc}`);
+    await maybeSleep();
   }
 }
 
@@ -227,55 +186,66 @@ export function reportWatchEvent(event: WatchEvent): void {
 /**
  * Show a preview of all fix actions that will be applied.
  */
-export function reportFixPreview(actions: FixAction[]): void {
+export async function reportFixPreview(actions: FixAction[]): Promise<void> {
   console.log("");
-  console.log(chalk.bold("  📋 Fix Plan"));
+  console.log(sectionHeader("Fix plan"));
+  await maybeSleep();
   console.log("");
 
   for (const action of actions) {
-    const typeIcon =
+    const typeGlyph =
       action.type === "safe"
-        ? chalk.green("●")
+        ? colors.mintClear.apply(glyphs.passed)
         : action.type === "destructive"
-          ? chalk.yellow("●")
-          : chalk.red("●");
-    const typeLabel = chalk.dim(`[${action.type}]`);
-    console.log(`  ${typeIcon} ${action.description}  ${typeLabel}`);
+          ? colors.amberFlag.apply(glyphs.warning)
+          : colors.pulseCoral.apply(glyphs.critical);
+    const typeLabel = colors.slateDim.dim(`[${action.type}]`);
+    console.log(`  ${typeGlyph} ${action.description}  ${typeLabel}`);
+    await maybeSleep();
     if (action.preview) {
-      console.log(chalk.dim(`      ${action.preview}`));
+      console.log(colors.slateDim.dim(`      ${action.preview}`));
+      await maybeSleep();
     }
   }
 
   console.log("");
   console.log(
-    chalk.dim(
-      `  ${chalk.green("●")} safe  ${chalk.yellow("●")} destructive  ${chalk.red("●")} irreversible`,
+    colors.slateDim.dim(
+      `  ${colors.mintClear.apply(glyphs.passed)} safe  ${colors.amberFlag.apply(glyphs.warning)} destructive  ${colors.pulseCoral.apply(glyphs.critical)} irreversible`,
     ),
   );
+  await maybeSleep();
   console.log("");
 }
 
 /**
  * Report fix application summary.
  */
-export function reportFixComplete(applied: number, skipped: number): void {
+export async function reportFixComplete(applied: number, skipped: number): Promise<void> {
   console.log("");
   if (applied > 0) {
     console.log(
-      chalk.green.bold(
-        `  ✅ ${applied} fix${applied !== 1 ? "es" : ""} applied successfully.`,
+      colors.mintClear.bold(
+        `  ${glyphs.fixed} ${applied} fix${applied !== 1 ? "es" : ""} applied successfully`,
       ),
     );
+    await maybeSleep();
   }
   if (skipped > 0) {
     console.log(
-      chalk.yellow(`  ⏭  ${skipped} fix${skipped !== 1 ? "es" : ""} skipped.`),
+      colors.amberFlag.apply(
+        `  ${glyphs.info} ${skipped} fix${skipped !== 1 ? "es" : ""} skipped`,
+      ),
     );
+    await maybeSleep();
   }
   if (applied > 0) {
     console.log(
-      chalk.dim("  A snapshot was saved — run `bilt undo` to revert."),
+      colors.slateDim.dim(
+        `  A snapshot was saved \u2014 run ${text.bold("bilt undo")} to revert`,
+      ),
     );
+    await maybeSleep();
   }
   console.log("");
 }
@@ -285,19 +255,24 @@ export function reportFixComplete(applied: number, skipped: number): void {
 /**
  * Report a successful undo (snapshot restore).
  */
-export function reportUndoComplete(snapshot: Snapshot): void {
+export async function reportUndoComplete(snapshot: Snapshot): Promise<void> {
   console.log("");
-  console.log(chalk.green.bold("  ⏪ Undo successful!"));
   console.log(
-    chalk.dim(
-      `  Restored snapshot ${chalk.white(snapshot.id)} (${snapshot.description})`,
+    colors.mintClear.bold(`  ${glyphs.fixed} Undo successful`),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(
+      `  Restored snapshot ${text.bold(snapshot.id)} (${snapshot.description})`,
     ),
   );
+  await maybeSleep();
   console.log(
-    chalk.dim(
-      `  ${snapshot.files.length} file${snapshot.files.length !== 1 ? "s" : ""} restored.`,
+    colors.slateDim.dim(
+      `  ${snapshot.files.length} file${snapshot.files.length !== 1 ? "s" : ""} restored`,
     ),
   );
+  await maybeSleep();
   console.log("");
 }
 
@@ -306,55 +281,55 @@ export function reportUndoComplete(snapshot: Snapshot): void {
 /**
  * Print the zero-friction onboarding summary after `bilt init`.
  */
-export function reportInitComplete(
+export async function reportInitComplete(
   result: ScanResult,
   fixesApplied: number,
-): void {
+): Promise<void> {
   console.log("");
 
-  const banner = boxen(
-    `\n${chalk.bold.cyan("  🏗️  Welcome to Bilt!")}\n\n` +
-      chalk.dim("  Your project has been scanned and hardened.\n") +
-      chalk.dim("  Zero configuration needed.\n"),
-    {
-      padding: 0,
-      margin: { top: 0, bottom: 0, left: 1, right: 1 },
-      borderStyle: "round",
-      borderColor: "cyan",
-    },
+  // Welcome text
+  console.log(colors.vitalTeal.bold("  Welcome to Bilt"));
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim("  Your project has been scanned and hardened."),
   );
-  console.log(banner);
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim("  Zero configuration needed."),
+  );
+  await maybeSleep();
   console.log("");
 
   if (fixesApplied > 0) {
     console.log(
-      chalk.green(
-        `  ✅ ${fixesApplied} safe fix${fixesApplied !== 1 ? "es" : ""} applied automatically.`,
+      colors.mintClear.apply(
+        `  ${glyphs.fixed} ${fixesApplied} safe fix${fixesApplied !== 1 ? "es" : ""} applied automatically`,
       ),
     );
+    await maybeSleep();
   }
 
-  // Delegate to the main health card
-  reportScanResults(result, { fun: true });
+  // Delegate to the main scan results display
+  await reportScanResults(result);
 
-  console.log(chalk.bold("  🚀 Next steps:"));
-  console.log(chalk.dim("     bilt scan     Full project scan"));
-  console.log(chalk.dim("     bilt fix      Auto-fix issues"));
-  console.log(chalk.dim("     bilt watch    Real-time monitoring"));
-  console.log(chalk.dim("     bilt doctor   Detailed health report"));
+  // Next steps
+  console.log(sectionHeader("Next steps"));
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(`     ${text.bold("bilt scan")}     Full project scan`),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(`     ${text.bold("bilt fix")}      Auto-fix issues`),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(`     ${text.bold("bilt watch")}    Real-time monitoring`),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(`     ${text.bold("bilt doctor")}   Detailed health report`),
+  );
+  await maybeSleep();
   console.log("");
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function groupBySeverity(
-  findings: ScanFinding[],
-): Map<Severity, ScanFinding[]> {
-  const map = new Map<Severity, ScanFinding[]>();
-  for (const f of findings) {
-    const list = map.get(f.severity) ?? [];
-    list.push(f);
-    map.set(f.severity, list);
-  }
-  return map;
 }

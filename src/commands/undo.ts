@@ -2,7 +2,7 @@
 // Restore the latest snapshot to revert changes made by `bilt fix`.
 
 import path from "node:path";
-import chalk from "chalk";
+import { colors, glyphs, text, sectionHeader, divider } from "../ui/theme.js";
 import {
   getLatestSnapshot,
   listSnapshots,
@@ -23,17 +23,41 @@ import { promises as fs } from "node:fs";
  * 5. Restore snapshot
  * 6. Report success
  */
-export async function executeUndo(projectDir: string): Promise<void> {
+export async function executeUndo(
+  projectDir: string,
+  options: { list?: boolean } = {},
+): Promise<void> {
   const rootDir = path.resolve(projectDir);
 
   // ── List snapshots ──────────────────────────────────────────────────
   const snapshots = await listSnapshots(rootDir);
 
+  if (options.list) {
+    console.log("");
+    console.log(sectionHeader("Snapshots History (last 10)"));
+    console.log(divider());
+    if (snapshots.length === 0) {
+      console.log(colors.slateDim.dim("  No snapshots found."));
+      console.log("");
+      return;
+    }
+    const count = Math.min(snapshots.length, 10);
+    for (let i = 0; i < count; i++) {
+      const snap = snapshots[i]!;
+      const ts = new Date(snap.timestamp).toISOString().replace("T", " ").slice(0, 19);
+      console.log(
+        `  ${colors.vitalTeal.apply(snap.id)}  ${colors.slateDim.apply(ts)}  ${snap.description}`
+      );
+    }
+    console.log("");
+    return;
+  }
+
   if (snapshots.length === 0) {
     console.log("");
-    console.log(chalk.yellow("  ⚠ No snapshots found. Nothing to undo."));
+    console.log(colors.amberFlag.apply("  " + glyphs.warning + " No snapshots found. Nothing to undo."));
     console.log(
-      chalk.dim(
+      colors.slateDim.dim(
         "  Snapshots are created automatically when `bilt fix` or `bilt init` makes changes.",
       ),
     );
@@ -46,20 +70,20 @@ export async function executeUndo(projectDir: string): Promise<void> {
 
   if (!snapshot) {
     console.log("");
-    console.log(chalk.yellow("  ⚠ Could not load the latest snapshot."));
+    console.log(colors.amberFlag.apply("  " + glyphs.warning + " Could not load the latest snapshot."));
     console.log("");
     return;
   }
 
   // ── Preview changes ─────────────────────────────────────────────────
   console.log("");
-  console.log(chalk.bold(`  ⏪ Snapshot: ${chalk.cyan(snapshot.id)}`));
-  console.log(chalk.dim(`  ${snapshot.description}`));
+  console.log(text.bold("  " + glyphs.info + " Snapshot: " + colors.vitalTeal.apply(snapshot.id)));
+  console.log(colors.slateDim.dim("  " + snapshot.description));
   console.log(
-    chalk.dim(`  Created: ${new Date(snapshot.timestamp).toLocaleString()}`),
+    colors.slateDim.dim("  Created: " + new Date(snapshot.timestamp).toLocaleString()),
   );
   console.log("");
-  console.log(chalk.bold("  Files to restore:"));
+  console.log(text.bold("  Files to restore:"));
 
   for (const file of snapshot.files) {
     const fullPath = path.join(rootDir, file.path);
@@ -73,7 +97,7 @@ export async function executeUndo(projectDir: string): Promise<void> {
     const hasChanged = currentContent !== file.content;
 
     if (hasChanged) {
-      console.log(chalk.yellow(`    ↻ ${file.path}`));
+      console.log(colors.amberFlag.apply("    " + glyphs.warning + " " + file.path));
 
       // Show brief diff
       const diff = formatDiff(currentContent, file.content);
@@ -82,10 +106,10 @@ export async function executeUndo(projectDir: string): Promise<void> {
         console.log(`      ${line}`);
       }
       if (diff.split("\n").length > 8) {
-        console.log(chalk.dim(`      … and more`));
+        console.log(colors.slateDim.dim("      ... and more"));
       }
     } else {
-      console.log(chalk.dim(`    ✓ ${file.path} (unchanged)`));
+      console.log(colors.slateDim.dim("    " + glyphs.fixed + " " + file.path + " (unchanged)"));
     }
   }
 
@@ -101,7 +125,7 @@ export async function executeUndo(projectDir: string): Promise<void> {
   });
 
   if (!confirmed) {
-    console.log(chalk.dim("  Undo cancelled."));
+    console.log(colors.slateDim.dim("  Undo cancelled."));
     console.log("");
     return;
   }
@@ -109,5 +133,5 @@ export async function executeUndo(projectDir: string): Promise<void> {
   // ── Restore ─────────────────────────────────────────────────────────
   await restoreSnapshot(snapshot.id, rootDir);
 
-  reportUndoComplete(snapshot);
+  await reportUndoComplete(snapshot);
 }

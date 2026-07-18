@@ -34,7 +34,7 @@ describe("Doctor Integration Tests", () => {
     logSpy.mockRestore();
   });
 
-  it("should run doctor with --card and output markdown summary", async () => {
+  it("should run doctor with --card and generate a PNG card", async () => {
     await createLeakyFixtureProject(tmpDir);
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -43,9 +43,13 @@ describe("Doctor Integration Tests", () => {
 
     expect(logSpy).toHaveBeenCalled();
     const calls = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
-    expect(calls).toContain("# 🏗️ Bilt Health Report");
-    expect(calls).toContain("**Score:**");
-    expect(calls).toContain("## Summary");
+    expect(calls).toContain("Generated card:");
+    expect(calls).toContain("Score:");
+    expect(calls).toContain("scanned with bilt");
+
+    const cardPath = path.join(tmpDir, "bilt-health-card.png");
+    const exists = await fs.stat(cardPath).then(() => true).catch(() => false);
+    expect(exists).toBe(true);
 
     logSpy.mockRestore();
   });

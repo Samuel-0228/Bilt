@@ -125,6 +125,7 @@ export function startWatcher(
   projectDir: string,
   config: BiltConfig,
   onEvent: (event: WatchEvent) => void,
+  options: { debounce?: number; poll?: boolean } = {},
 ): WatcherHandle {
   // Merge user-configured ignore patterns with defaults
   const ignorePatterns = [...IGNORED_PATTERNS, ...config.ignore];
@@ -136,6 +137,7 @@ export function startWatcher(
     ignored: ignorePatterns,
     persistent: true,
     ignoreInitial: true,
+    usePolling: options.poll || undefined,
     awaitWriteFinish: {
       stabilityThreshold: 200,
       pollInterval: 100,
@@ -178,11 +180,12 @@ export function startWatcher(
   };
 
   // Create debounced handler
+  const debounceMs = options.debounce ?? DEFAULT_DEBOUNCE_MS;
   const debouncedProcess = debounce(
     (eventType: "add" | "change", filePath: string) => {
       void processFile(eventType, filePath);
     },
-    DEFAULT_DEBOUNCE_MS,
+    debounceMs,
   );
 
   // Attach event handlers
