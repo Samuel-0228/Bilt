@@ -175,6 +175,25 @@ function getFindingHeadlineAndDetail(finding: ScanFinding): { headline: string; 
   }
 }
 
+function renderFiveQuestions(finding: ScanFinding, defaultDetail: string): string {
+  if (!finding.knowledge) return `     ${defaultDetail}`;
+  
+  const k = finding.knowledge;
+  const fixable = finding.suggestion?.toLowerCase().includes("rotate") ? "yes → bilt fix" : "no → manual";
+  // The default detail often includes rotation URLs, we just want the location prefix
+  const loc = defaultDetail.split(" ")[0];
+  
+  const lines = [
+    `     loc         ${loc}`,
+    `     what        ${k.whatItIs}`,
+    `     why         ${k.why}`,
+    `     confidence  ${finding.confidence ?? "low"}`,
+    `     do next     ${k.action}`,
+    `     fixable     ${fixable}`
+  ];
+  return lines.join("\n");
+}
+
 /**
  * Format a single finding in either headline or detail mode.
  */
@@ -191,20 +210,20 @@ export function formatFinding(
       const boldText = colors.pulseCoral.bold(`${headline} [verified-live]`);
       const headlineStr = `  ${icon}  ${boldText}`;
       if (mode === "headline") return headlineStr;
-      return `${headlineStr}\n${colors.slateDim.apply(`     ${detail}`)}`;
+      return `${headlineStr}\n${colors.slateDim.apply(renderFiveQuestions(finding, detail))}`;
     } else if (state === "unverified") {
       const icon = colors.pulseCoral.dim(glyphs.critical);
       const boldText = colors.pulseCoral.dim(`${headline} [unverified]`);
       const headlineStr = `  ${icon}  ${boldText}`;
       if (mode === "headline") return headlineStr;
-      const detailStr = colors.slateDim.dim(`     ${detail}\n     (detection could not confirm liveness)`);
+      const detailStr = colors.slateDim.dim(`${renderFiveQuestions(finding, detail)}\n     (detection could not confirm liveness)`);
       return `${headlineStr}\n${detailStr}`;
     } else if (state === "verified-dead") {
       const icon = colors.slateDim.dim(glyphs.critical);
       const boldText = colors.slateDim.dim(`${headline} [verified-dead]`);
       const headlineStr = `  ${icon}  ${boldText}`;
       if (mode === "headline") return headlineStr;
-      return `${headlineStr}\n${colors.slateDim.dim(`     ${detail}`)}`;
+      return `${headlineStr}\n${colors.slateDim.dim(renderFiveQuestions(finding, detail))}`;
     }
   }
 
@@ -215,7 +234,7 @@ export function formatFinding(
   if (mode === "headline") {
     return headlineStr;
   } else {
-    const detailStr = colors.slateDim.apply(`     ${detail}`);
+    const detailStr = colors.slateDim.apply(renderFiveQuestions(finding, detail));
     return `${headlineStr}\n${detailStr}`;
   }
 }

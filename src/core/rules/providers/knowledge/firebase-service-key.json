@@ -1,0 +1,9 @@
+{
+  "provider": "Firebase",
+  "type": "service_account",
+  "whatItIs": "Firebase Admin Service Account Key",
+  "why": "Grants privileged administrative access to Firebase services bypassing client rules",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and delete key in Google Cloud Console",
+  "docsUrl": "https://firebase.google.com/docs/admin/setup"
+}

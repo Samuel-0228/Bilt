@@ -1,0 +1,9 @@
+{
+  "provider": "Stripe",
+  "type": "restricted_key",
+  "whatItIs": "Stripe restricted key",
+  "why": "Anyone with this key can perform restricted API operations",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and roll the key in Stripe Dashboard",
+  "docsUrl": "https://stripe.com/docs/keys"
+}

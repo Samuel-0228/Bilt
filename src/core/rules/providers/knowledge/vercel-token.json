@@ -1,0 +1,9 @@
+{
+  "provider": "Vercel",
+  "type": "api_token",
+  "whatItIs": "API token for Vercel deployment and account management",
+  "why": "Allows an attacker to deploy code, change environment variables, or delete projects",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and revoke token in Vercel Account Settings",
+  "docsUrl": "https://vercel.com/docs/rest-api/openapi"
+}

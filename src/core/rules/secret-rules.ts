@@ -54,7 +54,7 @@ export const SECRET_RULES: SecretRule[] = [
   {
     id: "stripe-publishable-key",
     name: "Stripe Publishable Key",
-    pattern: /pk_(live|test)_[a-zA-Z0-9]{24,}/g,
+    pattern: /pk_(?:live|test)_[a-zA-Z0-9]{24,}/g,
     provider: "stripe",
     severity: "info",
     description:
@@ -63,7 +63,7 @@ export const SECRET_RULES: SecretRule[] = [
   {
     id: "stripe-restricted-key",
     name: "Stripe Restricted Key",
-    pattern: /rk_(live|test)_[a-zA-Z0-9]{24,}/g,
+    pattern: /rk_(?:live|test)_[a-zA-Z0-9]{24,}/g,
     provider: "stripe",
     severity: "critical",
     description: "Stripe restricted key with custom permissions.",
@@ -97,6 +97,92 @@ export const SECRET_RULES: SecretRule[] = [
     provider: "slack",
     severity: "critical",
     description: "Slack bot, user, or app token.",
+  },
+
+  // ── Supabase ─────────────────────────────────────────────────────────
+  {
+    id: "supabase-service-role",
+    name: "Supabase Service Role Key",
+    pattern: /eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/g, // We'll refine this or use generic JWT + context, but for now we'll rely on env-var keys for supabase
+    provider: "supabase",
+    severity: "critical",
+    description: "Supabase service role JWT",
+  },
+  {
+    id: "supabase-anon-key",
+    name: "Supabase Anon Key",
+    pattern: /eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*/g,
+    provider: "supabase",
+    severity: "info",
+    description: "Supabase anonymous client key",
+  },
+
+  // ── Anthropic ────────────────────────────────────────────────────────
+  {
+    id: "anthropic-api-key",
+    name: "Anthropic API Key",
+    pattern: /sk-ant-api[0-9a-zA-Z-_]{80,}/g,
+    provider: "anthropic",
+    severity: "critical",
+    description: "Anthropic API key.",
+  },
+
+  // ── Vercel ───────────────────────────────────────────────────────────
+  {
+    id: "vercel-token",
+    name: "Vercel Token",
+    pattern: /vt[a-zA-Z0-9]{24}/g,
+    provider: "vercel",
+    severity: "critical",
+    description: "Vercel API token.",
+  },
+
+  // ── Resend ───────────────────────────────────────────────────────────
+  {
+    id: "resend-api-key",
+    name: "Resend API Key",
+    pattern: /re_[a-zA-Z0-9]{24}/g,
+    provider: "resend",
+    severity: "critical",
+    description: "Resend API key.",
+  },
+
+  // ── SendGrid ─────────────────────────────────────────────────────────
+  {
+    id: "sendgrid-api-key",
+    name: "SendGrid API Key",
+    pattern: /SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}/g,
+    provider: "sendgrid",
+    severity: "critical",
+    description: "SendGrid API key.",
+  },
+
+  // ── Clerk ────────────────────────────────────────────────────────────
+  {
+    id: "clerk-secret-key",
+    name: "Clerk Secret Key",
+    pattern: /sk_(?:test|live)_[a-zA-Z0-9]{24,}/g,
+    provider: "clerk",
+    severity: "critical",
+    description: "Clerk backend secret key.",
+  },
+
+  // ── Databases ────────────────────────────────────────────────────────
+  {
+    id: "mongodb-uri",
+    name: "MongoDB Connection URI",
+    pattern: /mongodb(?:\+srv)?:\/\/[^\s"'`]+:[^\s"'`]+@[^\s"'`]+/g,
+    provider: "mongodb",
+    severity: "critical",
+    description: "MongoDB connection string with credentials.",
+  },
+  {
+    id: "postgres-uri",
+    name: "PostgreSQL Connection URI",
+    pattern: /postgres(?:ql)?:\/\/[^\s"'`]+:[^\s"'`]+@[^\s"'`]+/g,
+    provider: "postgres",
+    severity: "critical",
+    description: "PostgreSQL connection string with credentials.",
   },
   {
     id: "slack-webhook",

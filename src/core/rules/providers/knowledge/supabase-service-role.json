@@ -1,0 +1,9 @@
+{
+  "provider": "Supabase",
+  "type": "service_role",
+  "whatItIs": "Full-access database key, bypasses row-level security",
+  "why": "Anyone with this key can read, write, or delete your entire database",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, rotate if repo was ever pushed",
+  "docsUrl": "https://supabase.com/docs/guides/api#the-service_role-key"
+}

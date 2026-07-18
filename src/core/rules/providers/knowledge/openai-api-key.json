@@ -1,0 +1,9 @@
+{
+  "provider": "OpenAI",
+  "type": "api_key",
+  "whatItIs": "API key for accessing OpenAI language models",
+  "why": "Anyone with this key can rack up API usage costs under your account",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and revoke in OpenAI Platform",
+  "docsUrl": "https://platform.openai.com/docs/api-reference/authentication"
+}

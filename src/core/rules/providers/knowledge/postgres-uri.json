@@ -1,0 +1,9 @@
+{
+  "provider": "PostgreSQL",
+  "type": "connection_uri",
+  "whatItIs": "Database connection string containing credentials",
+  "why": "Provides direct read/write access to your entire database",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and change database password immediately",
+  "docsUrl": "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
+}
