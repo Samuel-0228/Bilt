@@ -252,6 +252,7 @@ export interface ScanOptions {
   details?: boolean;
   noVerify?: boolean;
   debug?: boolean;
+  retainSecrets?: boolean;
 }
 
 export interface FixOptions {

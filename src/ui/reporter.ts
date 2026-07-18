@@ -8,7 +8,6 @@ import {
   banner,
   pulseBar,
   sectionHeader,
-  ruleLine,
   divider,
   summaryBox,
   styledGlyph,
@@ -188,7 +187,7 @@ export async function reportWatchEvent(event: WatchEvent): Promise<void> {
  */
 export async function reportFixPlan(plan: FixPlan): Promise<void> {
   console.log("");
-  console.log(ruleLine);
+  console.log(divider());
   console.log("");
   console.log(text.bold("  Bilt Fix Plan"));
   console.log("");
@@ -216,7 +215,7 @@ export async function reportFixPlan(plan: FixPlan): Promise<void> {
     console.log("");
   }
 
-  console.log(ruleLine);
+  console.log(divider());
   console.log("");
 }
 

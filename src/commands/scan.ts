@@ -356,7 +356,9 @@ export async function executeScan(
                 finding.verificationState = "unverified";
               }
             }
-            delete finding.secret;
+            if (!options.retainSecrets) {
+              delete finding.secret;
+            }
           }
         }
 

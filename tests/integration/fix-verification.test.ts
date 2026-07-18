@@ -45,4 +45,35 @@ describe("Fix Verification Integration Tests", () => {
     const postMissingFindings = postScan.findings.filter(f => f.category === "env-missing");
     expect(postMissingFindings.length).toBe(0);
   });
+
+  it("should successfully purge a secret from Git history using purgeSecretFromHistory", async () => {
+    const { execSync } = await import("node:child_process");
+
+    // 1. Initialize a git repo in tmpDir
+    execSync("git init", { cwd: tmpDir });
+    execSync("git config user.name 'Test'", { cwd: tmpDir });
+    execSync("git config user.email 'test@test.com'", { cwd: tmpDir });
+
+    const jsPath = path.join(tmpDir, "index.js");
+    const fakeSecret = "sk-1234567890abcdef1234567890abcdef1234567890abcdef"; // Matches OpenAI Secret Key pattern /sk-[a-zA-Z0-9]{20,}/
+    
+    await fs.writeFile(jsPath, `const key = "${fakeSecret}";`, "utf-8");
+    execSync("git add index.js", { cwd: tmpDir });
+    execSync('git commit -m "Initial_commit_with_secret"', { cwd: tmpDir });
+
+    // 2. Scan history to find the secret
+    const preScan = await executeScan(tmpDir, { quiet: true, fullHistory: true, retainSecrets: true });
+    const secretFindings = preScan.findings.filter(f => f.category === "secret-detected");
+    expect(secretFindings.length).toBeGreaterThan(0);
+    expect(secretFindings[0].secret).toBe(fakeSecret);
+
+    // 3. Import and execute the purge function directly
+    const { purgeSecretFromHistory } = await import("../../src/core/fix/git.js");
+    await purgeSecretFromHistory(tmpDir, fakeSecret);
+
+    // 4. Verify the secret is redacted in the git repository's HEAD commit
+    const committedContent = execSync("git show HEAD:index.js", { cwd: tmpDir }).toString();
+    expect(committedContent).not.toContain(fakeSecret);
+    expect(committedContent).toContain("[REDACTED_BY_BILT]");
+  });
 });

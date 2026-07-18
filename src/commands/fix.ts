@@ -376,8 +376,6 @@ async function generateFixActions(
       }
 
       case "secret-detected": {
-        const isGitHistory = finding.file.startsWith("git:");
-        
         actions.push({
           id: `fix-secret-${finding.id}`,
           description: `Remove secret from ${finding.file}${finding.line ? `:${finding.line}` : ""}`,
@@ -391,11 +389,18 @@ async function generateFixActions(
             instructions: "1. Rotate the credential.\n2. Rewrite Git history.\n3. Force-push the cleaned history.\n4. Notify collaborators."
           }),
           apply: async () => {
-            if (isGitHistory && finding.secret) {
+            let isGitRepo = false;
+            try {
+              const { execSync } = await import("node:child_process");
+              execSync("git rev-parse --is-inside-work-tree", { cwd: rootDir, stdio: "ignore" });
+              isGitRepo = true;
+            } catch {}
+
+            if (isGitRepo && finding.secret) {
               console.log(colors.amberFlag.apply("    " + glyphs.info + "  Executing Git history rewrite..."));
               try {
                 await purgeSecretFromHistory(rootDir, finding.secret);
-                return { success: true, stepsApplied: ["Git history purged of the secret."] };
+                return { success: true, stepsApplied: ["Git history and workspace purged of the secret."] };
               } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
                 return { success: false, stepsApplied: [], error: msg };
