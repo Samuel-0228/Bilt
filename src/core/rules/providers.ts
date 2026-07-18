@@ -4,7 +4,12 @@
 // so that Bilt can tell developers exactly where to rotate a leaked key.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ProviderInfo } from "../../types/index.js";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { ProviderInfo, ProviderKnowledge } from "../../types/index.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── Provider Definitions ────────────────────────────────────────────────────
 
@@ -115,6 +120,62 @@ const digitalocean: ProviderInfo = {
     "https://docs.digitalocean.com/reference/api/create-personal-access-token/",
 };
 
+const anthropic: ProviderInfo = {
+  name: "anthropic",
+  displayName: "Anthropic",
+  icon: "🧠",
+  rotationUrl: "https://console.anthropic.com/settings/keys",
+  docsUrl: "https://docs.anthropic.com/en/api/getting-started",
+};
+
+const vercel: ProviderInfo = {
+  name: "vercel",
+  displayName: "Vercel",
+  icon: "▲",
+  rotationUrl: "https://vercel.com/account/tokens",
+  docsUrl: "https://vercel.com/docs/rest-api/openapi",
+};
+
+const resend: ProviderInfo = {
+  name: "resend",
+  displayName: "Resend",
+  icon: "✉️",
+  rotationUrl: "https://resend.com/api-keys",
+  docsUrl: "https://resend.com/docs/dashboard/api-keys/introduction",
+};
+
+const clerk: ProviderInfo = {
+  name: "clerk",
+  displayName: "Clerk",
+  icon: "🔑",
+  rotationUrl: "https://dashboard.clerk.com/",
+  docsUrl: "https://clerk.com/docs/backend-requests/handling/overview",
+};
+
+const firebase: ProviderInfo = {
+  name: "firebase",
+  displayName: "Firebase",
+  icon: "🔥",
+  rotationUrl: "https://console.firebase.google.com/",
+  docsUrl: "https://firebase.google.com/docs/admin/setup",
+};
+
+const mongodb: ProviderInfo = {
+  name: "mongodb",
+  displayName: "MongoDB",
+  icon: "🍃",
+  rotationUrl: "https://cloud.mongodb.com/",
+  docsUrl: "https://www.mongodb.com/docs/manual/reference/connection-string/",
+};
+
+const postgres: ProviderInfo = {
+  name: "postgres",
+  displayName: "PostgreSQL",
+  icon: "🐘",
+  rotationUrl: "",
+  docsUrl: "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",
+};
+
 // ─── Provider Map ────────────────────────────────────────────────────────────
 
 export const PROVIDER_MAP: Map<string, ProviderInfo> = new Map([
@@ -131,6 +192,13 @@ export const PROVIDER_MAP: Map<string, ProviderInfo> = new Map([
   ["mailchimp", mailchimp],
   ["heroku", heroku],
   ["digitalocean", digitalocean],
+  ["anthropic", anthropic],
+  ["vercel", vercel],
+  ["resend", resend],
+  ["clerk", clerk],
+  ["firebase", firebase],
+  ["mongodb", mongodb],
+  ["postgres", postgres],
 ]);
 
 // ─── Value-based detection heuristics ────────────────────────────────────────
@@ -180,6 +248,15 @@ const RULE_ID_PROVIDER: Record<string, string> = {
   "mailchimp-api-key": "mailchimp",
   "heroku-api-key": "heroku",
   "digitalocean-token": "digitalocean",
+  "anthropic-api-key": "anthropic",
+  "vercel-token": "vercel",
+  "resend-api-key": "resend",
+  "clerk-secret-key": "clerk",
+  "firebase-service-key": "firebase",
+  "mongodb-uri": "mongodb",
+  "postgres-uri": "postgres",
+  "supabase-service-role": "supabase",
+  "supabase-anon-key": "supabase",
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -212,4 +289,28 @@ export function detectProvider(
   }
 
   return undefined;
+}
+
+// ─── Provider Knowledge Loader ───────────────────────────────────────────────
+
+let knowledgeCache: Record<string, ProviderKnowledge> | null = null;
+
+export function getProviderKnowledge(ruleId: string): ProviderKnowledge | undefined {
+  if (!knowledgeCache) {
+    knowledgeCache = {};
+    try {
+      const knowledgeDir = join(__dirname, "knowledge");
+      const files = readdirSync(knowledgeDir);
+      for (const file of files) {
+        if (file.endsWith(".json")) {
+          const content = readFileSync(join(knowledgeDir, file), "utf-8");
+          const key = file.replace(/\.json$/, "");
+          knowledgeCache[key] = JSON.parse(content) as ProviderKnowledge;
+        }
+      }
+    } catch (error) {
+      // Ignore if directory doesn't exist or permissions error
+    }
+  }
+  return knowledgeCache[ruleId];
 }

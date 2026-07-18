@@ -1,0 +1,9 @@
+{
+  "provider": "GitHub",
+  "type": "personal_access_token",
+  "whatItIs": "Authentication token for GitHub API",
+  "why": "Grants access to read, clone, or modify repositories",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and delete token in GitHub Settings",
+  "docsUrl": "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+}

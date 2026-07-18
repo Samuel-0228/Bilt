@@ -14,6 +14,18 @@ export type FindingCategory =
 
 export type VerificationState = "verified-live" | "verified-dead" | "unverified";
 
+export type ConfidenceBucket = "low" | "medium" | "high";
+
+export interface ProviderKnowledge {
+  provider: string;
+  type: string;
+  whatItIs: string;
+  why: string;
+  safeAsPublic: boolean;
+  action: string;
+  docsUrl: string;
+}
+
 export interface ScanFinding {
   id: string;
   severity: Severity;
@@ -31,6 +43,10 @@ export interface ScanFinding {
   verificationState?: VerificationState;
   /** Raw secret value (removed before serializing to user-facing results) */
   secret?: string;
+  /** Context-aware confidence level */
+  confidence?: ConfidenceBucket;
+  /** The 5-question provider knowledge block */
+  knowledge?: ProviderKnowledge;
 }
 
 // ─── Scan Result ─────────────────────────────────────────────────────────────
@@ -120,6 +136,8 @@ export interface BiltConfig {
   customRules: SecretRule[];
   /** Enable fun mode */
   funMode: boolean;
+  /** Play subtle terminal sound on critical findings */
+  sound?: boolean;
 }
 
 // ─── Framework Detection ─────────────────────────────────────────────────────

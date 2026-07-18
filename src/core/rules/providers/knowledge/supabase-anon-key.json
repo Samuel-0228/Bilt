@@ -1,0 +1,9 @@
+{
+  "provider": "Supabase",
+  "type": "anon_key",
+  "whatItIs": "Public-facing anonymous client key",
+  "why": "Safe to bundle in client apps if row-level security is strictly enforced",
+  "safeAsPublic": true,
+  "action": "Ensure database Row Level Security (RLS) is enabled",
+  "docsUrl": "https://supabase.com/docs/guides/api#the-anon-key"
+}

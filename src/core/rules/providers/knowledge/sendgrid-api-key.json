@@ -1,0 +1,9 @@
+{
+  "provider": "SendGrid",
+  "type": "api_key",
+  "whatItIs": "API key for Twilio SendGrid email service",
+  "why": "Attackers can send mass spam, resulting in permanent domain blacklisting",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and delete key in SendGrid Settings",
+  "docsUrl": "https://docs.sendgrid.com/ui/account-and-settings/api-keys"
+}

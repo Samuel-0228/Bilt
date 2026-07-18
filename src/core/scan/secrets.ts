@@ -8,9 +8,9 @@
 
 import { simpleGit } from "simple-git";
 import { isHighEntropy } from "../rules/entropy.js";
-import { detectProvider } from "../rules/providers.js";
+import { detectProvider, getProviderKnowledge } from "../rules/providers.js";
 import { SECRET_RULES } from "../rules/secret-rules.js";
-import type { SecretRule, ScanFinding, BiltConfig } from "../../types/index.js";
+import type { SecretRule, ScanFinding, BiltConfig, ConfidenceBucket, ProviderKnowledge } from "../../types/index.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -134,8 +134,8 @@ export function scanFileForSecrets(
       // For the generic high-entropy rule, prefer the captured group
       const matchedValue = match[1] ?? match[0];
 
-      // De-duplicate by position + rule
-      const dedupeKey = `${rule.id}:${match.index}`;
+      // De-duplicate by exact span to prevent multiple rules flagging the same string
+      const dedupeKey = `${match.index}:${matchedValue.length}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
@@ -177,10 +177,59 @@ export function scanFileForSecrets(
 
       if (isAllowed) continue;
       const provider = detectProvider(matchedValue, rule.id) ?? undefined;
+      const knowledge = getProviderKnowledge(rule.id);
+
+      let severity = rule.severity;
+      let confidence: ConfidenceBucket = "low";
+
+      if (knowledge || provider) {
+        confidence = "medium";
+      }
+
+      // Context Heuristics for JS/TS
+      const isJsTs = /\.(js|jsx|ts|tsx)$/i.test(filePath);
+      
+      // Suppress test and docs files
+      const isTestOrDoc = 
+        filePath.includes("/test/") || 
+        filePath.includes("/tests/") || 
+        filePath.includes("/fixtures/") || 
+        /\.(test|spec)\.(js|ts|jsx|tsx)$/i.test(filePath) || 
+        filePath.endsWith(".md") || 
+        filePath.includes("/docs/");
+
+      if (isTestOrDoc) {
+        // Skip entirely per heuristic rules
+        continue;
+      }
+
+      if (isJsTs) {
+        // Suppress if inside a code comment
+        if (matchedLine && (matchedLine.trim().startsWith("//") || matchedLine.trim().startsWith("*") || matchedLine.includes("/*"))) {
+          continue;
+        }
+
+        if (matchedLine) {
+          const upperLine = matchedLine.toUpperCase();
+          // Assignment names
+          if (upperLine.includes("PUBLIC") || upperLine.includes("ANON") || upperLine.includes("CLIENT")) {
+            severity = "info";
+          } else if (upperLine.includes("SERVICE") || upperLine.includes("SECRET") || upperLine.includes("PRIVATE") || upperLine.includes("ADMIN") || upperLine.includes("ROLE")) {
+            severity = "critical";
+          }
+
+          // Literal vs reference
+          if (matchedLine.includes("process.env.") || matchedLine.includes("import.meta.env.")) {
+            severity = "warning";
+          } else if (matchedLine.includes('"') || matchedLine.includes("'") || matchedLine.includes("`")) {
+            severity = "critical";
+          }
+        }
+      }
 
       findings.push({
         id: nextId("secret"),
-        severity: rule.severity,
+        severity: severity,
         category: "secret-detected",
         message:
           `${rule.name} detected` +
@@ -194,6 +243,8 @@ export function scanFileForSecrets(
         ruleId: rule.id,
         preview: maskValue(matchedValue),
         secret: matchedValue,
+        confidence,
+        knowledge,
       });
     }
   }

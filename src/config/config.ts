@@ -25,6 +25,7 @@ export const DEFAULT_CONFIG: BiltConfig = {
   historyDepth: 10,
   customRules: [],
   funMode: false,
+  sound: false,
 };
 
 // ─── Config Loader ───────────────────────────────────────────────────────────
@@ -75,6 +76,7 @@ export async function loadConfig(searchFrom?: string): Promise<BiltConfig> {
         ? [...DEFAULT_CONFIG.customRules, ...userConfig.customRules]
         : [...DEFAULT_CONFIG.customRules],
       funMode: userConfig.funMode ?? DEFAULT_CONFIG.funMode,
+      sound: userConfig.sound ?? DEFAULT_CONFIG.sound,
     };
   } catch {
     // If config loading fails, silently use defaults (zero-config philosophy)

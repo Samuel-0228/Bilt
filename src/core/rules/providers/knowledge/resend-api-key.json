@@ -1,0 +1,9 @@
+{
+  "provider": "Resend",
+  "type": "api_key",
+  "whatItIs": "API key for sending emails via Resend",
+  "why": "Attackers can send spam emails from your verified domain, ruining its reputation",
+  "safeAsPublic": false,
+  "action": "Move to .env.local, add to .gitignore, and rotate key in Resend Dashboard",
+  "docsUrl": "https://resend.com/docs/dashboard/api-keys/introduction"
+}

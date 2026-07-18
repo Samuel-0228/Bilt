@@ -40,6 +40,7 @@ import {
   showBliptBanner,
 } from "../ui/theme.js";
 import { formatFinding } from "../ui/format.js";
+import { playSound } from "../ui/sound.js";
 import { VERIFIERS } from "../core/scan/verifiers/index.js";
 import { createRequire } from "node:module";
 
@@ -336,6 +337,9 @@ export async function executeScan(
                 try {
                   const state = await VERIFIERS[providerName](finding.secret);
                   finding.verificationState = state;
+                  if (state === "verified-live") {
+                    finding.confidence = "high";
+                  }
                 } catch {
                   finding.verificationState = "unverified";
                 }
@@ -415,6 +419,10 @@ export async function executeScan(
       const criticalCount = findings.filter((f) => f.severity === "critical").length;
       const warningCount = findings.filter((f) => f.severity === "warning").length;
       const issuesCount = criticalCount + warningCount;
+
+      if (criticalCount > 0 && config.sound) {
+        playSound();
+      }
 
       const parts: string[] = [];
       if (issuesCount === 0) {
