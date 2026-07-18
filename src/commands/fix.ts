@@ -53,6 +53,7 @@ export async function executeFix(
   // ── Run scan ────────────────────────────────────────────────────────
   const result = await executeScan(rootDir, {
     quiet: true,
+    debug: options.debug,
   });
 
   if (result.findings.length === 0) {
@@ -63,7 +64,7 @@ export async function executeFix(
   }
 
   // ── Generate fix actions ────────────────────────────────────────────
-  const actions = await generateFixActions(rootDir, result.findings);
+  const actions = await generateFixActions(rootDir, result.findings, options);
 
   if (actions.length === 0) {
     console.log("");
@@ -206,10 +207,42 @@ export async function executeFix(
 async function generateFixActions(
   rootDir: string,
   findings: ScanFinding[],
+  options: FixOptions
 ): Promise<FixAction[]> {
   const actions: FixAction[] = [];
   const addedTypes = new Set<string>();
   const config = await loadConfig(rootDir);
+
+  const debugReadFile = async (pathStr: string): Promise<string> => {
+    try {
+      const content = await fs.readFile(pathStr, "utf-8");
+      if (options.debug) {
+        console.log(`[DEBUG READ] ${pathStr} (${Buffer.byteLength(content, "utf8")} bytes)`);
+      }
+      return content;
+    } catch (err) {
+      if (options.debug) {
+        console.log(`[DEBUG READ] ${pathStr} (Error: ${(err as Error).message})`);
+      }
+      throw err;
+    }
+  };
+
+  const debugWriteFile = async (pathStr: string, newContent: string, oldContent: string = ""): Promise<void> => {
+    if (options.debug) {
+      console.log(`[DEBUG WRITE] ${pathStr}`);
+      console.log(`  Length Before: ${Buffer.byteLength(oldContent, "utf8")} bytes`);
+      console.log(`  Length After:  ${Buffer.byteLength(newContent, "utf8")} bytes`);
+      console.log(`  Diff Preview:`);
+      // Simple diff preview: just show it's different if lengths or content differ
+      if (oldContent === newContent) {
+        console.log(`    (No changes)`);
+      } else {
+        console.log(`    (File modified)`);
+      }
+    }
+    await fs.writeFile(pathStr, newContent, "utf-8");
+  };
 
   for (const finding of findings) {
     switch (finding.category) {
@@ -228,7 +261,11 @@ async function generateFixActions(
                 [".env", ".env.*", ".env.local", ".env.*.local", ".bilt/"],
                 gitignorePath,
               );
-              await fs.writeFile(gitignorePath, newContent, "utf-8");
+              
+              let oldContent = "";
+              try { oldContent = await fs.readFile(gitignorePath, "utf-8"); } catch {}
+              
+              await debugWriteFile(gitignorePath, newContent, oldContent);
               return true;
             },
           });
@@ -238,9 +275,10 @@ async function generateFixActions(
 
       case "env-missing": {
         const key =
+          finding.message.match(/process\.env\.(\w+)/)?.[1] ??
           finding.message.match(/["']([^"']+)["']/)?.[1] ??
           finding.message.match(/`([^`]+)`/)?.[1] ??
-          finding.message.match(/(\w+)/)?.[1];
+          finding.message.match(/Variable "(\w+)"/)?.[1];
 
         if (key && !addedTypes.has(`env-missing-${key}`)) {
           addedTypes.add(`env-missing-${key}`);
@@ -251,13 +289,13 @@ async function generateFixActions(
             findingId: finding.id,
             preview: `Will append ${key}= to ${finding.file}`,
             apply: async () => {
-              const envFilePath = path.join(rootDir, finding.file);
+              const envFilePath = path.join(rootDir, ".env");
               let content = "";
               try {
-                content = await fs.readFile(envFilePath, "utf-8");
+                content = await debugReadFile(envFilePath);
               } catch {}
               const newContent = addMissingEnvVars(content, [key]);
-              await fs.writeFile(envFilePath, newContent, "utf-8");
+              await debugWriteFile(envFilePath, newContent, content);
               return true;
             },
           });
@@ -288,10 +326,15 @@ async function generateFixActions(
                 SECRET_RULES,
                 config.entropyThreshold,
               );
-              await fs.writeFile(
-                path.join(rootDir, ".env.example"),
+              const targetPath = path.join(rootDir, ".env.example");
+              
+              let oldExampleContent = "";
+              try { oldExampleContent = await fs.readFile(targetPath, "utf-8"); } catch {}
+
+              await debugWriteFile(
+                targetPath,
                 exampleContent,
-                "utf-8",
+                oldExampleContent
               );
               return true;
             },

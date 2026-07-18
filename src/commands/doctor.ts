@@ -18,7 +18,7 @@ import { createRequire } from "node:module";
  */
 export async function executeDoctor(
   projectDir: string,
-  options: { card?: boolean; fun?: boolean } = {},
+  options: { card?: boolean; fun?: boolean; debug?: boolean } = {},
 ): Promise<void> {
   const rootDir = path.resolve(projectDir);
 
@@ -26,6 +26,7 @@ export async function executeDoctor(
   const result = await executeScan(rootDir, {
     quiet: true,
     fullHistory: true,
+    debug: options.debug,
   });
 
   const { findings, healthScore, grade, scannedFiles, duration, framework } =

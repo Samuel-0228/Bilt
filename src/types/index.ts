@@ -221,6 +221,7 @@ export interface ScanOptions {
   fun?: boolean;
   details?: boolean;
   noVerify?: boolean;
+  debug?: boolean;
 }
 
 export interface FixOptions {
@@ -228,6 +229,7 @@ export interface FixOptions {
   dryRun?: boolean;
   verbose?: boolean;
   quiet?: boolean;
+  debug?: boolean;
 }
 
 export interface WatchOptions {

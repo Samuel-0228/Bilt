@@ -65,6 +65,7 @@ program
   .option("--quiet", "Suppress all output except errors")
   .option("--dry-run", "Show what would be scanned without scanning")
   .option("--no-verify", "Disable live credential verification calls")
+  .option("--debug", "Enable debug logging for path and file resolutions")
   .option("--fun", "Enable fun mode with celebrations")
   .action(
     async (
@@ -79,6 +80,7 @@ program
         dryRun?: boolean;
         fun?: boolean;
         verify?: boolean;
+        debug?: boolean;
       },
     ) => {
       try {
@@ -92,6 +94,7 @@ program
           dryRun: opts.dryRun,
           fun: opts.fun,
           noVerify: opts.verify === false,
+          debug: opts.debug,
         });
 
         // Exit code based on findings
@@ -135,6 +138,7 @@ program
   .option("--dry-run", "Preview fixes without applying")
   .option("--verbose", "Show detailed output")
   .option("--quiet", "Suppress non-essential output")
+  .option("--debug", "Enable debug logging for file reads and writes")
   .action(
     async (
       dir: string,
@@ -143,6 +147,7 @@ program
         dryRun?: boolean;
         verbose?: boolean;
         quiet?: boolean;
+        debug?: boolean;
       },
     ) => {
       try {
@@ -151,6 +156,7 @@ program
           dryRun: opts.dryRun,
           verbose: opts.verbose,
           quiet: opts.quiet,
+          debug: opts.debug,
         });
       } catch (error) {
         printError(error);
@@ -209,12 +215,14 @@ program
   .description("Comprehensive health report with detailed breakdown")
   .argument("[dir]", "Project directory", ".")
   .option("--card", "Output a markdown health card to stdout")
+  .option("--debug", "Enable debug logging for file reads")
   .option("--fun", "Enable celebrations and streak counter")
-  .action(async (dir: string, opts: { card?: boolean; fun?: boolean }) => {
+  .action(async (dir: string, opts: { card?: boolean; fun?: boolean; debug?: boolean }) => {
     try {
       await executeDoctor(dir, {
         card: opts.card,
         fun: opts.fun,
+        debug: opts.debug,
       });
     } catch (error) {
       printError(error);
