@@ -35,23 +35,31 @@ export async function executeWatch(
   }
 
   // ── Start watcher ──────────────────────────────────────────────────
-  const watcher = startWatcher(rootDir, config, async (event: WatchEvent) => {
-    // Only report if there are findings or the file was deleted
-    if (event.findings.length > 0 || event.type === "unlink") {
-      // Map absolute path back to relative path for formatting
-      const relativePath = path.relative(rootDir, event.file);
-      const relativeFindings = event.findings.map((f) => ({
-        ...f,
-        file: path.relative(rootDir, f.file),
-      }));
+  const watcher = startWatcher(
+    rootDir,
+    config,
+    async (event: WatchEvent) => {
+      // Only report if there are findings or the file was deleted
+      if (event.findings.length > 0 || event.type === "unlink") {
+        // Map absolute path back to relative path for formatting
+        const relativePath = path.relative(rootDir, event.file);
+        const relativeFindings = event.findings.map((f) => ({
+          ...f,
+          file: path.relative(rootDir, f.file),
+        }));
 
-      await reportWatchEvent({
-        ...event,
-        file: relativePath,
-        findings: relativeFindings,
-      });
-    }
-  });
+        await reportWatchEvent({
+          ...event,
+          file: relativePath,
+          findings: relativeFindings,
+        });
+      }
+    },
+    {
+      debounce: options.debounce,
+      poll: options.poll,
+    },
+  );
 
   // ── Graceful shutdown ──────────────────────────────────────────────
   const cleanup = async (): Promise<void> => {

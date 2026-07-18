@@ -215,4 +215,5 @@ export interface FixOptions {
 export interface WatchOptions {
   quiet?: boolean;
   debounce?: number;
+  poll?: boolean;
 }

@@ -183,17 +183,24 @@ program
   .argument("[dir]", "Project directory", ".")
   .option("--quiet", "Only show findings, no status messages")
   .option("--debounce <ms>", "Debounce interval in milliseconds", "300")
-  .action(async (dir: string, opts: { quiet?: boolean; debounce?: string }) => {
-    try {
-      await executeWatch(dir, {
-        quiet: opts.quiet,
-        debounce: opts.debounce ? parseInt(opts.debounce, 10) : undefined,
-      });
-    } catch (error) {
-      printError(error);
-      process.exitCode = 2;
-    }
-  });
+  .option("--poll", "Use polling instead of native file events (recommended for WSL/Docker)")
+  .action(
+    async (
+      dir: string,
+      opts: { quiet?: boolean; debounce?: string; poll?: boolean },
+    ) => {
+      try {
+        await executeWatch(dir, {
+          quiet: opts.quiet,
+          debounce: opts.debounce ? parseInt(opts.debounce, 10) : undefined,
+          poll: opts.poll,
+        });
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
 
 // ─── bilt doctor ─────────────────────────────────────────────────────────────
 
