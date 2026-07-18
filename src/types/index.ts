@@ -86,15 +86,45 @@ export interface ProviderInfo {
 
 export type FixType = "safe" | "destructive" | "irreversible";
 
+export type FixRisk = "Low" | "High" | "Critical";
+
+export interface FixPlan {
+  steps: string[];
+  estimatedTime: string;
+  risk: FixRisk;
+  requiresConfirmation?: string;
+  instructions?: string;
+}
+
+export interface FixResult {
+  success: boolean;
+  stepsApplied: string[];
+  error?: string;
+}
+
+export interface VerificationResult {
+  passed: boolean;
+  message: string;
+}
+
+export interface Fix {
+  id: string;
+  type: FixType;
+  findingId: string;
+  description: string;
+  preview(): Promise<FixPlan>;
+  apply(): Promise<FixResult>;
+  verify(): Promise<VerificationResult>;
+  undo(): Promise<void>;
+}
+
+// Deprecated in favor of the new Fix interface
 export interface FixAction {
   id: string;
   description: string;
   type: FixType;
-  /** The finding this fix addresses */
   findingId: string;
-  /** Preview of what the fix will do */
   preview?: string;
-  /** Function to apply the fix — returns true if successful */
   apply: () => Promise<boolean>;
 }
 

@@ -21,10 +21,10 @@ import type {
   ScanResult,
   ScanFinding,
   WatchEvent,
-  FixAction,
   Snapshot,
   Severity,
   FindingCategory,
+  FixPlan,
 } from "../types/index.js";
 import { formatFinding, formatProviderLink } from "./format.js";
 
@@ -184,37 +184,39 @@ export async function reportWatchEvent(event: WatchEvent): Promise<void> {
 // ─── Fix Previews ────────────────────────────────────────────────────────────
 
 /**
- * Show a preview of all fix actions that will be applied.
+ * Show a detailed preview of a single fix plan.
  */
-export async function reportFixPreview(actions: FixAction[]): Promise<void> {
+export async function reportFixPlan(plan: FixPlan): Promise<void> {
   console.log("");
-  console.log(sectionHeader("Fix plan"));
-  await maybeSleep();
+  console.log(ruleLine);
+  console.log("");
+  console.log(text.bold("  Bilt Fix Plan"));
   console.log("");
 
-  for (const action of actions) {
-    const typeGlyph =
-      action.type === "safe"
-        ? colors.mintClear.apply(glyphs.passed)
-        : action.type === "destructive"
-          ? colors.amberFlag.apply(glyphs.warning)
-          : colors.pulseCoral.apply(glyphs.critical);
-    const typeLabel = colors.slateDim.dim(`[${action.type}]`);
-    console.log(`  ${typeGlyph} ${action.description}  ${typeLabel}`);
-    await maybeSleep();
-    if (action.preview) {
-      console.log(colors.slateDim.dim(`      ${action.preview}`));
-      await maybeSleep();
-    }
+  plan.steps.forEach((step: string, i: number) => {
+    console.log(`  ${i + 1}. ${step}`);
+    console.log("");
+  });
+
+  console.log(colors.slateDim.dim("  Estimated time"));
+  console.log(`  ${plan.estimatedTime}`);
+  console.log("");
+  
+  const riskColor = plan.risk === "Low" ? colors.mintClear 
+    : plan.risk === "High" ? colors.amberFlag 
+    : colors.pulseCoral;
+  
+  console.log(colors.slateDim.dim("  Risk"));
+  console.log(`  ${riskColor.apply(plan.risk)}`);
+  console.log("");
+  
+  if (plan.instructions) {
+    console.log(colors.slateDim.dim("  Instructions"));
+    console.log(`  ${plan.instructions}`);
+    console.log("");
   }
 
-  console.log("");
-  console.log(
-    colors.slateDim.dim(
-      `  ${colors.mintClear.apply(glyphs.passed)} safe  ${colors.amberFlag.apply(glyphs.warning)} destructive  ${colors.pulseCoral.apply(glyphs.critical)} irreversible`,
-    ),
-  );
-  await maybeSleep();
+  console.log(ruleLine);
   console.log("");
 }
 
