@@ -58,6 +58,7 @@ export async function executeFix(
   const result = await executeScan(rootDir, {
     quiet: true,
     debug: options.debug,
+    retainSecrets: true,
   });
 
   if (result.findings.length === 0) {

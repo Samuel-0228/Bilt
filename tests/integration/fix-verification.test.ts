@@ -67,9 +67,8 @@ describe("Fix Verification Integration Tests", () => {
     expect(secretFindings.length).toBeGreaterThan(0);
     expect(secretFindings[0].secret).toBe(fakeSecret);
 
-    // 3. Import and execute the purge function directly
-    const { purgeSecretFromHistory } = await import("../../src/core/fix/git.js");
-    await purgeSecretFromHistory(tmpDir, fakeSecret);
+    // 3. Apply fixes programmatically via executeFix (which calls executeScan with retainSecrets)
+    await executeFix(tmpDir, { debug: true });
 
     // 4. Verify the secret is redacted in the git repository's HEAD commit
     const committedContent = execSync("git show HEAD:index.js", { cwd: tmpDir }).toString();
