@@ -103,7 +103,7 @@ export async function reportScanResults(
   await maybeSleep();
   console.log("");
 
-  const mode = (options.verbose || options.details || isPlainMode()) ? "detail" : "headline";
+  const mode = (options.verbose || options.details !== false || isPlainMode()) ? "detail" : "headline";
 
   // ── Findings ───────────────────────────────────────────────────────
   if (findings.length === 0) {
@@ -144,7 +144,7 @@ export async function reportScanResults(
 
   parts.push(colors.slateDim.apply("bilt fix"));
   if (mode !== "detail") {
-    parts.push(colors.slateDim.apply("bilt scan --details"));
+    parts.push(colors.slateDim.apply("bilt scan"));
   }
 
   console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);

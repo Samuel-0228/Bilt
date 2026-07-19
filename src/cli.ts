@@ -61,7 +61,7 @@ program
     "Minimum severity to report (critical, warning, info)",
   )
   .option("--verbose", "Show detailed output with suggestions")
-  .option("--details", "Show detailed output under each headline")
+  .option("--no-details", "Hide detailed output under each headline")
   .option("--quiet", "Suppress all output except errors")
   .option("--dry-run", "Show what would be scanned without scanning")
   .option("--no-verify", "Disable live credential verification calls")
