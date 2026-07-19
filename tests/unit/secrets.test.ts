@@ -256,4 +256,18 @@ describe("scanFileForSecrets", () => {
     );
     expect(findings.length).toBe(0);
   });
+
+  it("should match Heroku keys only when accompanied by heroku context", () => {
+    const rawUuid = "12345678-1234-1234-1234-1234567890ab";
+    
+    // Generic UUID should be ignored (not categorized as heroku)
+    const genericUuidContent = `const id = "${rawUuid}";`;
+    const genericFindings = scanFileForSecrets(genericUuidContent, "src/index.js", DEFAULT_CONFIG);
+    expect(genericFindings.find(f => f.ruleId === "heroku-api-key")).toBeUndefined();
+
+    // UUID with Heroku context should be flagged
+    const herokuKeyContent = `HEROKU_API_KEY="${rawUuid}"`;
+    const herokuFindings = scanFileForSecrets(herokuKeyContent, "src/index.js", DEFAULT_CONFIG);
+    expect(herokuFindings.find(f => f.ruleId === "heroku-api-key")).toBeDefined();
+  });
 });

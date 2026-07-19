@@ -174,7 +174,21 @@ export async function findEnvFiles(dir: string): Promise<string[]> {
   const matches = await fg(["**/.env", "**/.env.*"], {
     cwd: dir,
     dot: true,
-    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**"],
+    ignore: [
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.bilt/**",
+      "**/venv/**",
+      "**/.venv/**",
+      "**/__pycache__/**",
+      "**/.next/**",
+      "**/.nuxt/**",
+      "**/.cache/**",
+      "**/.vercel/**",
+      "**/.netlify/**",
+    ],
     absolute: true,
     onlyFiles: true,
   });

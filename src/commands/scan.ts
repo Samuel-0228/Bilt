@@ -125,7 +125,7 @@ export async function executeScan(
 
   const isQuiet = !!options.quiet;
   const isJson = !!options.json;
-  const detailsEnabled = !!options.details;
+  const detailsEnabled = options.details !== false;
 
   if (!isQuiet && !isJson) {
     console.log("");
@@ -162,6 +162,9 @@ export async function executeScan(
         for (const envFile of envFiles) {
           try {
             const content = await fs.readFile(envFile, "utf-8");
+            if (options.debug) {
+              console.log(`[DEBUG READ] ${envFile} (${Buffer.byteLength(content, "utf8")} bytes)`);
+            }
             const parsed = parseEnvFile(content, envFile);
             parsedEnvFiles.push(parsed);
           } catch {
@@ -186,6 +189,9 @@ export async function executeScan(
         for (const codeFile of codeFiles) {
           try {
             const content = await fs.readFile(codeFile, "utf-8");
+            if (options.debug) {
+              console.log(`[DEBUG READ] ${codeFile} (${Buffer.byteLength(content, "utf8")} bytes)`);
+            }
             const refs = scanCodeForEnvRefs(content, codeFile);
             for (const ref of refs) envRefs.add(ref);
 
@@ -296,6 +302,9 @@ export async function executeScan(
             if (stat.size > 1_048_576) continue;
 
             const content = await fs.readFile(fullPath, "utf-8");
+            if (options.debug) {
+              console.log(`[DEBUG READ] ${fullPath} (${Buffer.byteLength(content, "utf8")} bytes)`);
+            }
             const secretFindings = scanFileForSecrets(
               content,
               file,
@@ -347,7 +356,9 @@ export async function executeScan(
                 finding.verificationState = "unverified";
               }
             }
-            delete finding.secret;
+            if (!options.retainSecrets) {
+              delete finding.secret;
+            }
           }
         }
 
@@ -433,9 +444,9 @@ export async function executeScan(
 
       parts.push(colors.slateDim.apply("bilt fix"));
       const isPlain = isPlainMode();
-      const mode = (options.verbose || options.details || isPlain) ? "detail" : "headline";
+      const mode = (options.verbose || options.details !== false || isPlain) ? "detail" : "headline";
       if (mode !== "detail") {
-        parts.push(colors.slateDim.apply("bilt scan --details"));
+        parts.push(colors.slateDim.apply("bilt scan"));
       }
 
       console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);

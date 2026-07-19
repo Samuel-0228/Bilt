@@ -287,7 +287,7 @@ export const SECRET_RULES: SecretRule[] = [
     id: "heroku-api-key",
     name: "Heroku API Key",
     pattern:
-      /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g,
+      /(?:heroku[a-z0-9_.\-,~*'+=!$&()]{0,30})(?:=|\s|:)\s*['"]?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})['"]?/gi,
     provider: "heroku",
     severity: "warning",
     description: "Heroku API key (UUID format).",
