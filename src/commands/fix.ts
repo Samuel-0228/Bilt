@@ -168,7 +168,15 @@ export async function executeFix(
     let shouldApply = false;
 
     if (plan.requiresConfirmation) {
-      shouldApply = await requireTypedConfirmation({ description: action.description } as any, plan.requiresConfirmation);
+      const wantAutoFix = await requireSimpleConfirmation(
+        { description: action.description } as any,
+        `Would you like Bilt to run this fix automatically?`
+      );
+      if (wantAutoFix) {
+        shouldApply = await requireTypedConfirmation({ description: action.description } as any, plan.requiresConfirmation);
+      } else {
+        shouldApply = false;
+      }
     } else {
       shouldApply = await requireSimpleConfirmation({ description: action.description } as any);
     }

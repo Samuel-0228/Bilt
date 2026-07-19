@@ -61,6 +61,7 @@ export async function requireTypedConfirmation(
  */
 export async function requireSimpleConfirmation(
   action: FixAction,
+  customMessage?: string,
 ): Promise<boolean> {
   // Safe actions and test environment need no confirmation
   if (
@@ -73,7 +74,7 @@ export async function requireSimpleConfirmation(
   const response = (await enquirer.prompt({
     type: "confirm",
     name: "confirm",
-    message: `Apply fix: ${action.description}?\n  ${SNAPSHOT_NOTICE}`,
+    message: customMessage || `Apply fix: ${action.description}?\n  ${SNAPSHOT_NOTICE}`,
     initial: false,
   })) as { confirm: boolean };
 
