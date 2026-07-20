@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # Required to create a GitHub Release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to generate release notes from commits
+
+      - name: Setup Node.js (latest LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check for npm token
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "Error: NPM_TOKEN secret is missing or empty."
+            echo "Please add a granular access token with publish permissions as a repository secret named 'NPM_TOKEN'."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run typecheck
+        run: npx tsc --noEmit
+
+      - name: Run every test suite
+        run: npm run test:all
+
+      - name: Build Bilt
+        run: npm run build
+
+      - name: Verify package version matches git tag
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Error: Tag version (v$TAG_VERSION) does not match package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "Version check passed: v$TAG_VERSION"
+
+      - name: Verify required files exist before publishing
+        run: |
+          MISSING_FILES=0
+          for file in README.md LICENSE bin/bilt.js dist/cli.js; do
+            if [ ! -f "$file" ]; then
+              echo "Error: Required file $file is missing."
+              MISSING_FILES=1
+            fi
+          done
+          if [ "$MISSING_FILES" -eq 1 ]; then
+            exit 1
+          fi
+          echo "All required files exist."
+
+      - name: Verify package with npm pack
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes
