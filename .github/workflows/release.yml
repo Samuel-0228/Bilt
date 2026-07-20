@@ -24,6 +24,14 @@ jobs:
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Check for npm token
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "Error: NPM_TOKEN secret is missing or empty."
+            echo "Please add a granular access token with publish permissions as a repository secret named 'NPM_TOKEN'."
+            exit 1
+          fi
+
       - name: Install dependencies
         run: npm ci
 
