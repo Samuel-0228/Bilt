@@ -11,7 +11,11 @@
     "dist",
     "bin"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+    "prepare": "npm run build",
     "dev": "tsx src/cli.ts",
     "build": "tsc",
     "start": "node dist/cli.js",
