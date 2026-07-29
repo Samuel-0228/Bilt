@@ -1,6 +1,6 @@
 {
   "name": "bilt-toolkit",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Zero-configuration CLI toolkit that keeps local projects healthy before they reach Git.",
   "type": "module",
   "main": "dist/cli.js",
@@ -11,7 +11,11 @@
     "dist",
     "bin"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+    "prepare": "npm run build",
     "dev": "tsx src/cli.ts",
     "build": "tsc",
     "start": "node dist/cli.js",
