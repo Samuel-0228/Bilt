@@ -1,0 +1,38 @@
+// ─── OpenRouter Provider Adapter ─────────────────────────────────────────────
+
+import { OpenAICompatibleProvider } from "./openai-compatible.js";
+import type { AIProvider, RedactedContext } from "../types.js";
+
+export class OpenRouterProvider implements AIProvider {
+  public readonly id = "openrouter" as const;
+  public readonly name = "OpenRouter";
+  public readonly defaultModel = "meta-llama/llama-3.1-8b-instruct:free";
+  private client: OpenAICompatibleProvider;
+
+  constructor() {
+    this.client = new OpenAICompatibleProvider({
+      id: this.id,
+      name: this.name,
+      baseUrl: "https://openrouter.ai/api/v1",
+      defaultModel: this.defaultModel,
+      extraHeaders: {
+        "HTTP-Referer": "https://github.com/Samuel-0228/Bilt",
+        "X-Title": "Bilt CLI",
+      },
+    });
+  }
+
+  async validateKey(key: string): Promise<boolean> {
+    return this.client.validateKey(key);
+  }
+
+  async complete(
+    prompt: string,
+    context: RedactedContext,
+    model?: string,
+    key?: string,
+    timeoutMs?: number,
+  ): Promise<string> {
+    return this.client.complete(prompt, context, model || this.defaultModel, key, timeoutMs);
+  }
+}
