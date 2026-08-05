@@ -175,20 +175,25 @@ function getFindingHeadlineAndDetail(finding: ScanFinding): { headline: string; 
   }
 }
 
+import { generateAIExplanation } from "../core/ai/explainer.js";
+
 function renderFiveQuestions(finding: ScanFinding, defaultDetail: string): string {
-  if (!finding.knowledge) return `     ${defaultDetail}`;
-  
-  const k = finding.knowledge;
-  const fixable = finding.suggestion?.toLowerCase().includes("rotate") ? "yes → bilt fix" : "no → manual";
-  // The default detail often includes rotation URLs, we just want the location prefix
   const loc = defaultDetail.split(" ")[0];
-  
+  const exp = finding.aiExplanation || generateAIExplanation(finding);
+  const what = finding.knowledge?.whatItIs || exp.whatIsIt;
+  const why = finding.knowledge?.why || exp.whyIsItAProblem;
+  const confidence = finding.confidence ?? (finding.category.includes("secret") ? "medium" : "high");
+  const action = finding.knowledge?.action || exp.howToFix;
+  const fixable = (finding.suggestion?.toLowerCase().includes("rotate") || exp.canBiltFix)
+    ? "yes → bilt fix"
+    : "no → manual";
+
   const lines = [
     `     loc         ${loc}`,
-    `     what        ${k.whatItIs}`,
-    `     why         ${k.why}`,
-    `     confidence  ${finding.confidence ?? "low"}`,
-    `     do next     ${k.action}`,
+    `     what        ${what}`,
+    `     why         ${why}`,
+    `     confidence  ${confidence}`,
+    `     action      ${action}`,
     `     fixable     ${fixable}`
   ];
   return lines.join("\n");

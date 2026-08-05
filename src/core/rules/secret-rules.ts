@@ -131,7 +131,7 @@ export const SECRET_RULES: SecretRule[] = [
   {
     id: "vercel-token",
     name: "Vercel Token",
-    pattern: /vt[a-zA-Z0-9]{24}/g,
+    pattern: /\bvt[a-zA-Z0-9]{24}\b/g,
     provider: "vercel",
     severity: "critical",
     description: "Vercel API token.",
@@ -141,7 +141,7 @@ export const SECRET_RULES: SecretRule[] = [
   {
     id: "resend-api-key",
     name: "Resend API Key",
-    pattern: /re_[a-zA-Z0-9]{24}/g,
+    pattern: /\bre_[a-zA-Z0-9]{24}\b/g,
     provider: "resend",
     severity: "critical",
     description: "Resend API key.",

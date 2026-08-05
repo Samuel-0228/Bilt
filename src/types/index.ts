@@ -10,11 +10,45 @@ export type FindingCategory =
   | "env-exposed"
   | "gitignore-missing"
   | "framework-warning"
-  | "plugin-finding";
+  | "plugin-finding"
+  // Domain additions
+  | "git-history-secret"
+  | "git-large-file"
+  | "git-committed-env"
+  | "git-hygiene"
+  | "dep-vulnerable"
+  | "dep-duplicate"
+  | "dep-unused"
+  | "dep-outdated"
+  | "dep-abandoned"
+  | "config-tsconfig"
+  | "config-docker"
+  | "config-ci"
+  | "config-package"
+  | "perf-image"
+  | "perf-bundle"
+  | "perf-import";
+
+export type HealthDomain =
+  | "security"
+  | "environment"
+  | "git"
+  | "dependencies"
+  | "configuration"
+  | "performance";
 
 export type VerificationState = "verified-live" | "verified-dead" | "unverified";
 
 export type ConfidenceBucket = "low" | "medium" | "high";
+
+export interface AIExplanation {
+  whatIsIt: string;
+  whyIsItAProblem: string;
+  howSerious: string;
+  canItBeExploited: string;
+  howToFix: string;
+  canBiltFix: boolean;
+}
 
 export interface ProviderKnowledge {
   provider: string;
@@ -47,13 +81,25 @@ export interface ScanFinding {
   confidence?: ConfidenceBucket;
   /** The 5-question provider knowledge block */
   knowledge?: ProviderKnowledge;
+  /** The structured 6-question AI explanation */
+  aiExplanation?: AIExplanation;
 }
 
 // ─── Scan Result ─────────────────────────────────────────────────────────────
 
+export interface DomainHealthScore {
+  security: number;
+  environment: number;
+  git: number;
+  dependencies: number;
+  configuration: number;
+  performance: number;
+}
+
 export interface ScanResult {
   findings: ScanFinding[];
   healthScore: number;
+  domainScores: DomainHealthScore;
   grade: string;
   timestamp: Date;
   scannedFiles: number;
@@ -253,6 +299,7 @@ export interface ScanOptions {
   noVerify?: boolean;
   debug?: boolean;
   retainSecrets?: boolean;
+  includeTests?: boolean;
 }
 
 export interface FixOptions {

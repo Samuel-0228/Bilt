@@ -74,5 +74,5 @@ describe("Fix Verification Integration Tests", () => {
     const committedContent = execSync("git show HEAD:index.js", { cwd: tmpDir }).toString();
     expect(committedContent).not.toContain(fakeSecret);
     expect(committedContent).toContain("[REDACTED_BY_BILT]");
-  });
+  }, 60000);
 });

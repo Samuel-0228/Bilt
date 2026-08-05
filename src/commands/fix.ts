@@ -301,6 +301,212 @@ async function generateFixActions(
         break;
       }
 
+      case "git-committed-env": {
+        const targetFile = finding.file;
+        const basename = path.basename(targetFile);
+        if (!addedTypes.has(`git-committed-env-${targetFile}`)) {
+          addedTypes.add(`git-committed-env-${targetFile}`);
+          actions.push({
+            id: `fix-git-committed-env-${Date.now()}`,
+            description: `Untrack ${targetFile} from Git index & update .gitignore`,
+            type: "destructive",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: [
+                `Run "git rm --cached ${targetFile}" (untrack file without deleting from disk)`,
+                `Add ${basename} to .gitignore`,
+              ],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const stepsApplied: string[] = [];
+              try {
+                const { execSync } = await import("node:child_process");
+                execSync(`git rm --cached "${targetFile}"`, { cwd: rootDir, stdio: "ignore" });
+                stepsApplied.push(`Untracked ${targetFile} from Git index`);
+              } catch {
+                // Ignore if untracked or git error
+              }
+
+              const gitignorePath = path.join(rootDir, ".gitignore");
+              const newContent = await addToGitignore(
+                [basename, ".env", ".env.*", ".env.local"],
+                gitignorePath,
+              );
+              let oldContent = "";
+              try { oldContent = await fs.readFile(gitignorePath, "utf-8"); } catch {}
+              await debugWriteFile(gitignorePath, newContent, oldContent);
+              stepsApplied.push(`Added ${basename} to .gitignore`);
+
+              return { success: true, stepsApplied };
+            },
+            verify: async () => {
+              try {
+                const { execSync } = await import("node:child_process");
+                const out = execSync(`git ls-files "${targetFile}"`, { cwd: rootDir, encoding: "utf-8" }).trim();
+                if (!out) {
+                  return { passed: true, message: `Verified ${targetFile} is untracked from Git.` };
+                }
+              } catch {}
+              return { passed: false, message: `${targetFile} is still tracked in Git.` };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "config-docker": {
+        const dockerfilePath = path.join(rootDir, finding.file);
+        if (finding.message.includes("non-root USER")) {
+          actions.push({
+            id: `fix-docker-user-${Date.now()}`,
+            description: "Add non-root USER node to Dockerfile",
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: ["Append 'USER node' before container CMD/ENTRYPOINT in Dockerfile"],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              let content = "";
+              try { content = await fs.readFile(dockerfilePath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: "Dockerfile not found" };
+              }
+              if (!content.includes("USER ")) {
+                let newContent = "";
+                if (content.includes("CMD ")) {
+                  newContent = content.replace(/^(CMD\s+)/m, "USER node\n\n$1");
+                } else if (content.includes("ENTRYPOINT ")) {
+                  newContent = content.replace(/^(ENTRYPOINT\s+)/m, "USER node\n\n$1");
+                } else {
+                  newContent = content + "\nUSER node\n";
+                }
+                await debugWriteFile(dockerfilePath, newContent, content);
+                return { success: true, stepsApplied: ["Added 'USER node' directive to Dockerfile"] };
+              }
+              return { success: true, stepsApplied: ["USER directive already present in Dockerfile"] };
+            },
+            verify: async () => {
+              try {
+                const content = await fs.readFile(dockerfilePath, "utf-8");
+                if (content.includes("USER ")) return { passed: true, message: "Verified USER directive in Dockerfile." };
+              } catch {}
+              return { passed: false, message: "USER directive missing from Dockerfile." };
+            },
+            undo: async () => {},
+          });
+        } else if (finding.message.includes("unpinned base image")) {
+          actions.push({
+            id: `fix-docker-pin-${Date.now()}`,
+            description: "Pin Docker base image tag in Dockerfile",
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: ["Replace unpinned FROM tag with node:20-alpine"],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              let content = "";
+              try { content = await fs.readFile(dockerfilePath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: "Dockerfile not found" };
+              }
+              const newContent = content
+                .replace(/^FROM\s+node:latest/m, "FROM node:20-alpine")
+                .replace(/^FROM\s+node:alpine/m, "FROM node:20-alpine");
+              await debugWriteFile(dockerfilePath, newContent, content);
+              return { success: true, stepsApplied: ["Pinned Docker base image to node:20-alpine"] };
+            },
+            verify: async () => {
+              try {
+                const content = await fs.readFile(dockerfilePath, "utf-8");
+                if (!content.includes("node:latest")) return { passed: true, message: "Verified base image pinned." };
+              } catch {}
+              return { passed: false, message: "Unpinned base image tag still present." };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "config-tsconfig": {
+        const tsconfigPath = path.join(rootDir, "tsconfig.json");
+        actions.push({
+          id: `fix-tsconfig-${Date.now()}`,
+          description: `Fix tsconfig setting: ${finding.message}`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: ["Update tsconfig.json compilerOptions"],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            let content = "";
+            try { content = await fs.readFile(tsconfigPath, "utf-8"); } catch {
+              return { success: false, stepsApplied: [], error: "tsconfig.json not found" };
+            }
+            let newContent = content;
+            if (finding.message.includes("strict mode")) {
+              newContent = newContent.replace(/"strict"\s*:\s*false/g, '"strict": true');
+            }
+            if (finding.message.includes("noImplicitAny")) {
+              newContent = newContent.replace(/"noImplicitAny"\s*:\s*false/g, '"noImplicitAny": true');
+            }
+            await debugWriteFile(tsconfigPath, newContent, content);
+            return { success: true, stepsApplied: ["Updated tsconfig.json compilerOptions"] };
+          },
+          verify: async () => {
+            try {
+              const content = await fs.readFile(tsconfigPath, "utf-8");
+              if (!content.includes('"strict": false')) return { passed: true, message: "Verified tsconfig updated." };
+            } catch {}
+            return { passed: false, message: "tsconfig setting not updated." };
+          },
+          undo: async () => {},
+        });
+        break;
+      }
+
+      case "config-ci": {
+        const wfPath = path.join(rootDir, finding.file);
+        actions.push({
+          id: `fix-ci-${Date.now()}`,
+          description: `Upgrade GitHub Action version in ${finding.file}`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: ["Upgrade actions/checkout to @v4"],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            let content = "";
+            try { content = await fs.readFile(wfPath, "utf-8"); } catch {
+              return { success: false, stepsApplied: [], error: `${finding.file} not found` };
+            }
+            const newContent = content
+              .replace(/actions\/checkout@v1/g, "actions/checkout@v4")
+              .replace(/actions\/checkout@v2/g, "actions/checkout@v4");
+            await debugWriteFile(wfPath, newContent, content);
+            return { success: true, stepsApplied: ["Upgraded actions/checkout to @v4"] };
+          },
+          verify: async () => {
+            try {
+              const content = await fs.readFile(wfPath, "utf-8");
+              if (content.includes("actions/checkout@v4")) return { passed: true, message: "Verified actions/checkout upgraded." };
+            } catch {}
+            return { passed: false, message: "Action version not upgraded." };
+          },
+          undo: async () => {},
+        });
+        break;
+      }
+
       case "env-missing": {
         const key =
           finding.message.match(/process\.env\.(\w+)/)?.[1] ??

@@ -11,6 +11,21 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import type { ScanFinding } from "../../types/index.js";
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+export const COMMON_SENSITIVE_DIRS = [
+  "node_modules",
+  ".venv",
+  "venv",
+  "dist",
+  "build",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  "__pycache__",
+  ".bilt",
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 let findingCounter = 0;
@@ -173,6 +188,82 @@ export async function checkEnvFilesIgnoredWithGit(
         message: `${name} is not ignored by git — secrets may be committed`,
         file: envFile,
         suggestion: `Add "${name}" or ".env*" to your .gitignore file`,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Check whether common sensitive directories (like node_modules, .venv, .bilt)
+ * are properly ignored by git.
+ */
+export async function checkCommonDirsIgnored(
+  projectDir: string,
+): Promise<ScanFinding[]> {
+  const findings: ScanFinding[] = [];
+
+  let useGit = false;
+  const git = simpleGit(projectDir);
+  git.env({
+    ...process.env,
+    GIT_DIR: undefined,
+    GIT_WORK_TREE: undefined,
+  });
+
+  try {
+    const isRepo = await git.checkIsRepo();
+    if (isRepo) useGit = true;
+  } catch {
+    // Git not available or not a repo
+  }
+
+  let gitignoreContent = "";
+  try {
+    gitignoreContent = await fs.readFile(
+      path.join(projectDir, ".gitignore"),
+      "utf-8",
+    );
+  } catch {
+    // Missing gitignore
+  }
+
+  for (const dirName of COMMON_SENSITIVE_DIRS) {
+    const fullDirPath = path.join(projectDir, dirName);
+    try {
+      const stat = await fs.stat(fullDirPath);
+      if (!stat.isDirectory()) continue;
+    } catch {
+      // If the directory does not exist in the project, skip it to avoid false positives
+      continue;
+    }
+
+    let isIgnored = false;
+    
+    // We append a trailing slash to simulate directory matching
+    const testPath = `${dirName}/`;
+
+    if (useGit) {
+      try {
+        await git.raw(["check-ignore", "-q", testPath]);
+        isIgnored = true;
+      } catch {
+        isIgnored = false;
+      }
+    } else {
+      const patterns = parseGitignore(gitignoreContent);
+      isIgnored = patternCoversFile(patterns, dirName, testPath);
+    }
+
+    if (!isIgnored) {
+      findings.push({
+        id: nextId(`gitignore-missing-dir-${dirName}`),
+        severity: "warning",
+        category: "gitignore-missing",
+        message: `Directory ${dirName} is present but not ignored by git`,
+        file: ".gitignore",
+        suggestion: `Add "${dirName}/" to your .gitignore file`,
       });
     }
   }

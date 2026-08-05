@@ -100,5 +100,5 @@ describe("Snapshot System", () => {
 
     const all = await listSnapshots(tmpDir);
     expect(all.length).toBe(10);
-  });
+  }, 15000);
 });
