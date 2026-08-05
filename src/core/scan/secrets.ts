@@ -99,63 +99,55 @@ export function scanFileForSecrets(
   content: string,
   filePath: string,
   rulesOrConfig: SecretRule[] | BiltConfig = SECRET_RULES,
-  entropyThreshold: number = 4.5,
+  optionsOrThreshold: { entropyThreshold?: number; includeTests?: boolean } | number = 4.5,
 ): ScanFinding[] {
   let rules: SecretRule[];
-  let threshold = entropyThreshold;
+  let threshold = 4.5;
+  let includeTests = false;
+
+  if (typeof optionsOrThreshold === "number") {
+    threshold = optionsOrThreshold;
+  } else if (optionsOrThreshold && typeof optionsOrThreshold === "object") {
+    threshold = optionsOrThreshold.entropyThreshold ?? 4.5;
+    includeTests = !!optionsOrThreshold.includeTests;
+  }
 
   if (Array.isArray(rulesOrConfig)) {
     rules = rulesOrConfig;
   } else if (rulesOrConfig && typeof rulesOrConfig === "object") {
-    // It's a BiltConfig
     const config = rulesOrConfig;
     rules = [...SECRET_RULES, ...(config.customRules || [])];
-    threshold = config.entropyThreshold ?? entropyThreshold;
+    threshold = config.entropyThreshold ?? threshold;
   } else {
     rules = SECRET_RULES;
   }
 
   const findings: ScanFinding[] = [];
-
-  // Split content into lines for ignore-comment checks
   const fileLines = content.split("\n");
-
-  // Track matches we've already reported to avoid duplicates when
-  // multiple rules match the same span.
   const seen = new Set<string>();
 
   for (const rule of rules) {
-    // Reset the regex's lastIndex (rules use /g flag)
     rule.pattern.lastIndex = 0;
-
     let match: RegExpExecArray | null;
 
     while ((match = rule.pattern.exec(content)) !== null) {
-      // For the generic high-entropy rule, prefer the captured group
       const matchedValue = match[1] ?? match[0];
-
-      // De-duplicate by exact span to prevent multiple rules flagging the same string
       const dedupeKey = `${match.index}:${matchedValue.length}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
-      // Skip placeholders
       if (isPlaceholder(matchedValue)) continue;
 
-      // For the generic high-entropy rule, require high entropy
       if (rule.id === "generic-high-entropy") {
         if (!isHighEntropy(matchedValue, threshold)) continue;
       }
 
-      // For the AWS secret key rule, require high entropy to avoid
-      // false positives from 40-char strings in code.
       if (rule.id === "aws-secret-key") {
         if (!isHighEntropy(matchedValue, threshold)) continue;
       }
 
       const line = lineNumberAt(content, match.index);
 
-      // Check for known public assignments (e.g. ANON_KEY, PUBLISHABLE_KEY)
       const matchedLine = fileLines[line - 1];
       if (matchedLine) {
         const isPublicAssignment =
@@ -165,7 +157,6 @@ export function scanFileForSecrets(
         if (isPublicAssignment) continue;
       }
 
-      // Check for inline ignore comments (e.g. gitleaks:allow or bilt:allow)
       const previousLine = line > 1 ? fileLines[line - 2] : undefined;
       const isAllowed =
         (matchedLine &&
@@ -186,10 +177,8 @@ export function scanFileForSecrets(
         confidence = "medium";
       }
 
-      // Context Heuristics for JS/TS
       const isJsTs = /\.(js|jsx|ts|tsx)$/i.test(filePath);
       
-      // Suppress test and docs files
       const isTestOrDoc = 
         filePath.includes("/test/") || 
         filePath.includes("/tests/") || 
@@ -198,8 +187,7 @@ export function scanFileForSecrets(
         filePath.endsWith(".md") || 
         filePath.includes("/docs/");
 
-      if (isTestOrDoc) {
-        // Skip entirely per heuristic rules
+      if (isTestOrDoc && !includeTests) {
         continue;
       }
 

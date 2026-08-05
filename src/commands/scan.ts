@@ -1,5 +1,6 @@
 // ─── Scan Command ────────────────────────────────────────────────────────────
-// Orchestrates all scanning passes and produces a unified ScanResult.
+// Orchestrates all domain scanning passes and produces a unified ScanResult.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import path from "node:path";
 import { promises as fs } from "node:fs";
@@ -12,20 +13,15 @@ import type {
   Severity,
 } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
-import {
-  parseEnvFile,
-  findEnvFiles,
-  diffEnvFiles,
-  scanCodeForEnvRefs,
-  findMissingEnvVars,
-  findUnusedEnvVars,
-} from "../core/scan/env.js";
-import { checkEnvFilesIgnoredWithGit } from "../core/scan/gitignore.js";
+import { detectEcosystem } from "../core/ecosystem/detector.js";
+import { generateAIExplanation } from "../core/ai/explainer.js";
+import { performEnvScan, findEnvFiles } from "../core/scan/env.js";
+import { checkEnvFilesIgnoredWithGit, checkCommonDirsIgnored } from "../core/scan/gitignore.js";
 import { scanFileForSecrets, scanGitHistory } from "../core/scan/secrets.js";
-import {
-  detectFramework,
-  checkClientExposedSecrets,
-} from "../core/scan/framework.js";
+import { scanGitRepository } from "../core/scan/git.js";
+import { scanDependencies } from "../core/scan/dependencies.js";
+import { scanConfigurations } from "../core/scan/config.js";
+import { scanPerformance } from "../core/scan/performance.js";
 import { calculateHealthScore } from "../core/score/health.js";
 import { loadPlugins } from "../plugins/loader.js";
 import { createPluginContext } from "../plugins/interface.js";
@@ -33,7 +29,6 @@ import { SECRET_RULES } from "../core/rules/secret-rules.js";
 import {
   colors,
   glyphs,
-  banner,
   pulseBar,
   isPlainMode,
   Spinner,
@@ -59,11 +54,11 @@ async function runScanStep(
 
   if (!quiet && stepFindings.length > 0) {
     const isPlain = isPlainMode();
-    const mode = (detailsEnabled || isPlain) ? "detail" : "headline";
+    const mode = detailsEnabled || isPlain ? "detail" : "headline";
     for (const f of stepFindings) {
       console.log(formatFinding(f, mode));
       if (!isPlain) {
-        await new Promise((resolve) => setTimeout(resolve, 80));
+        await new Promise((resolve) => setTimeout(resolve, 60));
       }
       console.log("");
     }
@@ -72,13 +67,11 @@ async function runScanStep(
   return stepFindings;
 }
 
-// Apply overrides and severity filters to a list of findings
 function applyOverridesAndFilter(
   findings: ScanFinding[],
   config: any,
   minSeverity?: Severity,
 ): ScanFinding[] {
-  // Apply overrides
   for (const finding of findings) {
     if (finding.ruleId) {
       const override = config.severityOverrides[finding.ruleId];
@@ -88,7 +81,6 @@ function applyOverridesAndFilter(
     }
   }
 
-  // Filter by severity
   if (minSeverity) {
     const severityOrder: Record<Severity, number> = {
       critical: 0,
@@ -104,15 +96,7 @@ function applyOverridesAndFilter(
 }
 
 /**
- * Execute a full project scan, returning a ScanResult.
- *
- * 1. Load config
- * 2. Step 1: Check .gitignore
- * 3. Step 2: Check env variable usage (and mismatches, unused, client exposed)
- * 4. Step 3: Check for secrets (working tree & git history)
- * 5. Step 4: Run plugins
- * 6. Calculate health score
- * 7. Report final results
+ * Execute a full project scan across all 6 health domains.
  */
 export async function executeScan(
   projectDir: string,
@@ -135,144 +119,57 @@ export async function executeScan(
   }
 
   let scannedFiles = 0;
-  let detectedFramework: FrameworkInfo | undefined;
+
+  // Auto-detect ecosystem
+  const ecosystem = await detectEcosystem(rootDir);
+  const detectedFramework: FrameworkInfo | undefined = ecosystem.primaryFramework
+    ? {
+        name: ecosystem.primaryFramework.id,
+        displayName: ecosystem.primaryFramework.name,
+        clientExposedPrefixes: ecosystem.clientExposedPrefixes,
+        configFiles: ecosystem.primaryFramework.configFiles || [],
+      }
+    : undefined;
 
   try {
-    // ── STEP 1. Check .gitignore ──────────────────────────────────────────
+    // 1. Environment & Gitignore Step
     const gitignoreStepFindings = await runScanStep(
-      "Checking .gitignore",
+      "Checking Git & Environment hygiene",
       isQuiet || isJson,
       async () => {
         const envFiles = await findEnvFiles(rootDir);
         const stepFindings = await checkEnvFilesIgnoredWithGit(rootDir, envFiles);
+        const commonDirsFindings = await checkCommonDirsIgnored(rootDir);
+        stepFindings.push(...commonDirsFindings);
+
+        const gitRepoFindings = await scanGitRepository(rootDir, {
+          historyDepth: config.historyDepth,
+        });
+        stepFindings.push(...gitRepoFindings);
+
         return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
       },
       detailsEnabled,
     );
     findings.push(...gitignoreStepFindings);
 
-    // ── STEP 2. Check environment variables ────────────────────────────────
+    // 2. Environment Variables Step
     const envStepFindings = await runScanStep(
-      "Checking environment variables",
+      "Checking environment variable usage",
       isQuiet || isJson,
       async () => {
-        const stepFindings: ScanFinding[] = [];
-        const envFiles = await findEnvFiles(rootDir);
-        const parsedEnvFiles = [];
-        for (const envFile of envFiles) {
-          try {
-            const content = await fs.readFile(envFile, "utf-8");
-            if (options.debug) {
-              console.log(`[DEBUG READ] ${envFile} (${Buffer.byteLength(content, "utf8")} bytes)`);
-            }
-            const parsed = parseEnvFile(content, envFile);
-            parsedEnvFiles.push(parsed);
-          } catch {
-            // Skip unreadable files
-          }
-        }
-
-        const codeFiles = await fg(
-          ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx", "**/*.py", "**/*.rb"],
-          {
-            cwd: rootDir,
-            ignore: config.ignore,
-            onlyFiles: true,
-            absolute: true,
-          },
-        );
-
-        const envRefs = new Set<string>();
-        const primaryEnv = parsedEnvFiles[0];
-        const definedKeys = primaryEnv ? [...primaryEnv.entries.keys()] : [];
-
-        for (const codeFile of codeFiles) {
-          try {
-            const content = await fs.readFile(codeFile, "utf-8");
-            if (options.debug) {
-              console.log(`[DEBUG READ] ${codeFile} (${Buffer.byteLength(content, "utf8")} bytes)`);
-            }
-            const refs = scanCodeForEnvRefs(content, codeFile);
-            for (const ref of refs) envRefs.add(ref);
-
-            if (primaryEnv) {
-              const missingFindings = findMissingEnvVars(
-                refs,
-                definedKeys,
-                path.relative(rootDir, codeFile),
-              );
-              stepFindings.push(...missingFindings);
-            }
-          } catch {
-            // Skip unreadable files
-          }
-        }
-
-        if (parsedEnvFiles.length >= 2) {
-          const diffFindings = diffEnvFiles(parsedEnvFiles);
-          stepFindings.push(...diffFindings);
-        }
-
-        if (primaryEnv) {
-          const unusedFindings = findUnusedEnvVars(
-            [...envRefs],
-            [...primaryEnv.entries.values()],
-            path.relative(rootDir, primaryEnv.filePath),
-          );
-          stepFindings.push(...unusedFindings);
-        }
-
-        try {
-          const detected = await detectFramework(rootDir);
-          detectedFramework = detected || undefined;
-          if (detectedFramework && parsedEnvFiles.length > 0) {
-            const exposedFindings = checkClientExposedSecrets(
-              parsedEnvFiles,
-              detectedFramework,
-              SECRET_RULES,
-              config.entropyThreshold,
-            );
-            stepFindings.push(...exposedFindings);
-          }
-        } catch {
-          // Framework detection failed
-        }
-
-        // Apply overrides and severity filters to raw step findings
-        let filteredStepFindings = applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
-
-        // Compute healthy env vars
-        if (primaryEnv) {
-          const envIssueKeys = new Set<string>();
-          for (const f of filteredStepFindings) {
-            const keyMatch = f.message.match(/Variable "(?<key>[A-Z_][A-Z0-9_]*)"/) ||
-                             f.message.match(/process\.env\.(?<key>[A-Z_][A-Z0-9_]*)/);
-            if (keyMatch?.groups?.["key"]) {
-              envIssueKeys.add(keyMatch.groups["key"]);
-            }
-          }
-          const healthyKeys = definedKeys.filter((k) => !envIssueKeys.has(k));
-          if (healthyKeys.length > 0) {
-            filteredStepFindings.push({
-              id: `env-healthy-${Date.now()}`,
-              severity: "passed",
-              category: "env-mismatch",
-              message: `${healthyKeys.length} var${healthyKeys.length > 1 ? "s" : ""} healthy`,
-              file: primaryEnv.filePath,
-              suggestion: healthyKeys.join(", "),
-            });
-          }
-        }
-
-        return filteredStepFindings;
+        return await performEnvScan(rootDir, config, {
+          severity: options.severity,
+          debug: options.debug,
+        });
       },
       detailsEnabled,
     );
     findings.push(...envStepFindings);
 
-    // ── STEP 3. Check for secrets ─────────────────────────────────────────
+    // 3. Secret Intelligence & Credentials Step
     const secretsStepFindings = await runScanStep(
-      "Checking for secrets",
+      "Scanning code & history for secrets",
       isQuiet || isJson,
       async () => {
         const stepFindings: ScanFinding[] = [];
@@ -302,14 +199,11 @@ export async function executeScan(
             if (stat.size > 1_048_576) continue;
 
             const content = await fs.readFile(fullPath, "utf-8");
-            if (options.debug) {
-              console.log(`[DEBUG READ] ${fullPath} (${Buffer.byteLength(content, "utf8")} bytes)`);
-            }
             const secretFindings = scanFileForSecrets(
               content,
               file,
               SECRET_RULES,
-              config.entropyThreshold,
+              { entropyThreshold: config.entropyThreshold, includeTests: options.includeTests },
             );
             stepFindings.push(...secretFindings);
             scannedFiles++;
@@ -331,11 +225,7 @@ export async function executeScan(
           // Skip
         }
 
-        // Liveness verification
-        if (options.noVerify && !isQuiet && !isJson) {
-          console.log(`  ${colors.slateDim.apply(glyphs.info)} Offline mode — live verification skipped`);
-        }
-
+        // Credential liveness verification
         for (const finding of stepFindings) {
           if (finding.category === "secret-detected" && finding.secret) {
             if (options.noVerify) {
@@ -368,9 +258,45 @@ export async function executeScan(
     );
     findings.push(...secretsStepFindings);
 
-    // ── STEP 4. Running plugins ───────────────────────────────────────────
+    // 4. Dependency Intelligence Step
+    const depStepFindings = await runScanStep(
+      "Auditing dependencies & lockfiles",
+      isQuiet || isJson,
+      async () => {
+        const stepFindings = await scanDependencies(rootDir);
+        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+      },
+      detailsEnabled,
+    );
+    findings.push(...depStepFindings);
+
+    // 5. Configuration Intelligence Step
+    const configStepFindings = await runScanStep(
+      "Auditing tool & deployment configurations",
+      isQuiet || isJson,
+      async () => {
+        const stepFindings = await scanConfigurations(rootDir);
+        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+      },
+      detailsEnabled,
+    );
+    findings.push(...configStepFindings);
+
+    // 6. Performance Insights Step
+    const perfStepFindings = await runScanStep(
+      "Analyzing performance & bundle health",
+      isQuiet || isJson,
+      async () => {
+        const stepFindings = await scanPerformance(rootDir);
+        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+      },
+      detailsEnabled,
+    );
+    findings.push(...perfStepFindings);
+
+    // 7. Plugin Execution Step
     const pluginsStepFindings = await runScanStep(
-      "Running plugins",
+      "Running third-party plugins",
       isQuiet || isJson,
       async () => {
         const stepFindings: ScanFinding[] = [];
@@ -396,7 +322,14 @@ export async function executeScan(
     );
     findings.push(...pluginsStepFindings);
 
-    // Sort verified-live findings first
+    // Enriched findings with structured AI explanations
+    for (const f of findings) {
+      if (!f.aiExplanation) {
+        f.aiExplanation = generateAIExplanation(f);
+      }
+    }
+
+    // Sort live findings first
     findings.sort((a, b) => {
       const aLive = a.category === "secret-detected" && a.verificationState === "verified-live";
       const bLive = b.category === "secret-detected" && b.verificationState === "verified-live";
@@ -405,14 +338,13 @@ export async function executeScan(
       return 0;
     });
 
-    // Calculate final score
-    // Passed findings don't count towards point deductions
-    const { score, grade } = calculateHealthScore(findings);
+    const { score, domainScores, grade } = calculateHealthScore(findings);
     const duration = Date.now() - start;
 
     const result: ScanResult = {
       findings: findings.filter((f) => f.severity !== "passed"),
       healthScore: score,
+      domainScores,
       grade,
       timestamp: new Date(),
       scannedFiles,
@@ -420,7 +352,6 @@ export async function executeScan(
       duration,
     };
 
-    // Report
     if (isJson) {
       console.log(JSON.stringify(result, null, 2));
     } else if (!isQuiet) {
@@ -444,54 +375,13 @@ export async function executeScan(
 
       parts.push(colors.slateDim.apply("bilt fix"));
       const isPlain = isPlainMode();
-      const mode = (options.verbose || options.details !== false || isPlain) ? "detail" : "headline";
+      const mode = options.verbose || options.details !== false || isPlain ? "detail" : "headline";
       if (mode !== "detail") {
         parts.push(colors.slateDim.apply("bilt scan"));
       }
 
       console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
       console.log("");
-
-      // Interactive mode keypress listener
-      if (process.stdin.isTTY && !options.details && !isPlain) {
-        const hint = colors.slateDim.dim("  (press d for details, any other key to exit)");
-        process.stdout.write(hint);
-
-        process.stdin.setRawMode(true);
-        process.stdin.resume();
-        process.stdin.setEncoding("utf8");
-
-        await new Promise<void>((resolve) => {
-          const onData = (key: string) => {
-            // Clear the hint line
-            process.stdout.write("\r" + " ".repeat(hint.length + 10) + "\r");
-
-            process.stdin.removeListener("data", onData);
-            process.stdin.setRawMode(false);
-            process.stdin.pause();
-
-            if (key === "\u0003") {
-              process.exit(0);
-            }
-
-            if (key.toLowerCase() === "d") {
-              console.log("");
-              // Reprint findings in detailed mode
-              for (const f of findings) {
-                console.log(formatFinding(f, "detail"));
-                console.log("");
-              }
-              // Print pulse bar and summary again
-              console.log(pulseBar(score));
-              console.log("");
-              console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
-              console.log("");
-            }
-            resolve();
-          };
-          process.stdin.on("data", onData);
-        });
-      }
     }
 
     return result;

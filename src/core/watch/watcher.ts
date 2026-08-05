@@ -7,8 +7,11 @@
 
 import chokidar from "chokidar";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { scanFileForSecrets } from "../scan/secrets.js";
 import { SECRET_RULES } from "../rules/secret-rules.js";
+import { performEnvScan, findEnvFiles } from "../scan/env.js";
+import { checkEnvFilesIgnoredWithGit, checkCommonDirsIgnored } from "../scan/gitignore.js";
 import type { BiltConfig, ScanFinding, WatchEvent } from "../../types/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -168,6 +171,22 @@ export function startWatcher(
       allRules,
       config.entropyThreshold,
     );
+
+    const basename = path.basename(filePath);
+
+    // If .gitignore changes, verify ignored files
+    if (basename === ".gitignore") {
+      const envFiles = await findEnvFiles(projectDir);
+      const gitignoreFindings = await checkEnvFilesIgnoredWithGit(projectDir, envFiles);
+      const commonDirsFindings = await checkCommonDirsIgnored(projectDir);
+      findings.push(...gitignoreFindings, ...commonDirsFindings);
+    }
+
+    // If an environment file changes, run an env cross-check
+    if (basename.startsWith(".env")) {
+      const envFindings = await performEnvScan(projectDir, config);
+      findings.push(...envFindings);
+    }
 
     const event: WatchEvent = {
       type: eventType,

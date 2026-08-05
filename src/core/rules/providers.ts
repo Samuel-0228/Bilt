@@ -4,7 +4,7 @@
 // so that Bilt can tell developers exactly where to rotate a leaked key.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ProviderInfo, ProviderKnowledge } from "../../types/index.js";
@@ -299,7 +299,9 @@ export function getProviderKnowledge(ruleId: string): ProviderKnowledge | undefi
   if (!knowledgeCache) {
     knowledgeCache = {};
     try {
-      const knowledgeDir = join(__dirname, "knowledge");
+      const dirA = join(__dirname, "providers", "knowledge");
+      const dirB = join(__dirname, "knowledge");
+      const knowledgeDir = existsSync(dirA) ? dirA : dirB;
       const files = readdirSync(knowledgeDir);
       for (const file of files) {
         if (file.endsWith(".json")) {

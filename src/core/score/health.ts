@@ -1,16 +1,15 @@
 // ─── Health Score Calculator ─────────────────────────────────────────────────
-//
-// Computes a 0-100 health score from scan findings, with a letter-grade
-// and per-category breakdown.  Pure function — no side effects.
+// Computes overall and domain-specific 0-100 health scores from scan findings.
+// Pure function — no side effects.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type {
   ScanFinding,
   FindingCategory,
   Severity,
+  DomainHealthScore,
+  HealthDomain,
 } from "../../types/index.js";
-
-// ─── Point Deductions ────────────────────────────────────────────────────────
 
 const SEVERITY_COST: Record<Severity, number> = {
   critical: 15,
@@ -18,9 +17,6 @@ const SEVERITY_COST: Record<Severity, number> = {
   info: 1,
   passed: 0,
 };
-
-// ─── Grade Thresholds ────────────────────────────────────────────────────────
-// Ordered from highest to lowest so the first match wins.
 
 const GRADE_THRESHOLDS: Array<{ min: number; grade: string }> = [
   { min: 97, grade: "A+" },
@@ -36,8 +32,6 @@ const GRADE_THRESHOLDS: Array<{ min: number; grade: string }> = [
   { min: 0, grade: "F" },
 ];
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export interface CategoryBreakdown {
   category: string;
   points: number;
@@ -45,60 +39,95 @@ export interface CategoryBreakdown {
 }
 
 export interface HealthReport {
-  /** Numeric score from 0 (worst) to 100 (perfect). */
   score: number;
-  /** Letter grade (A+ through F). */
+  domainScores: DomainHealthScore;
   grade: string;
-  /** Per-category breakdown showing point deductions and finding counts. */
   breakdown: CategoryBreakdown[];
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
+export function getCategoryDomain(category: FindingCategory): HealthDomain {
+  switch (category) {
+    case "secret-detected":
+    case "env-exposed":
+    case "git-history-secret":
+    case "dep-vulnerable":
+      return "security";
 
-/**
- * Calculate a health score from an array of `ScanFinding`s.
- *
- * Scoring:
- *   • Start at **100**.
- *   • Each `critical` finding: **−15 points**.
- *   • Each `warning` finding: **−5 points**.
- *   • Each `info` finding: **−1 point**.
- *   • Floor at **0** (score never goes negative).
- *
- * The `breakdown` array lists every finding category that contributed
- * to the score loss, sorted by point deduction (largest first).
- */
+    case "env-missing":
+    case "env-unused":
+    case "env-mismatch":
+    case "framework-warning":
+      return "environment";
+
+    case "gitignore-missing":
+    case "git-large-file":
+    case "git-committed-env":
+    case "git-hygiene":
+      return "git";
+
+    case "dep-duplicate":
+    case "dep-unused":
+    case "dep-outdated":
+    case "dep-abandoned":
+      return "dependencies";
+
+    case "config-tsconfig":
+    case "config-docker":
+    case "config-ci":
+    case "config-package":
+      return "configuration";
+
+    case "perf-image":
+    case "perf-bundle":
+    case "perf-import":
+      return "performance";
+
+    default:
+      return "security";
+  }
+}
+
 export function calculateHealthScore(findings: ScanFinding[]): HealthReport {
-  // Accumulate deductions per category
-  const categoryMap = new Map<
-    FindingCategory,
-    { points: number; count: number }
-  >();
+  const categoryMap = new Map<FindingCategory, { points: number; count: number }>();
+  const domainDeductions: Record<HealthDomain, number> = {
+    security: 0,
+    environment: 0,
+    git: 0,
+    dependencies: 0,
+    configuration: 0,
+    performance: 0,
+  };
+
+  let totalDeduction = 0;
 
   for (const finding of findings) {
-    const cost = SEVERITY_COST[finding.severity];
-    const existing = categoryMap.get(finding.category);
+    const cost = SEVERITY_COST[finding.severity] || 0;
+    totalDeduction += cost;
 
+    const existing = categoryMap.get(finding.category);
     if (existing) {
       existing.points += cost;
       existing.count += 1;
     } else {
       categoryMap.set(finding.category, { points: cost, count: 1 });
     }
+
+    const domain = getCategoryDomain(finding.category);
+    domainDeductions[domain] += cost;
   }
 
-  // Total deduction
-  let totalDeduction = 0;
-  for (const { points } of categoryMap.values()) {
-    totalDeduction += points;
-  }
+  const domainScores: DomainHealthScore = {
+    security: Math.max(0, 100 - domainDeductions.security),
+    environment: Math.max(0, 100 - domainDeductions.environment),
+    git: Math.max(0, 100 - domainDeductions.git),
+    dependencies: Math.max(0, 100 - domainDeductions.dependencies),
+    configuration: Math.max(0, 100 - domainDeductions.configuration),
+    performance: Math.max(0, 100 - domainDeductions.performance),
+  };
 
   const score = Math.max(0, 100 - totalDeduction);
-
-  // Determine grade
   const grade = GRADE_THRESHOLDS.find((t) => score >= t.min)?.grade ?? "F";
 
-  // Build sorted breakdown
   const breakdown: CategoryBreakdown[] = [...categoryMap.entries()]
     .map(([category, data]) => ({
       category,
@@ -107,5 +136,5 @@ export function calculateHealthScore(findings: ScanFinding[]): HealthReport {
     }))
     .sort((a, b) => b.points - a.points);
 
-  return { score, grade, breakdown };
+  return { score, domainScores, grade, breakdown };
 }

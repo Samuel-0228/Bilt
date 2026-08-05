@@ -18,7 +18,7 @@ describe("CLI Binary Integration Tests", () => {
     // Ensure project is built before running CLI binary tests
     const rootDir = path.resolve(__dirname, "../../");
     await execa("npm", ["run", "build"], { cwd: rootDir });
-  });
+  }, 60000);
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bilt-cli-integration-"));

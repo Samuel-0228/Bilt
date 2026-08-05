@@ -10,6 +10,19 @@ import { executeFix } from "./commands/fix.js";
 import { executeUndo } from "./commands/undo.js";
 import { executeDoctor } from "./commands/doctor.js";
 import { executeWatch } from "./commands/watch.js";
+import {
+  executeAISetup,
+  executeAIStatus,
+  executeAIRemove,
+  executeAITest,
+  executeAILastRequest,
+  executeAISwitch,
+  executeAIModel,
+  executeAIProvider,
+} from "./commands/ai.js";
+import { executeAsk } from "./commands/ask.js";
+import { executeWelcome } from "./commands/welcome.js";
+import { checkAndRunFirstTimeOnboarding } from "./core/onboarding/first-run.js";
 import type { Severity } from "./types/index.js";
 import { colors, glyphs, initColorSupport, setPlainMode, sectionHeader, divider, banner, pulseBar, styledGlyph, text, Spinner, spinnerFrames } from "./ui/theme.js";
 import { severityIcon, formatFinding, formatHealthScore } from "./ui/format.js";
@@ -27,13 +40,16 @@ const pkg = require("../package.json") as { version: string };
 
 const program = new Command();
 
-program.hook("preAction", (thisCommand) => {
-  const opts = thisCommand.optsWithGlobals() as { color?: boolean; plain?: boolean };
+program.hook("preAction", async (thisCommand, actionCommand) => {
+  const opts = thisCommand.optsWithGlobals() as { color?: boolean; plain?: boolean; json?: boolean };
   if (opts.color === false) {
     initColorSupport(true);
   }
   if (opts.plain) {
     setPlainMode(true);
+  }
+  if (actionCommand.name() !== "welcome" && actionCommand.name() !== "theme-preview") {
+    await checkAndRunFirstTimeOnboarding({ plain: opts.plain, json: opts.json });
   }
 });
 
@@ -65,6 +81,7 @@ program
   .option("--quiet", "Suppress all output except errors")
   .option("--dry-run", "Show what would be scanned without scanning")
   .option("--no-verify", "Disable live credential verification calls")
+  .option("--include-tests", "Include findings in test, fixture, and documentation files")
   .option("--debug", "Enable debug logging for path and file resolutions")
   .option("--fun", "Enable fun mode with celebrations")
   .action(
@@ -81,6 +98,7 @@ program
         fun?: boolean;
         verify?: boolean;
         debug?: boolean;
+        includeTests?: boolean;
       },
     ) => {
       try {
@@ -95,6 +113,7 @@ program
           fun: opts.fun,
           noVerify: opts.verify === false,
           debug: opts.debug,
+          includeTests: opts.includeTests,
         });
 
         // Exit code based on findings
@@ -208,6 +227,42 @@ program
     },
   );
 
+// ─── bilt report ─────────────────────────────────────────────────────────────
+
+program
+  .command("report")
+  .description("Export project health report as Markdown or JSON")
+  .argument("[dir]", "Project directory", ".")
+  .option("--format <format>", "Export format (markdown or json)", "markdown")
+  .option("--output <path>", "File path to save the report")
+  .action(async (dir: string, opts: { format?: string; output?: string }) => {
+    try {
+      const { executeReport } = await import("./commands/report.js");
+      await executeReport(dir, opts);
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+// ─── bilt plugin ─────────────────────────────────────────────────────────────
+
+program
+  .command("plugin")
+  .description("Manage Bilt plugins (install, list, create)")
+  .argument("<action>", "Action to perform: list, install, create")
+  .argument("[name]", "Plugin name or path")
+  .option("--dir <dir>", "Project directory", ".")
+  .action(async (action: string, name: string | undefined, opts: { dir?: string }) => {
+    try {
+      const { executePlugin } = await import("./commands/plugin.js");
+      await executePlugin(action, name, opts);
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
 // ─── bilt doctor ─────────────────────────────────────────────────────────────
 
 program
@@ -230,13 +285,151 @@ program
     }
   });
 
+// ─── bilt welcome ────────────────────────────────────────────────────────────
+
+program
+  .command("welcome")
+  .alias("onboarding")
+  .alias("guide")
+  .description("Interactive welcome guide & quick-start setup menu")
+  .action(async () => {
+    try {
+      await executeWelcome();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+// ─── bilt ai ─────────────────────────────────────────────────────────────────
+
+const aiCommand = program
+  .command("ai")
+  .description("Manage optional AI integration (providers, key storage, redaction debug)");
+
+aiCommand
+  .command("setup")
+  .description("Interactive wizard to connect an AI provider key")
+  .action(async () => {
+    try {
+      await executeAISetup();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("status")
+  .description("Show configured AI provider, masked key, active model, and validation status")
+  .action(async () => {
+    try {
+      await executeAIStatus();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("switch")
+  .description("Interactive menu to switch active AI provider or active model")
+  .action(async () => {
+    try {
+      await executeAISwitch();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("model")
+  .description("Select or change active AI model for the current provider")
+  .argument("[model]", "Model ID string (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash)")
+  .action(async (model?: string) => {
+    try {
+      await executeAIModel(model);
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("provider")
+  .description("Switch active AI provider among configured providers")
+  .argument("[provider]", "Provider ID (openai, anthropic, gemini, openrouter, groq)")
+  .action(async (provider?: string) => {
+    try {
+      await executeAIProvider(provider);
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("remove")
+  .description("Delete stored AI provider key and disable AI features")
+  .action(async () => {
+    try {
+      await executeAIRemove();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("test")
+  .description("Re-validate stored API key against active provider")
+  .action(async () => {
+    try {
+      await executeAITest();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+aiCommand
+  .command("last-request")
+  .description("Display the last redacted payload sent to AI for user auditing")
+  .option("--debug", "Enable debug output")
+  .action(async () => {
+    try {
+      await executeAILastRequest();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+// ─── bilt ask ────────────────────────────────────────────────────────────────
+
+program
+  .command("ask")
+  .description("Ask a question scoped to current project findings (requires optional AI setup)")
+  .argument("<question>", "Question to ask about project health and findings")
+  .argument("[dir]", "Project directory", ".")
+  .option("--debug", "Show redacted payload context before sending")
+  .action(async (question: string, dir: string, opts: { debug?: boolean }) => {
+    try {
+      await executeAsk(question, dir, { debug: opts.debug });
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
 // ─── Error Handler ───────────────────────────────────────────────────────────
 
-function printError(error: unknown): void {
+function printError(error: unknown, debug?: boolean): void {
   const message = error instanceof Error ? error.message : String(error);
   console.error("");
   console.error(colors.pulseCoral.bold(`  ${glyphs.critical} Error: ${message}`));
-  if (error instanceof Error && error.stack) {
+  if (debug && error instanceof Error && error.stack) {
     const stackLines = error.stack.split("\n").slice(1, 4);
     for (const line of stackLines) {
       console.error(colors.slateDim.dim(`  ${line.trim()}`));
