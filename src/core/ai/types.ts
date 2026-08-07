@@ -2,7 +2,14 @@
 
 import type { ScanFinding } from "../../types/index.js";
 
-export type AIProviderId = "anthropic" | "openai" | "gemini" | "openrouter" | "groq";
+export type AIProviderId = "anthropic" | "openai" | "gemini" | "openrouter" | "groq" | "local";
+
+export interface AIProviderRuntimeConfig {
+  enabled?: boolean;
+  timeoutMs?: number;
+  retries?: number;
+  maxRequestsPerMinute?: number;
+}
 
 export interface RedactedFindingContext {
   id: string;
@@ -30,6 +37,7 @@ export interface AIProvider {
   id: AIProviderId;
   name: string;
   defaultModel: string;
+  requiresApiKey?: boolean;
   validateKey(key: string): Promise<boolean>;
   complete(
     prompt: string,
@@ -50,5 +58,6 @@ export interface AIConfig {
   activeProvider?: AIProviderId;
   providerModels: Record<string, string>;
   lastValidated: Record<string, string>;
+  providerRuntime?: Partial<Record<AIProviderId, AIProviderRuntimeConfig>>;
   firstRunCompleted?: boolean;
 }

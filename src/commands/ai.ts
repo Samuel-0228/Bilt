@@ -48,28 +48,34 @@ export async function executeAISetup(): Promise<void> {
 
   const selectedProvider = getProvider(providerId);
 
-  // 2. Paste API key (masked input)
-  const { apiKey } = (await enquirer.prompt({
-    type: "password",
-    name: "apiKey",
-    message: `Paste your ${selectedProvider.name} API Key:`,
-  })) as { apiKey: string };
+  let apiKey = "";
+  if (selectedProvider.requiresApiKey !== false) {
+    // 2. Paste API key (masked input)
+    const keyPrompt = (await enquirer.prompt({
+      type: "password",
+      name: "apiKey",
+      message: `Paste your ${selectedProvider.name} API Key:`,
+    })) as { apiKey: string };
+    apiKey = keyPrompt.apiKey;
 
-  if (!apiKey || apiKey.trim() === "") {
-    console.log(colors.pulseCoral.apply("❌ No API key provided. Setup cancelled."));
-    return;
+    if (!apiKey || apiKey.trim() === "") {
+      console.log(colors.pulseCoral.apply("❌ No API key provided. Setup cancelled."));
+      return;
+    }
+
+    // 3. Validate key against provider API
+    console.log(text.dim(`Validating API key with ${selectedProvider.name}...`));
+    const isValid = await selectedProvider.validateKey(apiKey.trim());
+
+    if (!isValid) {
+      console.log(colors.pulseCoral.apply(`❌ API key validation failed for ${selectedProvider.name}. Check your key and network connection.`));
+      console.log(text.dim("No credentials were saved."));
+      return;
+    }
+    console.log(colors.mintClear.apply("✔ API key validated successfully!"));
+  } else {
+    console.log(text.dim(`${selectedProvider.name} does not require an API key.`));
   }
-
-  // 3. Validate key against provider API
-  console.log(text.dim(`Validating API key with ${selectedProvider.name}...`));
-  const isValid = await selectedProvider.validateKey(apiKey.trim());
-
-  if (!isValid) {
-    console.log(colors.pulseCoral.apply(`❌ API key validation failed for ${selectedProvider.name}. Check your key and network connection.`));
-    console.log(text.dim("No credentials were saved."));
-    return;
-  }
-  console.log(colors.mintClear.apply("✔ API key validated successfully!"));
 
   // 4. Show exact consent text
   console.log(colors.amberFlag.apply(CONSENT_TEXT_TEMPLATE(selectedProvider.name)));
@@ -87,17 +93,21 @@ export async function executeAISetup(): Promise<void> {
   }
 
   // 5. Store key securely
-  const saveRes = await saveApiKey(providerId, apiKey.trim());
-  if (!saveRes.success) {
-    console.log(colors.pulseCoral.apply(`❌ Failed to store API key: ${saveRes.error}`));
-    return;
+  let saveRes: Awaited<ReturnType<typeof saveApiKey>> | null = null;
+  if (selectedProvider.requiresApiKey !== false) {
+    saveRes = await saveApiKey(providerId, apiKey.trim());
+    if (!saveRes.success) {
+      console.log(colors.pulseCoral.apply(`❌ Failed to store API key: ${saveRes.error}`));
+      return;
+    }
   }
 
   setAIConfig({ activeProvider: providerId });
   recordValidation(providerId);
 
-  const storageMsg =
-    saveRes.storageMethod === "keyring"
+  const storageMsg = !saveRes
+    ? "Not required"
+    : saveRes.storageMethod === "keyring"
       ? "OS Keyring (Windows Credential Manager / macOS Keychain / Secret Service)"
       : "AES-256-GCM encrypted file (~/.bilt/credentials)";
 
@@ -105,7 +115,7 @@ export async function executeAISetup(): Promise<void> {
   console.log(colors.mintClear.apply(`✔ Bilt AI setup complete for ${selectedProvider.name}!`));
   console.log(text.dim(`Storage method: ${storageMsg}`));
   console.log(text.dim(`Active Model: ${getActiveModel(providerId)}`));
-  console.log(text.dim(`Masked Key: ${maskApiKey(apiKey)}`));
+  console.log(text.dim(`Masked Key: ${apiKey ? maskApiKey(apiKey) : "N/A"}`));
   console.log(colors.slateDim.dim("This setup applies globally across all project directories on your machine."));
 }
 
@@ -172,7 +182,7 @@ export async function executeAIProvider(targetProvider?: string): Promise<void> 
     try {
       const provider = getProvider(cleanId);
       const keyInfo = await getApiKey(cleanId);
-      if (!keyInfo.key) {
+      if (provider.requiresApiKey !== false && !keyInfo.key) {
         console.log(colors.amberFlag.apply(`No stored API key found for provider '${provider.name}'.`));
         console.log(text.dim("Run 'bilt ai setup' to enter an API key for this provider."));
         return;
@@ -201,7 +211,7 @@ export async function executeAIProvider(targetProvider?: string): Promise<void> 
 
   const provider = getProvider(selectedId);
   const keyInfo = await getApiKey(selectedId);
-  if (!keyInfo.key) {
+  if (provider.requiresApiKey !== false && !keyInfo.key) {
     console.log(colors.amberFlag.apply(`No stored API key found for provider '${provider.name}'.`));
     console.log(text.dim("Launching setup to configure key..."));
     await executeAISetup();
@@ -294,13 +304,18 @@ export async function executeAITest(): Promise<void> {
     return;
   }
 
+  const provider = getProvider(config.activeProvider);
+  if (provider.requiresApiKey === false) {
+    console.log(colors.mintClear.apply(`✔ ${provider.name} is available (offline deterministic mode).`));
+    return;
+  }
+
   const keyInfo = await getApiKey(config.activeProvider);
   if (!keyInfo.key) {
     console.log(colors.pulseCoral.apply(`No API key found for provider '${config.activeProvider}'.`));
     return;
   }
 
-  const provider = getProvider(config.activeProvider);
   const activeModel = getActiveModel(config.activeProvider);
   console.log(text.dim(`Testing API key for ${provider.name} (model: ${activeModel})...`));
 

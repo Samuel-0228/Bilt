@@ -2,11 +2,13 @@
 
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
 import type { AIProvider, RedactedContext } from "../types.js";
+import { getActiveModel } from "../config.js";
 
 export class OpenRouterProvider implements AIProvider {
   public readonly id = "openrouter" as const;
   public readonly name = "OpenRouter";
   public readonly defaultModel = "meta-llama/llama-3.1-8b-instruct:free";
+  public readonly requiresApiKey = true;
   private client: OpenAICompatibleProvider;
 
   constructor() {
@@ -33,6 +35,7 @@ export class OpenRouterProvider implements AIProvider {
     key?: string,
     timeoutMs?: number,
   ): Promise<string> {
-    return this.client.complete(prompt, context, model || this.defaultModel, key, timeoutMs);
+    const targetModel = model && model.trim() !== "" ? model.trim() : getActiveModel(this.id);
+    return this.client.complete(prompt, context, targetModel, key, timeoutMs);
   }
 }

@@ -7,6 +7,7 @@ export class GeminiProvider implements AIProvider {
   public readonly id: AIProviderId = "gemini";
   public readonly name = "Google (Gemini)";
   public readonly defaultModel = "gemini-1.5-flash";
+  public readonly requiresApiKey = true;
 
   async validateKey(key: string): Promise<boolean> {
     if (!key || key.trim() === "") return false;

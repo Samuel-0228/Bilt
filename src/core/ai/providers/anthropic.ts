@@ -7,6 +7,7 @@ export class AnthropicProvider implements AIProvider {
   public readonly id: AIProviderId = "anthropic";
   public readonly name = "Anthropic (Claude)";
   public readonly defaultModel = "claude-3-haiku-20240307";
+  public readonly requiresApiKey = true;
 
   async validateKey(key: string): Promise<boolean> {
     if (!key || key.trim() === "") return false;

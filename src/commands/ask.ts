@@ -4,8 +4,7 @@
 import { executeScan } from "./scan.js";
 import { redactForAI } from "../core/ai/redact.js";
 import { getAIConfig } from "../core/ai/config.js";
-import { getApiKey } from "../core/ai/storage.js";
-import { getProvider } from "../core/ai/providers/index.js";
+import { executeAICompletion } from "../core/ai/runtime.js";
 import { colors, sectionHeader, divider, text } from "../ui/theme.js";
 
 export async function executeAsk(
@@ -25,15 +24,6 @@ export async function executeAsk(
     console.log(text.dim("Run 'bilt ai setup' to connect an AI provider for conversational assistance."));
     return;
   }
-
-  const { key } = await getApiKey(config.activeProvider);
-  if (!key) {
-    console.log(colors.amberFlag.apply(`No API key found for provider '${config.activeProvider}'.`));
-    console.log(text.dim("Run 'bilt ai setup' to re-enter your API key."));
-    return;
-  }
-
-  const provider = getProvider(config.activeProvider);
 
   // 2. Perform quiet local scan to gather current context
   console.log(text.dim(`Gathering project context and scanning ${dir}...`));
@@ -56,16 +46,23 @@ export async function executeAsk(
   }
 
   // 4. Query AI provider with clear error handling
-  console.log(text.dim(`Querying ${provider.name} (${provider.defaultModel})...`));
+  console.log(text.dim("Querying AI providers with failover..."));
 
   try {
-    const answer = await provider.complete(question, redactedContext, undefined, key, 10000);
+    const result = await executeAICompletion(question, redactedContext, {
+      timeoutMs: 8000,
+      totalBudgetMs: 10000,
+    });
 
-    console.log(sectionHeader(`Bilt AI Answer (${provider.name})`));
-    console.log(answer);
+    console.log(sectionHeader(`Bilt AI Answer (${result.providerName})`));
+    console.log(result.content);
+    if (result.fellBack) {
+      console.log(text.dim(`(Fallback used from configured provider '${config.activeProvider}' to '${result.providerId}')`));
+    }
     console.log(divider());
-  } catch (err: any) {
-    console.log(colors.pulseCoral.apply(`❌ AI Query Failed: ${err?.message || String(err)}`));
-    console.log(text.dim("Bilt core scanner remains fully functional locally."));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(colors.pulseCoral.apply(`❌ AI Query Failed: ${message}`));
+    console.log(text.dim("Bilt continued locally. Run 'bilt ai provider local' to force deterministic offline mode."));
   }
 }

@@ -139,6 +139,14 @@ export const RECOMMENDED_MODELS: Record<AIProviderId, ModelInfo[]> = {
       description: "Google open model running on Groq hardware",
     },
   ],
+  local: [
+    {
+      id: "local-static-v1",
+      name: "Local Static Analyzer (Default)",
+      isDefault: true,
+      description: "Deterministic local explanation engine with no network access",
+    },
+  ],
 };
 
 /**

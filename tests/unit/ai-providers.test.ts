@@ -29,11 +29,11 @@ describe("AI Provider Adapters", () => {
     vi.restoreAllMocks();
   });
 
-  it("should list all 5 supported providers with default fast/cheap models", () => {
+  it("should list all supported providers with default fast/cheap models", () => {
     const providers = getAllProviders();
-    expect(providers).toHaveLength(5);
+    expect(providers).toHaveLength(6);
     const ids = providers.map((p) => p.id);
-    expect(ids).toEqual(["anthropic", "openai", "gemini", "openrouter", "groq"]);
+    expect(ids).toEqual(["anthropic", "openai", "gemini", "openrouter", "groq", "local"]);
   });
 
   describe("OpenAI Provider", () => {

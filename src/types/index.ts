@@ -314,4 +314,5 @@ export interface WatchOptions {
   quiet?: boolean;
   debounce?: number;
   poll?: boolean;
+  live?: boolean;
 }

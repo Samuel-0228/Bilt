@@ -5,9 +5,8 @@
 
 import type { ScanFinding, AIExplanation } from "../../types/index.js";
 import { getAIConfig } from "./config.js";
-import { getApiKey } from "./storage.js";
-import { getProvider } from "./providers/index.js";
 import { redactForAI } from "./redact.js";
+import { executeAICompletion } from "./runtime.js";
 
 /**
  * Static local 6-part AI Explanation for a finding (0 network calls, 100% reliable local baseline).
@@ -184,21 +183,18 @@ export async function generateAIExplanationWithFallback(finding: ScanFinding): P
 
   try {
     const config = getAIConfig();
-    const activeProviderId = config.activeProvider;
-    if (!activeProviderId) return staticFallback;
-
-    const { key } = await getApiKey(activeProviderId);
-    if (!key) return staticFallback;
-
-    const provider = getProvider(activeProviderId);
+    if (!config.activeProvider) return staticFallback;
     const redactedContext = redactForAI({ findings: [finding] });
 
     const prompt =
       "Analyze the redacted finding context and return ONLY a JSON object with keys: " +
       "whatIsIt, whyIsItAProblem, howSerious, canItBeExploited, howToFix, canBiltFix (boolean).";
 
-    // Strict 2.5s network timeout for scan explanation enhancement
-    const rawResponse = await provider.complete(prompt, redactedContext, undefined, key, 2500);
+    const result = await executeAICompletion(prompt, redactedContext, {
+      timeoutMs: 2500,
+      totalBudgetMs: 3000,
+    });
+    const rawResponse = result.content;
 
     // Extract JSON block if response contains markdown wrapper
     const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);

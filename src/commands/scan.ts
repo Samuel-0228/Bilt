@@ -26,6 +26,8 @@ import { calculateHealthScore } from "../core/score/health.js";
 import { loadPlugins } from "../plugins/loader.js";
 import { createPluginContext } from "../plugins/interface.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
+import { SecurityRuleEngine } from "../core/security-engine/rule-engine.js";
+import type { SecurityFindingDetails } from "../core/security-engine/types.js";
 import {
   colors,
   glyphs,
@@ -258,7 +260,65 @@ export async function executeScan(
     );
     findings.push(...secretsStepFindings);
 
-    // 4. Dependency Intelligence Step
+    // 3.5. Security Rule Engine Step (Deterministic Anti-Patterns)
+    const securityEngineStepFindings = await runScanStep(
+      "Auditing deterministic security anti-patterns",
+      isQuiet || isJson,
+      async () => {
+        const stepFindings: ScanFinding[] = [];
+        const ruleEngine = new SecurityRuleEngine();
+        const scanTargets = await fg(["**/*.{ts,js,tsx,jsx,json,yml,yaml,md,env*,Dockerfile}"], {
+          cwd: rootDir,
+          ignore: config.ignore,
+          onlyFiles: true,
+        });
+
+        const filePayloads: Array<{ path: string; content: string }> = [];
+        for (const relPath of scanTargets) {
+          const fullPath = path.join(rootDir, relPath);
+          try {
+            const stat = await fs.stat(fullPath);
+            if (stat.size > 1_048_576) continue;
+            const content = await fs.readFile(fullPath, "utf-8");
+            filePayloads.push({ path: relPath, content });
+          } catch {
+            // Skip unreadable files
+          }
+        }
+
+        const engineFindings = ruleEngine.analyzeProject(
+          filePayloads,
+          detectedFramework ? [detectedFramework.name] : []
+        );
+
+        engineFindings.forEach((ef: SecurityFindingDetails) => {
+          stepFindings.push({
+            id: `sec-rule-${ef.ruleId.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            severity: ef.severity,
+            category: "framework-warning",
+            message: `[${ef.ruleId}] ${ef.title}: ${ef.message}`,
+            file: ef.evidence.file,
+            line: ef.evidence.line,
+            column: ef.evidence.column,
+            suggestion: ef.suggestedFix,
+            ruleId: ef.ruleId,
+            confidence: ef.confidence,
+            aiExplanation: {
+              whatIsIt: `${ef.title}. ${ef.whyThisIsDangerous}`,
+              whyIsItAProblem: ef.whyThisIsDangerous,
+              howSerious: `${ef.severity.toUpperCase()} (${ef.confidence} confidence evidence)`,
+              canItBeExploited: ef.howAttackersAbuseIt,
+              howToFix: ef.suggestedFix,
+              canBiltFix: ef.automaticFixAvailability.available,
+            },
+          });
+        });
+
+        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+      },
+      detailsEnabled,
+    );
+    findings.push(...securityEngineStepFindings);
     const depStepFindings = await runScanStep(
       "Auditing dependencies & lockfiles",
       isQuiet || isJson,

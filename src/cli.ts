@@ -204,21 +204,24 @@ program
 
 program
   .command("watch")
+  .alias("live")
   .description("Watch the project for changes and scan in real-time")
   .argument("[dir]", "Project directory", ".")
   .option("--quiet", "Only show findings, no status messages")
   .option("--debounce <ms>", "Debounce interval in milliseconds", "300")
   .option("--poll", "Use polling instead of native file events (recommended for WSL/Docker)")
+  .option("--no-live", "Disable initial baseline scan before streaming changes")
   .action(
     async (
       dir: string,
-      opts: { quiet?: boolean; debounce?: string; poll?: boolean },
+      opts: { quiet?: boolean; debounce?: string; poll?: boolean; live?: boolean },
     ) => {
       try {
         await executeWatch(dir, {
           quiet: opts.quiet,
           debounce: opts.debounce ? parseInt(opts.debounce, 10) : undefined,
           poll: opts.poll,
+          live: opts.live,
         });
       } catch (error) {
         printError(error);

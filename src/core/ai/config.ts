@@ -4,12 +4,29 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import type { AIConfig, AIProviderId } from "./types.js";
+import type { AIConfig, AIProviderId, AIProviderRuntimeConfig } from "./types.js";
 import { getDefaultModel } from "./models.js";
 
 const BILT_DIR = path.join(os.homedir(), ".bilt");
 const CONFIG_FILE = path.join(BILT_DIR, "config.json");
 const LAST_REQUEST_FILE = path.join(BILT_DIR, "last-request.json");
+
+const DEFAULT_PROVIDER_RUNTIME: AIProviderRuntimeConfig = {
+  enabled: true,
+  timeoutMs: 8000,
+  retries: 1,
+  maxRequestsPerMinute: 20,
+};
+
+export function getProviderRuntime(providerId: AIProviderId): AIProviderRuntimeConfig {
+  const config = getAIConfig();
+  const override = config.providerRuntime?.[providerId] || {};
+
+  return {
+    ...DEFAULT_PROVIDER_RUNTIME,
+    ...override,
+  };
+}
 
 function ensureBiltDirExists(): void {
   if (!fs.existsSync(BILT_DIR)) {
@@ -37,12 +54,14 @@ export function getAIConfig(): AIConfig {
       activeProvider: parsed.activeProvider,
       providerModels: parsed.providerModels || {},
       lastValidated: parsed.lastValidated || {},
+      providerRuntime: parsed.providerRuntime || {},
       firstRunCompleted: Boolean(parsed.firstRunCompleted),
     };
   } catch {
     return {
       providerModels: {},
       lastValidated: {},
+      providerRuntime: {},
       firstRunCompleted: false,
     };
   }
@@ -64,6 +83,10 @@ export function setAIConfig(update: Partial<AIConfig>): AIConfig {
     lastValidated: {
       ...current.lastValidated,
       ...(update.lastValidated || {}),
+    },
+    providerRuntime: {
+      ...(current.providerRuntime || {}),
+      ...(update.providerRuntime || {}),
     },
   };
 

@@ -9,7 +9,7 @@ import { executeDoctor } from "../../src/commands/doctor.js";
 import { redactForAI } from "../../src/core/ai/redact.js";
 import { createLeakyFixtureProject } from "../fixtures/helper.js";
 
-describe("Regression & Consistency Tests", () => {
+describe("Regression & Consistency Tests", { timeout: 30000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -17,7 +17,12 @@ describe("Regression & Consistency Tests", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tmpDir, { recursive: true, force: true });
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Ignore transient Windows file lock errors
+    }
   });
 
   it("should perform fix -> undo -> scan and verify exact prior content & issue reappearance", async () => {

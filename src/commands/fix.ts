@@ -8,7 +8,11 @@ import { promises as fs } from "node:fs";
 import { executeScan } from "./scan.js";
 import { loadConfig } from "../config/config.js";
 import { createSnapshot } from "../core/fix/snapshot.js";
-import { purgeSecretFromHistory } from "../core/fix/git.js";
+import {
+  executeSecretRemediation,
+  previewSecretRemediation,
+  restoreGitSnapshot,
+} from "../core/fix/git.js";
 import { parseEnvFile } from "../core/scan/env.js";
 import {
   addToGitignore,
@@ -23,20 +27,8 @@ import {
   reportFixPlan,
   reportFixComplete,
 } from "../ui/reporter.js";
-import { type FixOptions, type ScanFinding, type Fix, type FixAction, type FixPlan } from "../types/index.js";
+import { type FixOptions, type ScanFinding, type Fix } from "../types/index.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
-
-function touchesGitHistory(action: FixAction): boolean {
-  if ((action as any).touchesGitHistory) return true;
-  const desc = action.description.toLowerCase();
-  const preview = (action.preview || "").toLowerCase();
-  return (
-    desc.includes("git history") ||
-    desc.includes("rewrite history") ||
-    preview.includes("git history") ||
-    preview.includes("rewrite history")
-  );
-}
 
 /**
  * Execute the `bilt fix` command.
@@ -94,22 +86,24 @@ export async function executeFix(
   }
 
   // ── Create snapshot before modifying files ──────────────────────────
-  const affectedFiles = new Set<string>();
-  for (const action of actions) {
-    // Extract file from finding ID heuristic
-    affectedFiles.add(".gitignore");
-    affectedFiles.add(".env");
-    affectedFiles.add(".env.example");
+  const affectedFiles = new Set<string>([".gitignore", ".env", ".env.example"]);
+  for (const finding of result.findings) {
+    if (finding.file && !finding.file.startsWith("git:")) {
+      affectedFiles.add(finding.file);
+    }
   }
 
-  try {
-    await createSnapshot(
-      [...affectedFiles].map((f) => path.join(rootDir, f)),
-      `Pre-fix snapshot (${actions.length} fixes)`,
-      rootDir,
-    );
-  } catch {
-    // Snapshot creation failure shouldn't block fixes
+  const hasSecretHistoryFix = result.findings.some((f) => f.category === "secret-detected");
+  if (!hasSecretHistoryFix) {
+    try {
+      await createSnapshot(
+        [...affectedFiles].map((f) => path.join(rootDir, f)),
+        `Pre-fix snapshot (${actions.length} fixes)`,
+        rootDir,
+      );
+    } catch {
+      // Snapshot creation failure shouldn't block fixes
+    }
   }
 
   // ── Safe mode: auto-apply safe fixes only ───────────────────────────
@@ -591,68 +585,110 @@ async function generateFixActions(
       }
 
       case "secret-detected": {
+        let remediationVerification = { passed: false, message: "Remediation did not run." };
+        let snapshotRef: string | undefined;
+
         actions.push({
           id: `fix-secret-${finding.id}`,
           description: `Remove secret from ${finding.file}${finding.line ? `:${finding.line}` : ""}`,
           type: "destructive",
           findingId: finding.id,
-          preview: async () => ({
-            steps: ["Rotate credential", "Rewrite Git history", "Force-push (if remote)"],
-            estimatedTime: "2-5 mins",
-            risk: "Critical",
-            requiresConfirmation: "PURGE_HISTORY",
-            instructions: "1. Rotate the credential.\n2. Rewrite Git history.\n3. Force-push the cleaned history.\n4. Notify collaborators."
-          }),
-          apply: async () => {
-            let isGitRepo = false;
-            try {
-              const { execSync } = await import("node:child_process");
-              execSync("git rev-parse --is-inside-work-tree", { cwd: rootDir, stdio: "ignore" });
-              isGitRepo = true;
-            } catch {}
+          preview: async () => {
+            if (!finding.secret) {
+              return {
+                steps: ["Manual remediation required"],
+                estimatedTime: "< 1m",
+                risk: "High",
+                instructions: "Secret value not retained in memory. Re-run with secret retention for automated remediation.",
+              };
+            }
 
-            if (isGitRepo && finding.secret) {
-              console.log(colors.amberFlag.apply("    " + glyphs.info + "  Executing Git history rewrite..."));
-              try {
-                await purgeSecretFromHistory(rootDir, finding.secret);
-                return { success: true, stepsApplied: ["Git history and workspace purged of the secret."] };
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                return { success: false, stepsApplied: [], error: msg };
+            try {
+              const plan = await previewSecretRemediation(rootDir, finding.secret);
+              const intro = plan.introducingCommit ? `First introduced in ${plan.introducingCommit.slice(0, 8)}` : "Introducing commit could not be determined";
+              const affected = `${plan.affectedCommits.length} affected commit(s)`;
+              return {
+                steps: [
+                  intro,
+                  affected,
+                  ...plan.estimatedSteps,
+                ],
+                estimatedTime: "2-8 mins",
+                risk: "Critical",
+                requiresConfirmation: "PURGE_HISTORY",
+                instructions:
+                  "Rotate the exposed credential first. Bilt will create a safety snapshot before rewriting history. " +
+                  (plan.forcePushRequired ? "Remote force-push will be required after local cleanup." : "No remote force-push detected."),
+              };
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              return {
+                steps: ["Unable to build remediation preview"],
+                estimatedTime: "unknown",
+                risk: "Critical",
+                requiresConfirmation: "PURGE_HISTORY",
+                instructions: `Preview error: ${msg}`,
+              };
+            }
+          },
+          apply: async () => {
+            if (!finding.secret) {
+              remediationVerification = {
+                passed: false,
+                message: "Secret value was unavailable, remediation could not execute.",
+              };
+              return {
+                success: false,
+                stepsApplied: [],
+                error: remediationVerification.message,
+              };
+            }
+
+            console.log(colors.amberFlag.apply("    " + glyphs.info + "  Executing Git history remediation..."));
+            try {
+              const execution = await executeSecretRemediation(rootDir, finding.secret);
+              snapshotRef = execution.snapshot?.tag;
+              remediationVerification = {
+                passed: execution.verification.verified,
+                message: execution.verification.message,
+              };
+
+              const stepsApplied = [
+                "Created Git safety snapshot",
+                "Rewrote local history to redact the secret",
+                execution.verification.message,
+              ];
+
+              for (const warning of execution.warnings) {
+                console.log(colors.amberFlag.apply("    " + glyphs.warning + "  " + warning));
               }
-            } else {
-              console.log(colors.amberFlag.apply("    " + glyphs.info + "  Please manually remove the secret from " + finding.file));
-              return { success: true, stepsApplied: ["Provided instructions for manual secret removal"] };
+
+              return {
+                success: execution.success,
+                stepsApplied,
+                error: execution.success ? undefined : execution.verification.message,
+              };
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              remediationVerification = { passed: false, message: msg };
+              return { success: false, stepsApplied: [], error: msg };
             }
           },
           verify: async () => {
-            return { passed: true, message: "Verification complete." };
+            return remediationVerification;
           },
-          undo: async () => {}
+          undo: async () => {
+            if (snapshotRef) {
+              await restoreGitSnapshot(rootDir, snapshotRef);
+            }
+          }
         });
         break;
       }
 
       case "framework-warning":
       case "env-exposed": {
-        actions.push({
-          id: `fix-exposed-${finding.id}`,
-          description: `Review client-exposed secret in ${finding.file}`,
-          type: "destructive",
-          findingId: finding.id,
-          preview: async () => ({
-            steps: ["Review client exposure"],
-            estimatedTime: "< 1m",
-            risk: "High",
-            instructions: finding.suggestion ?? "Ensure this env var should be exposed to the client bundle"
-          }),
-          apply: async () => {
-            console.log(colors.amberFlag.apply("    " + glyphs.info + "  Review " + finding.file + " \u2014 this value is exposed to the client."));
-            return { success: true, stepsApplied: ["Flagged for review"] };
-          },
-          verify: async () => { return { passed: true, message: "Instruction acknowledged." }; },
-          undo: async () => {}
-        });
+        // No automatic fix for client exposure without semantic refactor support.
         break;
       }
 

@@ -6,6 +6,7 @@ import { OpenAIProvider } from "./openai.js";
 import { GeminiProvider } from "./gemini.js";
 import { OpenRouterProvider } from "./openrouter.js";
 import { GroqProvider } from "./groq.js";
+import { LocalProvider } from "./local.js";
 
 const providerInstances: Record<AIProviderId, AIProvider> = {
   anthropic: new AnthropicProvider(),
@@ -13,6 +14,7 @@ const providerInstances: Record<AIProviderId, AIProvider> = {
   gemini: new GeminiProvider(),
   openrouter: new OpenRouterProvider(),
   groq: new GroqProvider(),
+  local: new LocalProvider(),
 };
 
 export function getProvider(id: AIProviderId): AIProvider {

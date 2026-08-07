@@ -7,6 +7,8 @@ import type { WatchOptions, WatchEvent } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
 import { startWatcher, stopWatcher } from "../core/watch/watcher.js";
 import { reportWatchEvent } from "../ui/reporter.js";
+import { executeScan } from "./scan.js";
+import { formatFinding } from "../ui/format.js";
 
 /**
  * Execute the `bilt watch` command.
@@ -32,6 +34,26 @@ export async function executeWatch(
     console.log(colors.slateDim.dim("  Press Ctrl+C to stop."));
     if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
     console.log("");
+  }
+
+  // ── Initial live baseline ─────────────────────────────────────────
+  if (options.live !== false) {
+    const baseline = await executeScan(rootDir, {
+      quiet: true,
+      noVerify: true,
+    });
+
+    if (!options.quiet) {
+      console.log(sectionHeader("Live Baseline"));
+      if (baseline.findings.length === 0) {
+        console.log(colors.mintClear.apply("  " + glyphs.passed + " No current findings in baseline scan."));
+      } else {
+        for (const finding of baseline.findings) {
+          console.log(formatFinding(finding, "headline"));
+        }
+      }
+      console.log("");
+    }
   }
 
   // ── Start watcher ──────────────────────────────────────────────────

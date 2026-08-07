@@ -28,6 +28,7 @@ const ENV_VAR_MAP: Record<AIProviderId, string> = {
   gemini: "BILT_GEMINI_API_KEY",
   openrouter: "BILT_OPENROUTER_API_KEY",
   groq: "BILT_GROQ_API_KEY",
+  local: "BILT_LOCAL_AI_KEY",
 };
 
 /**

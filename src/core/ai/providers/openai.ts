@@ -2,11 +2,13 @@
 
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
 import type { AIProvider, RedactedContext } from "../types.js";
+import { getActiveModel } from "../config.js";
 
 export class OpenAIProvider implements AIProvider {
   public readonly id = "openai" as const;
   public readonly name = "OpenAI";
   public readonly defaultModel = "gpt-4o-mini";
+  public readonly requiresApiKey = true;
   private client: OpenAICompatibleProvider;
 
   constructor() {
@@ -29,6 +31,7 @@ export class OpenAIProvider implements AIProvider {
     key?: string,
     timeoutMs?: number,
   ): Promise<string> {
-    return this.client.complete(prompt, context, model || this.defaultModel, key, timeoutMs);
+    const targetModel = model && model.trim() !== "" ? model.trim() : getActiveModel(this.id);
+    return this.client.complete(prompt, context, targetModel, key, timeoutMs);
   }
 }
