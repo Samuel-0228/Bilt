@@ -5,6 +5,7 @@
 import { Command } from "commander";
 import { createRequire } from "node:module";
 import { executeScan } from "./commands/scan.js";
+import { executeApiScan } from "./commands/api-scan.js";
 import { executeInit } from "./commands/init.js";
 import { executeFix } from "./commands/fix.js";
 import { executeUndo } from "./commands/undo.js";
@@ -120,6 +121,51 @@ program
         const criticals = result.findings.filter(
           (f) => f.severity === "critical",
         ).length;
+        if (criticals > 0) {
+          process.exitCode = 1;
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
+
+// ─── bilt api-scan ───────────────────────────────────────────────────────────
+
+program
+  .command("api-scan")
+  .description("Static API security checks — mass assignment, method allowlists, content validation, exposed docs")
+  .argument("[dir]", "Project directory", ".")
+  .option("--json", "Output results as JSON")
+  .option("--severity <level>", "Minimum severity to report (critical, warning, info)")
+  .option("--verbose", "Show detailed output with suggestions")
+  .option("--no-details", "Hide detailed five-question output under each headline")
+  .option("--quiet", "Suppress all output except errors")
+  .option("--debug", "Enable debug logging")
+  .action(
+    async (
+      dir: string,
+      opts: {
+        json?: boolean;
+        severity?: string;
+        verbose?: boolean;
+        details?: boolean;
+        quiet?: boolean;
+        debug?: boolean;
+      },
+    ) => {
+      try {
+        const result = await executeApiScan(dir, {
+          json: opts.json,
+          severity: opts.severity as Severity | undefined,
+          verbose: opts.verbose,
+          details: opts.details,
+          quiet: opts.quiet,
+          debug: opts.debug,
+        });
+
+        const criticals = result.findings.filter((f) => f.severity === "critical").length;
         if (criticals > 0) {
           process.exitCode = 1;
         }

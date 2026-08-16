@@ -51,6 +51,11 @@ export function getCategoryDomain(category: FindingCategory): HealthDomain {
     case "env-exposed":
     case "git-history-secret":
     case "dep-vulnerable":
+    case "api-mass-assignment":
+    case "api-wildcard-method":
+    case "api-missing-validation":
+    case "api-exposed-docs":
+    case "api-sensitive-exposure":
       return "security";
 
     case "env-missing":

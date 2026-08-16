@@ -166,6 +166,17 @@ function getFindingHeadlineAndDetail(finding: ScanFinding): { headline: string; 
       };
     }
 
+    case "api-mass-assignment":
+    case "api-wildcard-method":
+    case "api-missing-validation":
+    case "api-exposed-docs":
+    case "api-sensitive-exposure": {
+      return {
+        headline: finding.message,
+        detail: `in ${loc}`,
+      };
+    }
+
     default: {
       return {
         headline: finding.message,

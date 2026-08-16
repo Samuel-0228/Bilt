@@ -27,7 +27,13 @@ export type FindingCategory =
   | "config-package"
   | "perf-image"
   | "perf-bundle"
-  | "perf-import";
+  | "perf-import"
+  // API security domain additions
+  | "api-mass-assignment"
+  | "api-wildcard-method"
+  | "api-missing-validation"
+  | "api-exposed-docs"
+  | "api-sensitive-exposure";
 
 export type HealthDomain =
   | "security"

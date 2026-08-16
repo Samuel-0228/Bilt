@@ -22,6 +22,7 @@ import { scanGitRepository } from "../core/scan/git.js";
 import { scanDependencies } from "../core/scan/dependencies.js";
 import { scanConfigurations } from "../core/scan/config.js";
 import { scanPerformance } from "../core/scan/performance.js";
+import { performApiScan } from "../core/api-scan/index.js";
 import { calculateHealthScore } from "../core/score/health.js";
 import { loadPlugins } from "../plugins/loader.js";
 import { createPluginContext } from "../plugins/interface.js";
@@ -319,6 +320,19 @@ export async function executeScan(
       detailsEnabled,
     );
     findings.push(...securityEngineStepFindings);
+
+    // 3.6. API Security Scan Step (Static Local Analysis)
+    const apiScanStepFindings = await runScanStep(
+      "Auditing local API routes & spec files",
+      isQuiet || isJson,
+      async () => {
+        const { findings: apiFindings } = await performApiScan(rootDir);
+        return applyOverridesAndFilter(apiFindings, config, options.severity as Severity);
+      },
+      detailsEnabled,
+    );
+    findings.push(...apiScanStepFindings);
+
     const depStepFindings = await runScanStep(
       "Auditing dependencies & lockfiles",
       isQuiet || isJson,
