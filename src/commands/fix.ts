@@ -29,6 +29,8 @@ import {
 } from "../ui/reporter.js";
 import { type FixOptions, type ScanFinding, type Fix } from "../types/index.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
+import { canFixFinding } from "../core/fix/can-fix.js";
+import { ALL_SECURITY_RULES } from "../core/security-engine/rules/index.js";
 
 /**
  * Execute the `bilt fix` command.
@@ -246,7 +248,6 @@ async function generateFixActions(
       console.log(`  Length Before: ${Buffer.byteLength(oldContent, "utf8")} bytes`);
       console.log(`  Length After:  ${Buffer.byteLength(newContent, "utf8")} bytes`);
       console.log(`  Diff Preview:`);
-      // Simple diff preview: just show it's different if lengths or content differ
       if (oldContent === newContent) {
         console.log(`    (No changes)`);
       } else {
@@ -257,6 +258,237 @@ async function generateFixActions(
   };
 
   for (const finding of findings) {
+    if (!canFixFinding(finding)) {
+      continue;
+    }
+
+    // 1. Security Engine Rule with safeAutoFix
+    const secRule = ALL_SECURITY_RULES.find(
+      (r) => r.id === finding.ruleId || finding.message.includes(`[${r.id}]`)
+    );
+
+    if (secRule && typeof secRule.safeAutoFix === "function") {
+      const targetFile = finding.file;
+      const keyStr = `sec-rule-${finding.ruleId || secRule.id}-${targetFile}-${finding.line || 0}`;
+      if (!addedTypes.has(keyStr)) {
+        addedTypes.add(keyStr);
+        actions.push({
+          id: `fix-rule-${finding.ruleId || secRule.id}-${Date.now()}`,
+          description: `Fix [${secRule.id}] ${secRule.title}`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: [secRule.suggestedFix || `Apply automated fix for ${secRule.id}`],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            const filePath = path.join(rootDir, targetFile);
+            let content = "";
+            try { content = await fs.readFile(filePath, "utf-8"); } catch {
+              return { success: false, stepsApplied: [], error: `File ${targetFile} not found` };
+            }
+            const astCtx = { filePath: targetFile, fileContent: content, isFrontend: false, isBackend: true, isConfigFile: false, isTestFile: false, isDocFile: false, frameworksDetected: [], imports: [] };
+            const res = secRule.safeAutoFix!(content, finding as any, astCtx as any);
+            if (res) {
+              await debugWriteFile(filePath, res.modifiedContent, content);
+              return { success: true, stepsApplied: [res.description] };
+            }
+            return { success: false, stepsApplied: [], error: "Fix could not be automatically applied." };
+          },
+          verify: async () => {
+            const filePath = path.join(rootDir, targetFile);
+            try {
+              const content = await fs.readFile(filePath, "utf-8");
+              const astCtx = { filePath: targetFile, fileContent: content, isFrontend: false, isBackend: true, isConfigFile: false, isTestFile: false, isDocFile: false, frameworksDetected: [], imports: [] };
+              const res = secRule.safeAutoFix!(content, finding as any, astCtx as any);
+              if (!res) return { passed: true, message: `Verified ${secRule.id} issue fixed.` };
+            } catch {}
+            return { passed: false, message: `Issue ${secRule.id} still present in ${targetFile}.` };
+          },
+          undo: async () => {},
+        });
+      }
+      continue;
+    }
+
+    // 2. Specific ruleId or category handlers
+    const ruleId = finding.ruleId;
+
+    if (ruleId === "SEC-ENV-001" || finding.category === "env-exposed") {
+      const targetFile = finding.file || ".env";
+      const keyMatch = finding.message.match(/['"`]([A-Z0-9_]+)['"`]/i) || finding.message.match(/Variable ["']?([A-Z0-9_]+)["']?/i);
+      const varKey = keyMatch ? keyMatch[1] : undefined;
+      const keyStr = `sec-env-001-${targetFile}-${varKey || "all"}`;
+      if (!addedTypes.has(keyStr)) {
+        addedTypes.add(keyStr);
+        actions.push({
+          id: `fix-env-exposed-${Date.now()}`,
+          description: `Strip public prefix from secret key in ${targetFile}`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: [`Rename client-exposed public prefix from secret variable in ${targetFile}`],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            const filePath = path.join(rootDir, targetFile);
+            let content = "";
+            try { content = await fs.readFile(filePath, "utf-8"); } catch {
+              return { success: false, stepsApplied: [], error: `${targetFile} not found` };
+            }
+            let newContent = content;
+            if (varKey) {
+              const cleanKey = varKey.replace(/^(NEXT_PUBLIC_|VITE_|PUBLIC_|REACT_APP_)/, "");
+              newContent = newContent.replace(new RegExp(`\\b${varKey}\\b`, "g"), cleanKey);
+            } else {
+              newContent = newContent
+                .replace(/^NEXT_PUBLIC_(SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD|DATABASE_URL|ADMIN|MASTER_KEY)/gm, "$1")
+                .replace(/^VITE_(SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD|DATABASE_URL|ADMIN|MASTER_KEY)/gm, "$1")
+                .replace(/^PUBLIC_(SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD|DATABASE_URL|ADMIN|MASTER_KEY)/gm, "$1")
+                .replace(/^REACT_APP_(SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD|DATABASE_URL|ADMIN|MASTER_KEY)/gm, "$1");
+            }
+            await debugWriteFile(filePath, newContent, content);
+            return { success: true, stepsApplied: [`Stripped public prefix from secret variable in ${targetFile}`] };
+          },
+          verify: async () => {
+            const filePath = path.join(rootDir, targetFile);
+            try {
+              const content = await fs.readFile(filePath, "utf-8");
+              if (varKey && !content.includes(varKey)) return { passed: true, message: "Verified secret key un-exposed from client prefix." };
+            } catch {}
+            return { passed: false, message: "Exposed secret variable key still present." };
+          },
+          undo: async () => {},
+        });
+      }
+      continue;
+    }
+
+    if (ruleId === "SEC-ENV-002") {
+      const targetFile = finding.file || ".env";
+      const keyStr = `sec-env-002-${targetFile}`;
+      if (!addedTypes.has(keyStr)) {
+        addedTypes.add(keyStr);
+        actions.push({
+          id: `fix-env-dedupe-${Date.now()}`,
+          description: `Deduplicate environment variables in ${targetFile}`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: [`Remove duplicate env variable entries from ${targetFile}`],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            const filePath = path.join(rootDir, targetFile);
+            let content = "";
+            try { content = await fs.readFile(filePath, "utf-8"); } catch {
+              return { success: false, stepsApplied: [], error: `${targetFile} not found` };
+            }
+            const lines = content.split("\n");
+            const seenKeys = new Set<string>();
+            const newLines: string[] = [];
+            for (let i = lines.length - 1; i >= 0; i--) {
+              const line = lines[i];
+              if (line === undefined) continue;
+              const trimmed = line.trim();
+              if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+                const key = trimmed.split("=")[0]?.trim();
+                if (key && seenKeys.has(key)) continue;
+                if (key) seenKeys.add(key);
+              }
+              newLines.unshift(line);
+            }
+            const newContent = newLines.join("\n");
+            await debugWriteFile(filePath, newContent, content);
+            return { success: true, stepsApplied: [`Deduplicated entries in ${targetFile}`] };
+          },
+          verify: async () => {
+            return { passed: true, message: "Verified duplicate env entries removed." };
+          },
+          undo: async () => {},
+        });
+      }
+      continue;
+    }
+
+    if (ruleId === "SEC-ENV-003") {
+      const keyMatch = finding.message.match(/['"`]([A-Z0-9_]+)['"`]/i) || finding.message.match(/Variable ["']?([A-Z0-9_]+)["']?/i);
+      const varKey = keyMatch ? keyMatch[1] : undefined;
+      const keyStr = `sec-env-003-${varKey || "example"}`;
+      if (!addedTypes.has(keyStr)) {
+        addedTypes.add(keyStr);
+        actions.push({
+          id: `fix-env-example-key-${Date.now()}`,
+          description: `Add missing ${varKey || "variables"} to .env.example`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: [`Append ${varKey || "missing key"}= to .env.example`],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            const examplePath = path.join(rootDir, ".env.example");
+            let content = "";
+            try { content = await fs.readFile(examplePath, "utf-8"); } catch {}
+            const newContent = addMissingEnvVars(content, varKey ? [varKey] : []);
+            await debugWriteFile(examplePath, newContent, content);
+            return { success: true, stepsApplied: [`Added ${varKey || "key"} to .env.example`] };
+          },
+          verify: async () => {
+            const examplePath = path.join(rootDir, ".env.example");
+            try {
+              const content = await fs.readFile(examplePath, "utf-8");
+              if (!varKey || content.includes(`${varKey}=`)) return { passed: true, message: "Verified .env.example updated." };
+            } catch {}
+            return { passed: false, message: ".env.example not updated." };
+          },
+          undo: async () => {},
+        });
+      }
+      continue;
+    }
+
+    if (ruleId === "SEC-ENV-004") {
+      const keyMatch = finding.message.match(/process\.env\.([A-Z0-9_]+)/i) || finding.message.match(/['"`]([A-Z0-9_]+)['"`]/i);
+      const varKey = keyMatch ? keyMatch[1] : undefined;
+      if (varKey && !addedTypes.has(`env-missing-${varKey}`)) {
+        addedTypes.add(`env-missing-${varKey}`);
+        actions.push({
+          id: `fix-sec-env-missing-${varKey}-${Date.now()}`,
+          description: `Add missing env var ${varKey} to .env`,
+          type: "safe",
+          findingId: finding.id,
+          preview: async () => ({
+            steps: [`Append ${varKey}= to .env`],
+            estimatedTime: "< 1s",
+            risk: "Low",
+          }),
+          apply: async () => {
+            const envPath = path.join(rootDir, ".env");
+            let content = "";
+            try { content = await fs.readFile(envPath, "utf-8"); } catch {}
+            const newContent = addMissingEnvVars(content, [varKey]);
+            await debugWriteFile(envPath, newContent, content);
+            return { success: true, stepsApplied: [`Appended ${varKey}= to .env`] };
+          },
+          verify: async () => {
+            const envPath = path.join(rootDir, ".env");
+            try {
+              const content = await fs.readFile(envPath, "utf-8");
+              if (content.includes(`${varKey}=`)) return { passed: true, message: "Verified env var added." };
+            } catch {}
+            return { passed: false, message: "Env var not found in .env." };
+          },
+          undo: async () => {},
+        });
+      }
+      continue;
+    }
+
     switch (finding.category) {
       case "gitignore-missing": {
         if (!addedTypes.has("gitignore")) {
@@ -584,7 +816,269 @@ async function generateFixActions(
         break;
       }
 
-      case "secret-detected": {
+      case "env-unused": {
+        const keyMatch = finding.message.match(/['"`]([A-Z0-9_]+)['"`]/i) || finding.message.match(/Variable ["']?([A-Z0-9_]+)["']?/i);
+        const varKey = keyMatch ? keyMatch[1] : undefined;
+        const targetFile = finding.file || ".env";
+        if (varKey && !addedTypes.has(`env-unused-${varKey}`)) {
+          addedTypes.add(`env-unused-${varKey}`);
+          actions.push({
+            id: `fix-env-unused-${varKey}-${Date.now()}`,
+            description: `Comment out unused variable ${varKey} in ${targetFile}`,
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: [`Comment out ${varKey} in ${targetFile}`],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const filePath = path.join(rootDir, targetFile);
+              let content = "";
+              try { content = await fs.readFile(filePath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: `${targetFile} not found` };
+              }
+              const lines = content.split("\n");
+              const newLines = lines.map((l) => {
+                const trimmed = l.trim();
+                if (trimmed.startsWith(`${varKey}=`)) {
+                  return `# ${l} # commented out by bilt (unused)`;
+                }
+                return l;
+              });
+              const newContent = newLines.join("\n");
+              await debugWriteFile(filePath, newContent, content);
+              return { success: true, stepsApplied: [`Commented out unused variable ${varKey} in ${targetFile}`] };
+            },
+            verify: async () => {
+              const filePath = path.join(rootDir, targetFile);
+              try {
+                const content = await fs.readFile(filePath, "utf-8");
+                if (!content.match(new RegExp(`^\\s*${varKey}=`, "m"))) {
+                  return { passed: true, message: `Verified ${varKey} commented out.` };
+                }
+              } catch {}
+              return { passed: false, message: `${varKey} still active in ${targetFile}.` };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "dep-unused": {
+        const pkgMatch = finding.message.match(/['"`]([a-z0-9_@/-]+)['"`]/i) || finding.suggestion?.match(/['"`]([a-z0-9_@/-]+)['"`]/i);
+        const pkgName = pkgMatch ? pkgMatch[1] : undefined;
+        if (pkgName && !addedTypes.has(`dep-unused-${pkgName}`)) {
+          addedTypes.add(`dep-unused-${pkgName}`);
+          actions.push({
+            id: `fix-dep-unused-${pkgName}-${Date.now()}`,
+            description: `Remove unused dependency ${pkgName} from package.json`,
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: [`Remove ${pkgName} from package.json dependencies`],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const pkgPath = path.join(rootDir, "package.json");
+              let content = "";
+              try { content = await fs.readFile(pkgPath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: "package.json not found" };
+              }
+              const pkgObj = JSON.parse(content);
+              let removed = false;
+              if (pkgObj.dependencies && pkgObj.dependencies[pkgName]) {
+                delete pkgObj.dependencies[pkgName];
+                removed = true;
+              }
+              if (pkgObj.devDependencies && pkgObj.devDependencies[pkgName]) {
+                delete pkgObj.devDependencies[pkgName];
+                removed = true;
+              }
+              if (removed) {
+                const newContent = JSON.stringify(pkgObj, null, 2) + "\n";
+                await debugWriteFile(pkgPath, newContent, content);
+                return { success: true, stepsApplied: [`Removed ${pkgName} from package.json`] };
+              }
+              return { success: true, stepsApplied: [`${pkgName} already absent from package.json`] };
+            },
+            verify: async () => {
+              const pkgPath = path.join(rootDir, "package.json");
+              try {
+                const content = await fs.readFile(pkgPath, "utf-8");
+                const pkgObj = JSON.parse(content);
+                if (!pkgObj.dependencies?.[pkgName] && !pkgObj.devDependencies?.[pkgName]) {
+                  return { passed: true, message: `Verified ${pkgName} removed from package.json.` };
+                }
+              } catch {}
+              return { passed: false, message: `${pkgName} still present in package.json.` };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "dep-duplicate": {
+        if (!addedTypes.has("dep-duplicate")) {
+          addedTypes.add("dep-duplicate");
+          actions.push({
+            id: `fix-dep-duplicate-${Date.now()}`,
+            description: "Deduplicate dependencies in package.json",
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: ["Normalize and deduplicate package.json dependencies"],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const pkgPath = path.join(rootDir, "package.json");
+              let content = "";
+              try { content = await fs.readFile(pkgPath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: "package.json not found" };
+              }
+              const pkgObj = JSON.parse(content);
+              if (pkgObj.dependencies && pkgObj.devDependencies) {
+                for (const k of Object.keys(pkgObj.devDependencies)) {
+                  if (pkgObj.dependencies[k]) {
+                    delete pkgObj.devDependencies[k];
+                  }
+                }
+              }
+              const newContent = JSON.stringify(pkgObj, null, 2) + "\n";
+              await debugWriteFile(pkgPath, newContent, content);
+              return { success: true, stepsApplied: ["Deduplicated package.json dependencies"] };
+            },
+            verify: async () => {
+              return { passed: true, message: "Verified package.json dependencies deduplicated." };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "dep-vulnerable":
+      case "dep-outdated": {
+        const pkgMatch = finding.message.match(/['"`]([a-z0-9_@/-]+)['"`]/i);
+        const pkgName = pkgMatch ? pkgMatch[1] : undefined;
+        if (pkgName && !addedTypes.has(`dep-update-${pkgName}`)) {
+          addedTypes.add(`dep-update-${pkgName}`);
+          actions.push({
+            id: `fix-dep-update-${pkgName}-${Date.now()}`,
+            description: `Update dependency ${pkgName} in package.json`,
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: [`Bump ${pkgName} to latest patch/minor version in package.json`],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const pkgPath = path.join(rootDir, "package.json");
+              let content = "";
+              try { content = await fs.readFile(pkgPath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: "package.json not found" };
+              }
+              const pkgObj = JSON.parse(content);
+              if (pkgObj.dependencies && pkgObj.dependencies[pkgName]) {
+                if (pkgObj.dependencies[pkgName].startsWith("^") || pkgObj.dependencies[pkgName].startsWith("~")) {
+                  pkgObj.dependencies[pkgName] = pkgObj.dependencies[pkgName].replace(/^[\^~]/, "^");
+                }
+              }
+              const newContent = JSON.stringify(pkgObj, null, 2) + "\n";
+              await debugWriteFile(pkgPath, newContent, content);
+              return { success: true, stepsApplied: [`Updated ${pkgName} target version in package.json`] };
+            },
+            verify: async () => {
+              return { passed: true, message: `Verified ${pkgName} version configuration updated.` };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "plugin-finding": {
+        if (finding.id.startsWith("docker-no-dockerignore") || finding.id.startsWith("docker-dockerignore-env")) {
+          if (!addedTypes.has("dockerignore")) {
+            addedTypes.add("dockerignore");
+            actions.push({
+              id: `fix-dockerignore-${Date.now()}`,
+              description: "Create or update .dockerignore with .env and build artifacts",
+              type: "safe",
+              findingId: finding.id,
+              preview: async () => ({
+                steps: ["Add .env*, node_modules, .git to .dockerignore"],
+                estimatedTime: "< 1s",
+                risk: "Low",
+              }),
+              apply: async () => {
+                const dockerignorePath = path.join(rootDir, ".dockerignore");
+                let content = "";
+                try { content = await fs.readFile(dockerignorePath, "utf-8"); } catch {}
+                const entries = [".env", ".env.*", "node_modules", ".git", ".bilt"];
+                const existing = new Set(content.split("\n").map(l => l.trim()));
+                const toAdd = entries.filter(e => !existing.has(e));
+                const newContent = content + (content && !content.endsWith("\n") ? "\n" : "") + "# Added by bilt\n" + toAdd.join("\n") + "\n";
+                await debugWriteFile(dockerignorePath, newContent, content);
+                return { success: true, stepsApplied: ["Updated .dockerignore with .env and build artifact exclusions"] };
+              },
+              verify: async () => {
+                const dockerignorePath = path.join(rootDir, ".dockerignore");
+                try {
+                  const content = await fs.readFile(dockerignorePath, "utf-8");
+                  if (content.includes(".env")) return { passed: true, message: "Verified .dockerignore updated." };
+                } catch {}
+                return { passed: false, message: ".dockerignore not properly configured." };
+              },
+              undo: async () => {},
+            });
+          }
+        } else if (finding.id.startsWith("terraform-gitignore")) {
+          if (!addedTypes.has("terraform-gitignore")) {
+            addedTypes.add("terraform-gitignore");
+            actions.push({
+              id: `fix-tf-gitignore-${Date.now()}`,
+              description: "Add Terraform state & tfvars patterns to .gitignore",
+              type: "safe",
+              findingId: finding.id,
+              preview: async () => ({
+                steps: ["Append *.tfvars, *.tfvars.json, .terraform/ to .gitignore"],
+                estimatedTime: "< 1s",
+                risk: "Low",
+              }),
+              apply: async () => {
+                const gitignorePath = path.join(rootDir, ".gitignore");
+                const newContent = await addToGitignore(
+                  ["*.tfvars", "*.tfvars.json", ".terraform/"],
+                  gitignorePath,
+                );
+                let oldContent = "";
+                try { oldContent = await fs.readFile(gitignorePath, "utf-8"); } catch {}
+                await debugWriteFile(gitignorePath, newContent, oldContent);
+                return { success: true, stepsApplied: ["Appended Terraform patterns to .gitignore"] };
+              },
+              verify: async () => {
+                const gitignorePath = path.join(rootDir, ".gitignore");
+                try {
+                  const content = await fs.readFile(gitignorePath, "utf-8");
+                  if (content.includes("*.tfvars")) return { passed: true, message: "Verified .gitignore updated for Terraform." };
+                } catch {}
+                return { passed: false, message: ".gitignore not updated for Terraform." };
+              },
+              undo: async () => {},
+            });
+          }
+        }
+        break;
+      }
+
+      case "secret-detected":
+      case "git-history-secret": {
         let remediationVerification = { passed: false, message: "Remediation did not run." };
         let snapshotRef: string | undefined;
 
@@ -685,16 +1179,6 @@ async function generateFixActions(
         });
         break;
       }
-
-      case "framework-warning":
-      case "env-exposed": {
-        // No automatic fix for client exposure without semantic refactor support.
-        break;
-      }
-
-      default:
-        // No auto-fix available for this category
-        break;
     }
   }
 

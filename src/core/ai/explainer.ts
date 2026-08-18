@@ -7,6 +7,7 @@ import type { ScanFinding, AIExplanation } from "../../types/index.js";
 import { getAIConfig } from "./config.js";
 import { redactForAI } from "./redact.js";
 import { executeAICompletion } from "./runtime.js";
+import { canFixFinding } from "../fix/can-fix.js";
 
 /**
  * Static local 6-part AI Explanation for a finding (0 network calls, 100% reliable local baseline).
@@ -15,6 +16,7 @@ export function generateAIExplanation(finding: ScanFinding): AIExplanation {
   const cat = finding.category;
   const msg = finding.message;
   const sev = finding.severity;
+  const isFixable = canFixFinding(finding);
 
   // 1. Secret / Credential Leaks
   if (cat === "secret-detected" || cat === "git-history-secret") {

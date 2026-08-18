@@ -188,6 +188,8 @@ function getFindingHeadlineAndDetail(finding: ScanFinding): { headline: string; 
 
 import { generateAIExplanation } from "../core/ai/explainer.js";
 
+import { canFixFinding } from "../core/fix/can-fix.js";
+
 function renderFiveQuestions(finding: ScanFinding, defaultDetail: string): string {
   const loc = defaultDetail.split(" ")[0];
   const exp = finding.aiExplanation || generateAIExplanation(finding);
@@ -195,7 +197,7 @@ function renderFiveQuestions(finding: ScanFinding, defaultDetail: string): strin
   const why = finding.knowledge?.why || exp.whyIsItAProblem;
   const confidence = finding.confidence ?? (finding.category.includes("secret") ? "medium" : "high");
   const action = finding.knowledge?.action || exp.howToFix;
-  const fixable = (finding.suggestion?.toLowerCase().includes("rotate") || exp.canBiltFix)
+  const fixable = canFixFinding(finding)
     ? "yes → bilt fix"
     : "no → manual";
 
