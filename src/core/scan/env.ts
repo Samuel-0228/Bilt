@@ -295,15 +295,25 @@ export function findMissingEnvVars(
   const refs = codeRefs instanceof Set ? [...codeRefs] : codeRefs;
   const findings: ScanFinding[] = [];
 
-  // Built-in Node/framework vars that don't need to be in .env
+  // Built-in Node/framework/cloud runtime vars that don't need to be in .env
   const builtins = new Set([
     "NODE_ENV",
     "PORT",
+    "HOST",
     "PWD",
     "HOME",
     "PATH",
     "CI",
     "TZ",
+    "DEBUG",
+    "VERCEL",
+    "VERCEL_ENV",
+    "NETLIFY",
+    "AWS_REGION",
+    "AWS_EXECUTION_ENV",
+    "FORCE_COLOR",
+    "TERM",
+    "SHELL",
   ]);
 
   for (const ref of refs) {
@@ -443,7 +453,8 @@ export async function performEnvScan(
 
   const envRefs = new Set<string>();
   const primaryEnv = parsedEnvFiles[0];
-  const definedKeys = primaryEnv ? [...primaryEnv.entries.keys()] : [];
+  const allDefinedKeys = new Set(parsedEnvFiles.flatMap((f) => [...f.entries.keys()]));
+  const definedKeys = [...allDefinedKeys];
 
   for (const codeFile of codeFiles) {
     try {
@@ -451,7 +462,7 @@ export async function performEnvScan(
       const refs = scanCodeForEnvRefs(content, codeFile);
       for (const ref of refs) envRefs.add(ref);
 
-      if (primaryEnv) {
+      if (parsedEnvFiles.length > 0) {
         const missingFindings = findMissingEnvVars(
           refs,
           definedKeys,

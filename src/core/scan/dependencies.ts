@@ -29,6 +29,7 @@ export async function scanDependencies(rootDir: string): Promise<ScanFinding[]> 
   let pkg: {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
+    scripts?: Record<string, string>;
   } = {};
   try {
     pkg = JSON.parse(pkgContent);
@@ -70,24 +71,56 @@ export async function scanDependencies(rootDir: string): Promise<ScanFinding[]> 
     }
   }
 
-  // 2. Check for unused dependencies by scanning source files
-  const depNames = Object.keys(dependencies).filter(
-    (name) => !name.startsWith("@types/") && !name.includes("plugin") && !name.includes("preset"),
-  );
+  // 2. Check for unused dependencies by scanning source files & package.json scripts
+  const BUILD_CLI_PACKAGES = new Set([
+    "vite",
+    "vitest",
+    "typescript",
+    "tsx",
+    "ts-node",
+    "tailwindcss",
+    "postcss",
+    "autoprefixer",
+    "concurrently",
+    "rimraf",
+    "cross-env",
+    "dotenv",
+    "husky",
+    "lint-staged",
+    "eslint",
+    "prettier",
+    "sharp",
+    "micro",
+    "nodemon",
+  ]);
+
+  const scriptsContent = pkg.scripts ? JSON.stringify(pkg.scripts) : "";
+
+  const depNames = Object.keys(dependencies).filter((name) => {
+    if (name.startsWith("@types/") || name.includes("plugin") || name.includes("preset") || name.includes("config")) {
+      return false;
+    }
+    if (BUILD_CLI_PACKAGES.has(name)) {
+      return false;
+    }
+    if (scriptsContent.includes(name)) {
+      return false;
+    }
+    return true;
+  });
 
   if (depNames.length > 0) {
     try {
-      const codeFiles = await fg(["**/*.{js,ts,jsx,tsx,mjs,cjs}"], {
+      const codeFiles = await fg(["**/*.{js,ts,jsx,tsx,mjs,cjs,json,vue,svelte}"], {
         cwd: rootDir,
-        ignore: ["node_modules/**", "dist/**", "build/**", ".next/**"],
+        ignore: ["node_modules/**", "dist/**", "build/**", ".next/**", ".nuxt/**"],
         onlyFiles: true,
       });
 
       const importedModules = new Set<string>();
-      for (const file of codeFiles.slice(0, 100)) {
+      for (const file of codeFiles.slice(0, 200)) {
         try {
           const content = await fs.readFile(path.join(rootDir, file), "utf-8");
-          // Match import ... from 'pkg' or require('pkg')
           const matches = content.matchAll(/(?:import\s+.*?from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))/g);
           for (const match of matches) {
             const specifier = match[1] || match[2];
@@ -104,7 +137,6 @@ export async function scanDependencies(rootDir: string): Promise<ScanFinding[]> 
         }
       }
 
-      // Check if any declared dependency is never imported
       for (const dep of depNames) {
         if (!importedModules.has(dep)) {
           findings.push({
