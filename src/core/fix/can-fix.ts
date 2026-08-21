@@ -18,13 +18,19 @@ const FIXABLE_CATEGORIES = new Set([
   "dep-duplicate",
   "dep-unused",
   "dep-outdated",
+  "api-exposed-docs",
+  "api-wildcard-method",
 ]);
 
 const FIXABLE_PLUGIN_IDS = [
   "docker-no-dockerignore",
   "docker-dockerignore-env",
+  "docker-env-secret",
   "terraform-gitignore-tfvars",
   "terraform-gitignore-dir",
+  "terraform-hardcoded",
+  "prisma-hardcoded",
+  "prisma-missing-env",
 ];
 
 const FIXABLE_RULE_IDS = new Set([
@@ -37,6 +43,8 @@ const FIXABLE_RULE_IDS = new Set([
   "SEC-INP-004",
   "SEC-STO-002",
   "SEC-NET-001",
+  "SEC-CFG-001",
+  "SEC-CFG-002",
 ]);
 
 /**

@@ -1073,6 +1073,144 @@ async function generateFixActions(
               undo: async () => {},
             });
           }
+        } else if (finding.id.startsWith("prisma-hardcoded") || finding.id.startsWith("prisma-missing-env")) {
+          if (!addedTypes.has("prisma-hardcoded")) {
+            addedTypes.add("prisma-hardcoded");
+            actions.push({
+              id: `fix-prisma-env-${Date.now()}`,
+              description: "Migrate hardcoded Prisma connection string to env(\"DATABASE_URL\")",
+              type: "safe",
+              findingId: finding.id,
+              preview: async () => ({
+                steps: ["Update url in prisma/schema.prisma to env(\"DATABASE_URL\") and add to .env"],
+                estimatedTime: "< 1s",
+                risk: "Low",
+              }),
+              apply: async () => {
+                const schemaPath = path.join(rootDir, "prisma/schema.prisma");
+                let content = "";
+                try { content = await fs.readFile(schemaPath, "utf-8"); } catch {
+                  return { success: false, stepsApplied: [], error: "prisma/schema.prisma not found" };
+                }
+                const newContent = content.replace(/url\s*=\s*(?:"[^"]+"|'[^']+')/g, 'url = env("DATABASE_URL")');
+                await debugWriteFile(schemaPath, newContent, content);
+
+                const envPath = path.join(rootDir, ".env");
+                let envContent = "";
+                try { envContent = await fs.readFile(envPath, "utf-8"); } catch {}
+                const updatedEnv = addMissingEnvVars(envContent, ["DATABASE_URL"]);
+                await debugWriteFile(envPath, updatedEnv, envContent);
+
+                return { success: true, stepsApplied: ["Migrated Prisma datasource URL to env(\"DATABASE_URL\") and updated .env"] };
+              },
+              verify: async () => {
+                const schemaPath = path.join(rootDir, "prisma/schema.prisma");
+                try {
+                  const content = await fs.readFile(schemaPath, "utf-8");
+                  if (content.includes('env("DATABASE_URL")')) return { passed: true, message: "Verified Prisma schema uses env(\"DATABASE_URL\")." };
+                } catch {}
+                return { passed: false, message: "Prisma schema still uses hardcoded URL." };
+              },
+              undo: async () => {},
+            });
+          }
+        }
+        break;
+      }
+
+      case "api-exposed-docs": {
+        const targetFile = finding.file;
+        if (targetFile && !addedTypes.has(`api-exposed-docs-${targetFile}`)) {
+          addedTypes.add(`api-exposed-docs-${targetFile}`);
+          actions.push({
+            id: `fix-api-docs-${Date.now()}`,
+            description: `Wrap API documentation route in environment check in ${targetFile}`,
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: [`Add 'if (process.env.NODE_ENV !== "production")' guard around API docs route in ${targetFile}`],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const filePath = path.join(rootDir, targetFile);
+              let content = "";
+              try { content = await fs.readFile(filePath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: `${targetFile} not found` };
+              }
+              const lines = content.split("\n");
+              const newLines: string[] = [];
+              let guarded = false;
+              for (const l of lines) {
+                if (
+                  !guarded &&
+                  (l.includes("/docs") || l.includes("/swagger") || l.includes("/api-docs") || l.includes("/graphiql")) &&
+                  (l.includes(".use(") || l.includes(".get("))
+                ) {
+                  newLines.push(`if (process.env.NODE_ENV !== "production") {`);
+                  newLines.push(`  ${l}`);
+                  newLines.push(`}`);
+                  guarded = true;
+                } else {
+                  newLines.push(l);
+                }
+              }
+              const newContent = newLines.join("\n");
+              await debugWriteFile(filePath, newContent, content);
+              return { success: true, stepsApplied: [`Wrapped API docs route in production environment check in ${targetFile}`] };
+            },
+            verify: async () => {
+              const filePath = path.join(rootDir, targetFile);
+              try {
+                const content = await fs.readFile(filePath, "utf-8");
+                if (content.includes("process.env.NODE_ENV !== 'production'") || content.includes('process.env.NODE_ENV !== "production"')) {
+                  return { passed: true, message: "Verified API docs route is environment guarded." };
+                }
+              } catch {}
+              return { passed: false, message: "API docs route not guarded." };
+            },
+            undo: async () => {},
+          });
+        }
+        break;
+      }
+
+      case "api-wildcard-method": {
+        const targetFile = finding.file;
+        if (targetFile && !addedTypes.has(`api-wildcard-${targetFile}`)) {
+          addedTypes.add(`api-wildcard-${targetFile}`);
+          actions.push({
+            id: `fix-api-wildcard-${Date.now()}`,
+            description: `Replace wildcard HTTP method handler with explicit methods in ${targetFile}`,
+            type: "safe",
+            findingId: finding.id,
+            preview: async () => ({
+              steps: [`Replace app.all / router.all with explicit route handler in ${targetFile}`],
+              estimatedTime: "< 1s",
+              risk: "Low",
+            }),
+            apply: async () => {
+              const filePath = path.join(rootDir, targetFile);
+              let content = "";
+              try { content = await fs.readFile(filePath, "utf-8"); } catch {
+                return { success: false, stepsApplied: [], error: `${targetFile} not found` };
+              }
+              const newContent = content
+                .replace(/\bapp\.all\(/g, "app.get(")
+                .replace(/\brouter\.all\(/g, "router.get(");
+              await debugWriteFile(filePath, newContent, content);
+              return { success: true, stepsApplied: [`Replaced wildcard route handlers with explicit HTTP methods in ${targetFile}`] };
+            },
+            verify: async () => {
+              const filePath = path.join(rootDir, targetFile);
+              try {
+                const content = await fs.readFile(filePath, "utf-8");
+                if (!content.includes(".all(")) return { passed: true, message: "Verified wildcard route handlers replaced." };
+              } catch {}
+              return { passed: false, message: "Wildcard route handler still present." };
+            },
+            undo: async () => {},
+          });
         }
         break;
       }

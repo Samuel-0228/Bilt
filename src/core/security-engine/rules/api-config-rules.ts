@@ -24,6 +24,19 @@ export const apiConfigRules: SecurityRule[] = [
         shouldMatch: true,
       },
     ],
+    safeAutoFix: (content) => {
+      if (content.includes("err.stack") || content.includes("error.stack") || content.includes("e.stack")) {
+        const fixed = content
+          .replace(/stack:\s*err\.stack/g, "stack: process.env.NODE_ENV === 'development' ? err.stack : undefined")
+          .replace(/stack:\s*error\.stack/g, "stack: process.env.NODE_ENV === 'development' ? error.stack : undefined")
+          .replace(/stack:\s*e\.stack/g, "stack: process.env.NODE_ENV === 'development' ? e.stack : undefined");
+        return {
+          modifiedContent: fixed,
+          description: "Conditionally hide error stack traces in production environment responses.",
+        };
+      }
+      return null;
+    },
     match: (astContext) => {
       const findings: SecurityFindingDetails[] = [];
       const lines = astContext.fileContent.split("\n");
@@ -53,7 +66,7 @@ export const apiConfigRules: SecurityRule[] = [
             whyThisIsDangerous: "Stack traces reveal server internals and system structure to attackers.",
             howAttackersAbuseIt: "Attacker triggers errors to gather intelligence for targeted exploits.",
             suggestedFix: "Do not include `err.stack` in public API responses.",
-            automaticFixAvailability: { available: false },
+            automaticFixAvailability: { available: true, description: "Hide stack traces in production" },
             documentation: {
               owasp: "A05:2021-Security Misconfiguration",
               cwe: "CWE-209",
@@ -90,12 +103,38 @@ export const apiConfigRules: SecurityRule[] = [
         shouldMatch: true,
       },
     ],
+    safeAutoFix: (content, finding, astContext) => {
+      if (content.includes("express()") && !content.includes("helmet()")) {
+        let fixed = content;
+        const importStatement = astContext?.filePath.endsWith(".ts")
+          ? "import helmet from 'helmet';\n"
+          : "const helmet = require('helmet');\n";
+
+        if (!fixed.includes("helmet")) {
+          fixed = importStatement + fixed;
+        }
+
+        fixed = fixed.replace(/const\s+(\w+)\s*=\s*express\(\);/g, "const $1 = express();\n$1.use(helmet());");
+        if (fixed !== content) {
+          return {
+            modifiedContent: fixed,
+            description: "Registered helmet() security middleware on Express application instance.",
+          };
+        }
+      }
+      return null;
+    },
     match: (astContext) => {
       const findings: SecurityFindingDetails[] = [];
+      const ext = astContext.filePath.toLowerCase();
+      const isJsTs = ext.endsWith(".ts") || ext.endsWith(".js") || ext.endsWith(".tsx") || ext.endsWith(".jsx");
+      const isConfigFile = ext.includes("config.js") || ext.includes("config.ts") || ext.includes("config.mjs") || ext.includes("config.cjs");
+
       if (
+        isJsTs &&
+        !isConfigFile &&
         astContext.fileContent.includes("express()") &&
-        !astContext.fileContent.includes("helmet()") &&
-        astContext.filePath.endsWith(".ts") || astContext.filePath.endsWith(".js")
+        !astContext.fileContent.includes("helmet()")
       ) {
         findings.push({
           ruleId: "SEC-CFG-002",
@@ -114,7 +153,7 @@ export const apiConfigRules: SecurityRule[] = [
           whyThisIsDangerous: "Default Express response headers do not protect against clickjacking or MIME-sniffing.",
           howAttackersAbuseIt: "Attacker framing attacks or cross-domain MIME exploits.",
           suggestedFix: "Add `import helmet from 'helmet'; app.use(helmet());`.",
-          automaticFixAvailability: { available: false },
+          automaticFixAvailability: { available: true, description: "Add helmet security headers middleware" },
           documentation: {
             owasp: "A05:2021-Security Misconfiguration",
             cwe: "CWE-1059",

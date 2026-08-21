@@ -35,6 +35,8 @@ describe("canFixFinding Unit Tests", () => {
       { category: "framework-warning", ruleId: "SEC-STO-002", message: "res.cookie missing httpOnly" },
       { category: "framework-warning", ruleId: "SEC-NET-001", message: "rejectUnauthorized: false" },
       { category: "framework-warning", ruleId: "SEC-ENV-001", message: "Client-Exposed Secret Environment Variable" },
+      { category: "framework-warning", ruleId: "SEC-CFG-001", message: "Verbose error details exposed" },
+      { category: "framework-warning", ruleId: "SEC-CFG-002", message: "Missing essential HTTP security headers" },
     ];
 
     for (const f of secFindings) {
@@ -47,6 +49,7 @@ describe("canFixFinding Unit Tests", () => {
       { category: "plugin-finding", id: "docker-no-dockerignore-123" },
       { category: "plugin-finding", id: "docker-dockerignore-env-456" },
       { category: "plugin-finding", id: "terraform-gitignore-tfvars-789" },
+      { category: "plugin-finding", id: "prisma-hardcoded-db-url-1" },
     ];
 
     for (const f of pluginFindings) {
@@ -59,8 +62,6 @@ describe("canFixFinding Unit Tests", () => {
       { category: "git-large-file", message: "Large file > 5MB" },
       { category: "git-hygiene", message: "WIP commit" },
       { category: "perf-image", message: "Large uncompressed image" },
-      { category: "api-exposed-docs", message: "Exposed Swagger UI" },
-      { category: "framework-warning", ruleId: "SEC-CFG-002", message: "Missing Essential HTTP Security Headers" },
     ];
 
     for (const f of unfixableFindings) {
