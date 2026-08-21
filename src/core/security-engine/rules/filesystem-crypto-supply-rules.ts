@@ -45,9 +45,11 @@ export const filesystemCryptoSupplyRules: SecurityRule[] = [
         const lineNum = idx + 1;
         const lower = lineText.toLowerCase();
 
+        const isJsxKeyProp = lower.includes("key={") || lower.includes("key =");
         if (
           lower.includes("math.random()") &&
-          (lower.includes("token") || lower.includes("secret") || lower.includes("password") || lower.includes("key") || lower.includes("session"))
+          !isJsxKeyProp &&
+          (lower.includes("token") || lower.includes("secret") || lower.includes("password") || lower.includes("session") || lower.includes("apikey") || lower.includes("authkey"))
         ) {
           findings.push({
             ruleId: "SEC-CRY-001",
