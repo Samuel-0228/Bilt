@@ -284,7 +284,9 @@ program
   .argument("[dir]", "Project directory", ".")
   .option("--format <format>", "Export format (markdown or json)", "markdown")
   .option("--output <path>", "File path to save the report")
-  .action(async (dir: string, opts: { format?: string; output?: string }) => {
+  .option("--export <path>", "File path to save the report (alias)")
+  .option("--stdout", "Print report directly to terminal stdout instead of saving to file")
+  .action(async (dir: string, opts: { format?: string; output?: string; export?: string; stdout?: boolean }) => {
     try {
       const { executeReport } = await import("./commands/report.js");
       await executeReport(dir, opts);

@@ -12,3 +12,5 @@ coverage
 .vscode
 .bilt/
 video_intro/
+bilt-report.*
+bilt-health-card.png

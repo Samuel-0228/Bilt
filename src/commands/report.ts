@@ -5,21 +5,29 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { executeScan } from "./scan.js";
+import { colors } from "../ui/theme.js";
 
 export async function executeReport(
   projectDir: string,
-  options: { format?: string; output?: string } = {},
+  options: { format?: string; output?: string; export?: string; stdout?: boolean } = {},
 ): Promise<void> {
   const rootDir = path.resolve(projectDir);
   const result = await executeScan(rootDir, { quiet: true });
 
   const format = (options.format || "markdown").toLowerCase();
 
+  // Determine output target path (defaulting to bilt-report.md or bilt-report.json unless --stdout is passed)
+  let outputPath: string | null = options.output || options.export || null;
+  if (!outputPath && !options.stdout) {
+    outputPath = format === "json" ? "bilt-report.json" : "bilt-report.md";
+  }
+
   if (format === "json") {
     const jsonOutput = JSON.stringify(result, null, 2);
-    if (options.output) {
-      await fs.writeFile(path.resolve(options.output), jsonOutput, "utf-8");
-      console.log(`Report written to ${options.output}`);
+    if (outputPath) {
+      const fullPath = path.resolve(rootDir, outputPath);
+      await fs.writeFile(fullPath, jsonOutput, "utf-8");
+      console.log(colors.mintClear.apply(`✔ Report saved to ${outputPath}`));
     } else {
       console.log(jsonOutput);
     }
@@ -60,9 +68,10 @@ export async function executeReport(
 
   md += `---\n*Generated automatically by Bilt Toolkit*\n`;
 
-  if (options.output) {
-    await fs.writeFile(path.resolve(options.output), md, "utf-8");
-    console.log(`Report saved to ${options.output}`);
+  if (outputPath) {
+    const fullPath = path.resolve(rootDir, outputPath);
+    await fs.writeFile(fullPath, md, "utf-8");
+    console.log(colors.mintClear.apply(`✔ Report saved to ${outputPath}`));
   } else {
     console.log(md);
   }
