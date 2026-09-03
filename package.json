@@ -1,6 +1,6 @@
 {
   "name": "bilt-toolkit",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Zero-configuration developer security and project-health CLI toolkit.",
   "type": "module",
   "main": "dist/cli.js",
