@@ -44,7 +44,7 @@ export async function requireTypedConfirmation(
     type: "input",
     name: "confirm",
     message:
-      `⚠️  This action is IRREVERSIBLE: ${action.description}\n` +
+      `🔴  This action is IRREVERSIBLE: ${action.description}\n` +
       `   ${SNAPSHOT_NOTICE}\n` +
       `   Type "${fileName}" to confirm:`,
   })) as { confirm: string };

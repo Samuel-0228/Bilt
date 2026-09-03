@@ -17,9 +17,51 @@ import {
 } from "../ui/theme.js";
 import { createRequire } from "node:module";
 
+export function getOWASPMapping(f: ScanFinding): { id: string; name: string } {
+  if (f.owaspMapping) {
+    if (f.owaspMapping.includes("A01")) return { id: "A01:2021", name: "Broken Access Control" };
+    if (f.owaspMapping.includes("A02")) return { id: "A02:2021", name: "Cryptographic Failures" };
+    if (f.owaspMapping.includes("A03")) return { id: "A03:2021", name: "Injection" };
+    if (f.owaspMapping.includes("A04")) return { id: "A04:2021", name: "Insecure Design" };
+    if (f.owaspMapping.includes("A05")) return { id: "A05:2021", name: "Security Misconfiguration" };
+    if (f.owaspMapping.includes("A06")) return { id: "A06:2021", name: "Vulnerable & Outdated Components" };
+    if (f.owaspMapping.includes("A07")) return { id: "A07:2021", name: "Identification & Authentication Failures" };
+    if (f.owaspMapping.includes("A08")) return { id: "A08:2021", name: "Software & Data Integrity Failures" };
+    if (f.owaspMapping.includes("A09")) return { id: "A09:2021", name: "Security Logging & Monitoring Failures" };
+    if (f.owaspMapping.includes("A10")) return { id: "A10:2021", name: "Server-Side Request Forgery" };
+  }
+
+  switch (f.category) {
+    case "secret-detected":
+      return { id: "A02:2021", name: "Cryptographic Failures" };
+    case "env-missing":
+    case "env-unused":
+    case "env-mismatch":
+    case "env-exposed":
+    case "gitignore-missing":
+    case "plugin-finding":
+    case "config-package":
+      return { id: "A05:2021", name: "Security Misconfiguration" };
+    case "dep-vulnerable":
+    case "dep-unused":
+    case "dep-duplicate":
+      return { id: "A06:2021", name: "Vulnerable & Outdated Components" };
+    case "api-mass-assignment":
+    case "api-wildcard-method":
+      return { id: "A01:2021", name: "Broken Access Control" };
+    case "api-missing-validation":
+      return { id: "A04:2021", name: "Insecure Design" };
+    case "api-exposed-docs":
+    case "api-sensitive-exposure":
+      return { id: "A05:2021", name: "Security Misconfiguration" };
+    default:
+      return { id: "A05:2021", name: "Security Misconfiguration" };
+  }
+}
+
 export async function executeDoctor(
   projectDir: string,
-  options: { card?: boolean; fun?: boolean; debug?: boolean } = {},
+  options: { card?: boolean; owasp?: boolean; fun?: boolean; debug?: boolean } = {},
 ): Promise<void> {
   const rootDir = path.resolve(projectDir);
 
@@ -131,6 +173,71 @@ export async function executeDoctor(
     await maybeSleep();
   }
   console.log("");
+
+  // OWASP Top 10 Breakdown (if --owasp flag passed)
+  if (options.owasp) {
+    console.log(sectionHeader("OWASP Top 10 Security Compliance"));
+    await maybeSleep();
+    console.log("");
+
+    const owaspCategories = [
+      { id: "A01:2021", name: "Broken Access Control" },
+      { id: "A02:2021", name: "Cryptographic Failures" },
+      { id: "A03:2021", name: "Injection" },
+      { id: "A04:2021", name: "Insecure Design" },
+      { id: "A05:2021", name: "Security Misconfiguration" },
+      { id: "A06:2021", name: "Vulnerable & Outdated Components" },
+      { id: "A07:2021", name: "Identification & Authentication Failures" },
+      { id: "A08:2021", name: "Software & Data Integrity Failures" },
+      { id: "A09:2021", name: "Security Logging & Monitoring Failures" },
+      { id: "A10:2021", name: "Server-Side Request Forgery" },
+    ];
+
+    const counts: Record<string, number> = {};
+    const grouped: Record<string, ScanFinding[]> = {};
+    for (const cat of owaspCategories) {
+      counts[cat.id] = 0;
+      grouped[cat.id] = [];
+    }
+
+    for (const f of findings) {
+      const mapping = getOWASPMapping(f);
+      counts[mapping.id] = (counts[mapping.id] || 0) + 1;
+      grouped[mapping.id]?.push(f);
+    }
+
+    for (const cat of owaspCategories) {
+      const cnt = counts[cat.id] || 0;
+      const statusStr = cnt === 0
+        ? colors.mintClear.apply("🟢 PASS")
+        : colors.pulseCoral.apply(`🔴 ${cnt} RISK${cnt > 1 ? "S" : ""}`);
+      const label = `${cat.id} ${cat.name}`.padEnd(46);
+      console.log(`  ${label} [${statusStr}]`);
+      await maybeSleep();
+    }
+    console.log("");
+
+    if (findings.length > 0) {
+      console.log(sectionHeader("OWASP Risk Details & Findings"));
+      await maybeSleep();
+      console.log("");
+
+      for (const cat of owaspCategories) {
+        const catFindings = grouped[cat.id] || [];
+        if (catFindings.length > 0) {
+          console.log(colors.vitalTeal.bold(`  ◆ ${cat.id} ${cat.name}`));
+          for (const f of catFindings) {
+            const loc = f.line ? `${f.file}:${f.line}` : f.file;
+            console.log(`     ${severityIcon(f.severity)} ${f.message} (${loc})`);
+            if (f.suggestion) {
+              console.log(colors.slateDim.dim(`        Action: ${f.suggestion}`));
+            }
+          }
+          console.log("");
+        }
+      }
+    }
+  }
 
   // Detailed Findings with AI Explanations
   if (findings.length > 0) {

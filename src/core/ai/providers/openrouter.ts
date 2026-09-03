@@ -18,7 +18,7 @@ export class OpenRouterProvider implements AIProvider {
       baseUrl: "https://openrouter.ai/api/v1",
       defaultModel: this.defaultModel,
       extraHeaders: {
-        "HTTP-Referer": "https://github.com/Samuel-0228/Bilt",
+        "HTTP-Referer": "https://bilt.dev",
         "X-Title": "Bilt CLI",
       },
     });

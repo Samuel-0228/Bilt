@@ -62,7 +62,7 @@ export async function executeAsk(
     console.log(divider());
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.log(colors.pulseCoral.apply(`❌ AI Query Failed: ${message}`));
+    console.log(colors.pulseCoral.apply(`🔴 AI Query Failed: ${message}`));
     console.log(text.dim("Bilt continued locally. Run 'bilt ai provider local' to force deterministic offline mode."));
   }
 }

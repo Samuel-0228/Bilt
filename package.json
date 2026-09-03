@@ -44,16 +44,16 @@
     "git-security",
     "health-check"
   ],
-  "author": "Samuel Yeshambel <samuelnaod3@gmail.com>",
+  "author": "Bilt Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Samuel-0228/bilt.git"
+    "url": "git+https://github.com/bilt-dev/bilt.git"
   },
   "bugs": {
-    "url": "https://github.com/Samuel-0228/bilt/issues"
+    "url": "https://github.com/bilt-dev/bilt/issues"
   },
-  "homepage": "https://github.com/Samuel-0228/bilt#readme",
+  "homepage": "https://github.com/bilt-dev/bilt#readme",
   "dependencies": {
     "chalk": "^5.6.2",
     "chokidar": "^4.0.3",

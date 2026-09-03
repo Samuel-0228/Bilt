@@ -27,20 +27,20 @@ export async function executeReport(
   }
 
   // Generate Markdown report
-  let md = `# 🛡️ Bilt Repository Health Report\n\n`;
+  let md = `# Bilt Repository Health Report\n\n`;
   md += `**Overall Health Score:** ${result.healthScore}/100 (**Grade: ${result.grade}**)\n\n`;
 
-  md += `## 📊 Domain Health Scores\n\n`;
+  md += `## Domain Health Scores\n\n`;
   md += `| Health Domain | Score | Status |\n`;
   md += `|---|---|---|\n`;
-  md += `| Security | ${result.domainScores.security}/100 | ${result.domainScores.security >= 90 ? "✅ Healthy" : "⚠️ Needs Attention"} |\n`;
-  md += `| Environment | ${result.domainScores.environment}/100 | ${result.domainScores.environment >= 90 ? "✅ Healthy" : "⚠️ Needs Attention"} |\n`;
-  md += `| Git Hygiene | ${result.domainScores.git}/100 | ${result.domainScores.git >= 90 ? "✅ Healthy" : "⚠️ Needs Attention"} |\n`;
-  md += `| Dependencies | ${result.domainScores.dependencies}/100 | ${result.domainScores.dependencies >= 90 ? "✅ Healthy" : "⚠️ Needs Attention"} |\n`;
-  md += `| Configuration | ${result.domainScores.configuration}/100 | ${result.domainScores.configuration >= 90 ? "✅ Healthy" : "⚠️ Needs Attention"} |\n`;
-  md += `| Performance | ${result.domainScores.performance}/100 | ${result.domainScores.performance >= 90 ? "✅ Healthy" : "⚠️ Needs Attention"} |\n\n`;
+  md += `| Security | ${result.domainScores.security}/100 | ${result.domainScores.security >= 90 ? "🟢 Healthy" : "🟡 Needs Attention"} |\n`;
+  md += `| Environment | ${result.domainScores.environment}/100 | ${result.domainScores.environment >= 90 ? "🟢 Healthy" : "🟡 Needs Attention"} |\n`;
+  md += `| Git Hygiene | ${result.domainScores.git}/100 | ${result.domainScores.git >= 90 ? "🟢 Healthy" : "🟡 Needs Attention"} |\n`;
+  md += `| Dependencies | ${result.domainScores.dependencies}/100 | ${result.domainScores.dependencies >= 90 ? "🟢 Healthy" : "🟡 Needs Attention"} |\n`;
+  md += `| Configuration | ${result.domainScores.configuration}/100 | ${result.domainScores.configuration >= 90 ? "🟢 Healthy" : "🟡 Needs Attention"} |\n`;
+  md += `| Performance | ${result.domainScores.performance}/100 | ${result.domainScores.performance >= 90 ? "🟢 Healthy" : "🟡 Needs Attention"} |\n\n`;
 
-  md += `## 🔍 Detailed Issues & AI Guidance\n\n`;
+  md += `## Detailed Issues & AI Guidance\n\n`;
   if (result.findings.length === 0) {
     md += `*No issues detected! Repository is in excellent health.*\n\n`;
   } else {

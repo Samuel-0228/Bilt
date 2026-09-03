@@ -159,7 +159,7 @@ describe("AI Provider Adapters", () => {
 
       const response = await provider.complete("Explain issue", mockContext, undefined, "sk-or-key");
       expect(capturedUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
-      expect(capturedHeaders["HTTP-Referer"]).toBe("https://github.com/Samuel-0228/Bilt");
+      expect(capturedHeaders["HTTP-Referer"]).toBe("https://bilt.dev");
       expect(response).toBe("OpenRouter response");
     });
 

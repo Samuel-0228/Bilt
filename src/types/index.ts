@@ -89,6 +89,8 @@ export interface ScanFinding {
   knowledge?: ProviderKnowledge;
   /** The structured 6-question AI explanation */
   aiExplanation?: AIExplanation;
+  /** OWASP Top 10 mapping string */
+  owaspMapping?: string;
 }
 
 // ─── Scan Result ─────────────────────────────────────────────────────────────

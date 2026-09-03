@@ -2,8 +2,8 @@
 
 [![npm version](https://img.shields.io/badge/npm-v1.0.4-blue.svg)](https://www.npmjs.com/package/bilt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
-[![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/bilt-dev/bilt)
+[![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/bilt-dev/bilt)
 
 > Zero-configuration project health toolkit. Detect hardcoded secrets, resolve environment variable mismatches, enforce safe local practices, and maintain repository integrity before code reaches Git.
 
@@ -510,5 +510,5 @@ export const customPlugin: PluginManifest = {
 
 ## License
 
-MIT © [Samuel Yeshambel](https://github.com/Samuel-0228)
+MIT
 

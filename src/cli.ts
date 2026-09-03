@@ -319,12 +319,14 @@ program
   .description("Comprehensive health report with detailed breakdown")
   .argument("[dir]", "Project directory", ".")
   .option("--card", "Output a markdown health card to stdout")
+  .option("--owasp", "Format health report mapped to OWASP Top 10 categories")
   .option("--debug", "Enable debug logging for file reads")
   .option("--fun", "Enable celebrations and streak counter")
-  .action(async (dir: string, opts: { card?: boolean; fun?: boolean; debug?: boolean }) => {
+  .action(async (dir: string, opts: { card?: boolean; owasp?: boolean; fun?: boolean; debug?: boolean }) => {
     try {
       await executeDoctor(dir, {
         card: opts.card,
+        owasp: opts.owasp,
         fun: opts.fun,
         debug: opts.debug,
       });

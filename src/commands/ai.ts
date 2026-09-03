@@ -59,7 +59,7 @@ export async function executeAISetup(): Promise<void> {
     apiKey = keyPrompt.apiKey;
 
     if (!apiKey || apiKey.trim() === "") {
-      console.log(colors.pulseCoral.apply("❌ No API key provided. Setup cancelled."));
+      console.log(colors.pulseCoral.apply("🔴 No API key provided. Setup cancelled."));
       return;
     }
 
@@ -68,7 +68,7 @@ export async function executeAISetup(): Promise<void> {
     const isValid = await selectedProvider.validateKey(apiKey.trim());
 
     if (!isValid) {
-      console.log(colors.pulseCoral.apply(`❌ API key validation failed for ${selectedProvider.name}. Check your key and network connection.`));
+      console.log(colors.pulseCoral.apply(`🔴 API key validation failed for ${selectedProvider.name}. Check your key and network connection.`));
       console.log(text.dim("No credentials were saved."));
       return;
     }
@@ -97,7 +97,7 @@ export async function executeAISetup(): Promise<void> {
   if (selectedProvider.requiresApiKey !== false) {
     saveRes = await saveApiKey(providerId, apiKey.trim());
     if (!saveRes.success) {
-      console.log(colors.pulseCoral.apply(`❌ Failed to store API key: ${saveRes.error}`));
+      console.log(colors.pulseCoral.apply(`🔴 Failed to store API key: ${saveRes.error}`));
       return;
     }
   }
@@ -322,9 +322,9 @@ export async function executeAITest(): Promise<void> {
   const isValid = await provider.validateKey(keyInfo.key);
   if (isValid) {
     recordValidation(config.activeProvider);
-    console.log(colors.mintClear.apply(`✔ API key for ${provider.name} is valid and working.`));
+    console.log(colors.mintClear.apply("✔ API key for " + provider.name + " is valid and working."));
   } else {
-    console.log(colors.pulseCoral.apply(`❌ Validation failed for ${provider.name}. Key may be expired or revoked.`));
+    console.log(colors.pulseCoral.apply("🔴 Validation failed for " + provider.name + ". Key may be expired or revoked."));
   }
 }
 

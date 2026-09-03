@@ -48,10 +48,10 @@ export async function runOnboardingWizard(): Promise<void> {
   console.log(divider());
 
   console.log(colors.vitalTeal.apply("  What Bilt does for your codebase (100% Local Guarantee):"));
-  console.log(text.bold("  🛡️  Zero-Config Security") + text.dim("  : Detects 30+ secret types (AWS, Stripe, JWT) before push"));
-  console.log(text.bold("  ⚡ Instant Auto-Fixes") + text.dim("   : Safe automated fixes with 1-click snapshot restore (bilt undo)"));
-  console.log(text.bold("  🩺 Project Doctor") + text.dim("       : Comprehensive health scoring, repo hygiene & report cards"));
-  console.log(text.bold("  🤖 Optional AI Layer") + text.dim("    : Layer Claude, GPT-4o, Gemini, or Llama for bilt ask & insights"));
+  console.log(text.bold("  ●  Zero-Config Security") + text.dim("  : Detects 30+ secret types (AWS, Stripe, JWT) before push"));
+  console.log(text.bold("  ●  Instant Auto-Fixes") + text.dim("   : Safe automated fixes with 1-click snapshot restore (bilt undo)"));
+  console.log(text.bold("  ●  Project Doctor") + text.dim("       : Comprehensive health scoring, repo hygiene & report cards"));
+  console.log(text.bold("  ●  Optional AI Layer") + text.dim("    : Layer Claude, GPT-4o, Gemini, or Llama for bilt ask & insights"));
   console.log("");
   console.log(colors.slateDim.dim("  Tip: You can re-open this guide anytime by typing: bilt welcome"));
   console.log(divider());
