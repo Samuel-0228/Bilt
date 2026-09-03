@@ -1,6 +1,5 @@
 import type { SecurityRule, SecurityFindingDetails } from "../types.js";
 import { ASTAnalyzer } from "../ast-analyzer.js";
-import * as ts from "typescript";
 
 export const authRules: SecurityRule[] = [
   // 1. Unverified JWT Decode (jwt.decode instead of jwt.verify)
