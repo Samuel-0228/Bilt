@@ -48,7 +48,7 @@ Install Bilt globally or run directly on any repository using `npx`:
 
 ```bash
 # Global installation
-npm install -g bilt
+npm install -g bilt-toolkit
 
 # Initialize Bilt in your project root
 bilt init
