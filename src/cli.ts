@@ -100,6 +100,11 @@ program
   .option("--full-history", "Scan all git history (not just recent commits)")
   .option("--json", "Output results as JSON")
   .option(
+    "--format <format>",
+    "Output format: agent, sarif, json, text",
+    "text",
+  )
+  .option(
     "--severity <level>",
     "Minimum severity to report (critical, warning, info)",
   )
@@ -125,6 +130,7 @@ program
       opts: {
         fullHistory?: boolean;
         json?: boolean;
+        format?: "text" | "json" | "agent" | "sarif";
         severity?: string;
         verbose?: boolean;
         details?: boolean;
@@ -142,6 +148,7 @@ program
         const result = await executeScan(dir, {
           fullHistory: opts.fullHistory,
           json: opts.json,
+          format: opts.format,
           severity: opts.severity as Severity | undefined,
           verbose: opts.verbose,
           details: opts.details,

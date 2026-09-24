@@ -52,6 +52,10 @@ import {
   isFingerprintInBaseline,
 } from "../core/scoping/baseline.js";
 import { computeFingerprint } from "../core/finding/fingerprint.js";
+import { toAgentFinding } from "../core/finding/mapper.js";
+import { formatAgentOutput } from "../core/output/formatters/agent.js";
+import { formatSarifOutput } from "../core/output/formatters/sarif.js";
+import { statusToExitCode } from "../core/output/types.js";
 import { createRequire } from "node:module";
 
 // Helper to run a scan step and stream findings
@@ -534,8 +538,39 @@ export async function executeScan(
       duration,
     };
 
-    if (isJson) {
+    if (options.format === "agent") {
+      const agentFindings = result.findings.map((f) =>
+        toAgentFinding(f, {
+          introducedByChange: f.introducedByChange !== false,
+          surroundingSnippet: f.preview,
+        }),
+      );
+      const agentOutput = formatAgentOutput({
+        toolVersion: "1.0.5",
+        findings: agentFindings,
+        introducedOnly: Boolean(options.changed || options.base),
+      });
+      console.log(JSON.stringify(agentOutput, null, 2));
+      process.exitCode = statusToExitCode(agentOutput.status);
+    } else if (options.format === "sarif") {
+      const agentFindings = result.findings.map((f) =>
+        toAgentFinding(f, {
+          introducedByChange: f.introducedByChange !== false,
+          surroundingSnippet: f.preview,
+        }),
+      );
+      const sarif = formatSarifOutput(agentFindings, "1.0.5");
+      console.log(JSON.stringify(sarif, null, 2));
+      const criticalCount = findings.filter(
+        (f) => f.severity === "critical",
+      ).length;
+      if (criticalCount > 0) process.exitCode = 1;
+    } else if (isJson || options.format === "json") {
       console.log(JSON.stringify(result, null, 2));
+      const criticalCount = findings.filter(
+        (f) => f.severity === "critical",
+      ).length;
+      if (criticalCount > 0) process.exitCode = 1;
     } else if (!isQuiet) {
       console.log(pulseBar(score));
       console.log("");
@@ -575,6 +610,9 @@ export async function executeScan(
 
       console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
       console.log("");
+      if (criticalCount > 0) {
+        process.exitCode = 1;
+      }
     }
 
     return result;

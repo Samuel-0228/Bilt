@@ -315,6 +315,7 @@ export interface ScanOptions {
   includeTests?: boolean;
   changed?: boolean;
   base?: string;
+  format?: "text" | "json" | "agent" | "sarif";
 }
 
 export interface FixOptions {
