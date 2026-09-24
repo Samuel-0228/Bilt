@@ -25,7 +25,20 @@ import { executeAsk } from "./commands/ask.js";
 import { executeWelcome } from "./commands/welcome.js";
 import { checkAndRunFirstTimeOnboarding } from "./core/onboarding/first-run.js";
 import type { Severity } from "./types/index.js";
-import { colors, glyphs, initColorSupport, setPlainMode, sectionHeader, divider, banner, pulseBar, styledGlyph, text, Spinner, spinnerFrames } from "./ui/theme.js";
+import {
+  colors,
+  glyphs,
+  initColorSupport,
+  setPlainMode,
+  sectionHeader,
+  divider,
+  banner,
+  pulseBar,
+  styledGlyph,
+  text,
+  Spinner,
+  spinnerFrames,
+} from "./ui/theme.js";
 import { severityIcon, formatFinding, formatHealthScore } from "./ui/format.js";
 
 // ─── Color Support ───────────────────────────────────────────────────────────
@@ -42,15 +55,25 @@ const pkg = require("../package.json") as { version: string };
 const program = new Command();
 
 program.hook("preAction", async (thisCommand, actionCommand) => {
-  const opts = thisCommand.optsWithGlobals() as { color?: boolean; plain?: boolean; json?: boolean };
+  const opts = thisCommand.optsWithGlobals() as {
+    color?: boolean;
+    plain?: boolean;
+    json?: boolean;
+  };
   if (opts.color === false) {
     initColorSupport(true);
   }
   if (opts.plain) {
     setPlainMode(true);
   }
-  if (actionCommand.name() !== "welcome" && actionCommand.name() !== "theme-preview") {
-    await checkAndRunFirstTimeOnboarding({ plain: opts.plain, json: opts.json });
+  if (
+    actionCommand.name() !== "welcome" &&
+    actionCommand.name() !== "theme-preview"
+  ) {
+    await checkAndRunFirstTimeOnboarding({
+      plain: opts.plain,
+      json: opts.json,
+    });
   }
 });
 
@@ -61,7 +84,10 @@ program
   )
   .version(pkg.version, "-v, --version")
   .option("--no-color", "Disable colored output")
-  .option("--plain", "Plain output for CI — no banner, no color, greppable text");
+  .option(
+    "--plain",
+    "Plain output for CI — no banner, no color, greppable text",
+  );
 
 // ─── bilt scan ───────────────────────────────────────────────────────────────
 
@@ -82,9 +108,17 @@ program
   .option("--quiet", "Suppress all output except errors")
   .option("--dry-run", "Show what would be scanned without scanning")
   .option("--no-verify", "Disable live credential verification calls")
-  .option("--include-tests", "Include findings in test, fixture, and documentation files")
+  .option(
+    "--include-tests",
+    "Include findings in test, fixture, and documentation files",
+  )
   .option("--debug", "Enable debug logging for path and file resolutions")
   .option("--fun", "Enable fun mode with celebrations")
+  .option("--changed", "Scan only files modified in working tree vs HEAD")
+  .option(
+    "--base <ref>",
+    "Scan only changes between base git ref and current branch",
+  )
   .action(
     async (
       dir: string,
@@ -100,6 +134,8 @@ program
         verify?: boolean;
         debug?: boolean;
         includeTests?: boolean;
+        changed?: boolean;
+        base?: string;
       },
     ) => {
       try {
@@ -115,6 +151,8 @@ program
           noVerify: opts.verify === false,
           debug: opts.debug,
           includeTests: opts.includeTests,
+          changed: opts.changed,
+          base: opts.base,
         });
 
         // Exit code based on findings
@@ -135,12 +173,20 @@ program
 
 program
   .command("api-scan")
-  .description("Static API security checks — mass assignment, method allowlists, content validation, exposed docs")
+  .description(
+    "Static API security checks — mass assignment, method allowlists, content validation, exposed docs",
+  )
   .argument("[dir]", "Project directory", ".")
   .option("--json", "Output results as JSON")
-  .option("--severity <level>", "Minimum severity to report (critical, warning, info)")
+  .option(
+    "--severity <level>",
+    "Minimum severity to report (critical, warning, info)",
+  )
   .option("--verbose", "Show detailed output with suggestions")
-  .option("--no-details", "Hide detailed five-question output under each headline")
+  .option(
+    "--no-details",
+    "Hide detailed five-question output under each headline",
+  )
   .option("--quiet", "Suppress all output except errors")
   .option("--debug", "Enable debug logging")
   .action(
@@ -165,7 +211,9 @@ program
           debug: opts.debug,
         });
 
-        const criticals = result.findings.filter((f) => f.severity === "critical").length;
+        const criticals = result.findings.filter(
+          (f) => f.severity === "critical",
+        ).length;
         if (criticals > 0) {
           process.exitCode = 1;
         }
@@ -255,12 +303,20 @@ program
   .argument("[dir]", "Project directory", ".")
   .option("--quiet", "Only show findings, no status messages")
   .option("--debounce <ms>", "Debounce interval in milliseconds", "300")
-  .option("--poll", "Use polling instead of native file events (recommended for WSL/Docker)")
+  .option(
+    "--poll",
+    "Use polling instead of native file events (recommended for WSL/Docker)",
+  )
   .option("--no-live", "Disable initial baseline scan before streaming changes")
   .action(
     async (
       dir: string,
-      opts: { quiet?: boolean; debounce?: string; poll?: boolean; live?: boolean },
+      opts: {
+        quiet?: boolean;
+        debounce?: string;
+        poll?: boolean;
+        live?: boolean;
+      },
     ) => {
       try {
         await executeWatch(dir, {
@@ -285,16 +341,29 @@ program
   .option("--format <format>", "Export format (markdown or json)", "markdown")
   .option("--output <path>", "File path to save the report")
   .option("--export <path>", "File path to save the report (alias)")
-  .option("--stdout", "Print report directly to terminal stdout instead of saving to file")
-  .action(async (dir: string, opts: { format?: string; output?: string; export?: string; stdout?: boolean }) => {
-    try {
-      const { executeReport } = await import("./commands/report.js");
-      await executeReport(dir, opts);
-    } catch (error) {
-      printError(error);
-      process.exitCode = 2;
-    }
-  });
+  .option(
+    "--stdout",
+    "Print report directly to terminal stdout instead of saving to file",
+  )
+  .action(
+    async (
+      dir: string,
+      opts: {
+        format?: string;
+        output?: string;
+        export?: string;
+        stdout?: boolean;
+      },
+    ) => {
+      try {
+        const { executeReport } = await import("./commands/report.js");
+        await executeReport(dir, opts);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
 
 // ─── bilt plugin ─────────────────────────────────────────────────────────────
 
@@ -304,10 +373,39 @@ program
   .argument("<action>", "Action to perform: list, install, create")
   .argument("[name]", "Plugin name or path")
   .option("--dir <dir>", "Project directory", ".")
-  .action(async (action: string, name: string | undefined, opts: { dir?: string }) => {
+  .action(
+    async (
+      action: string,
+      name: string | undefined,
+      opts: { dir?: string },
+    ) => {
+      try {
+        const { executePlugin } = await import("./commands/plugin.js");
+        await executePlugin(action, name, opts);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
+
+// ─── bilt baseline ───────────────────────────────────────────────────────────
+
+const baselineCmd = program
+  .command("baseline")
+  .description("Manage security baseline fingerprints");
+
+baselineCmd
+  .command("create")
+  .description(
+    "Record current finding fingerprints as a baseline in .bilt/baseline.json",
+  )
+  .argument("[dir]", "Project directory", ".")
+  .option("--json", "Output results as JSON")
+  .action(async (dir: string, opts: { json?: boolean }) => {
     try {
-      const { executePlugin } = await import("./commands/plugin.js");
-      await executePlugin(action, name, opts);
+      const { executeBaselineCreate } = await import("./commands/baseline.js");
+      await executeBaselineCreate(dir, opts);
     } catch (error) {
       printError(error);
       process.exitCode = 2;
@@ -324,19 +422,24 @@ program
   .option("--owasp", "Format health report mapped to OWASP Top 10 categories")
   .option("--debug", "Enable debug logging for file reads")
   .option("--fun", "Enable celebrations and streak counter")
-  .action(async (dir: string, opts: { card?: boolean; owasp?: boolean; fun?: boolean; debug?: boolean }) => {
-    try {
-      await executeDoctor(dir, {
-        card: opts.card,
-        owasp: opts.owasp,
-        fun: opts.fun,
-        debug: opts.debug,
-      });
-    } catch (error) {
-      printError(error);
-      process.exitCode = 2;
-    }
-  });
+  .action(
+    async (
+      dir: string,
+      opts: { card?: boolean; owasp?: boolean; fun?: boolean; debug?: boolean },
+    ) => {
+      try {
+        await executeDoctor(dir, {
+          card: opts.card,
+          owasp: opts.owasp,
+          fun: opts.fun,
+          debug: opts.debug,
+        });
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
 
 // ─── bilt welcome ────────────────────────────────────────────────────────────
 
@@ -358,7 +461,9 @@ program
 
 const aiCommand = program
   .command("ai")
-  .description("Manage optional AI integration (providers, key storage, redaction debug)");
+  .description(
+    "Manage optional AI integration (providers, key storage, redaction debug)",
+  );
 
 aiCommand
   .command("setup")
@@ -374,7 +479,9 @@ aiCommand
 
 aiCommand
   .command("status")
-  .description("Show configured AI provider, masked key, active model, and validation status")
+  .description(
+    "Show configured AI provider, masked key, active model, and validation status",
+  )
   .action(async () => {
     try {
       await executeAIStatus();
@@ -399,7 +506,10 @@ aiCommand
 aiCommand
   .command("model")
   .description("Select or change active AI model for the current provider")
-  .argument("[model]", "Model ID string (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash)")
+  .argument(
+    "[model]",
+    "Model ID string (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash)",
+  )
   .action(async (model?: string) => {
     try {
       await executeAIModel(model);
@@ -412,7 +522,10 @@ aiCommand
 aiCommand
   .command("provider")
   .description("Switch active AI provider among configured providers")
-  .argument("[provider]", "Provider ID (openai, anthropic, gemini, openrouter, groq)")
+  .argument(
+    "[provider]",
+    "Provider ID (openai, anthropic, gemini, openrouter, groq)",
+  )
   .action(async (provider?: string) => {
     try {
       await executeAIProvider(provider);
@@ -463,7 +576,9 @@ aiCommand
 
 program
   .command("ask")
-  .description("Ask a question scoped to current project findings (requires optional AI setup)")
+  .description(
+    "Ask a question scoped to current project findings (requires optional AI setup)",
+  )
   .argument("<question>", "Question to ask about project health and findings")
   .argument("[dir]", "Project directory", ".")
   .option("--debug", "Show redacted payload context before sending")
@@ -481,7 +596,9 @@ program
 function printError(error: unknown, debug?: boolean): void {
   const message = error instanceof Error ? error.message : String(error);
   console.error("");
-  console.error(colors.pulseCoral.bold(`  ${glyphs.critical} Error: ${message}`));
+  console.error(
+    colors.pulseCoral.bold(`  ${glyphs.critical} Error: ${message}`),
+  );
   if (debug && error instanceof Error && error.stack) {
     const stackLines = error.stack.split("\n").slice(1, 4);
     for (const line of stackLines) {
@@ -519,7 +636,9 @@ program
     console.log(`  ${colors.slateDim.apply("Slate Dim")}   — secondary`);
     console.log("");
     console.log(divider());
-    console.log(`  ${colors.slateDim.dim("Spinner frames: " + spinnerFrames.join(" "))}`);
+    console.log(
+      `  ${colors.slateDim.dim("Spinner frames: " + spinnerFrames.join(" "))}`,
+    );
     console.log("");
   });
 
