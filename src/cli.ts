@@ -412,6 +412,44 @@ baselineCmd
     }
   });
 
+// ─── bilt verify ─────────────────────────────────────────────────────────────
+
+program
+  .command("verify")
+  .description(
+    "Strict verification against base ref for CI and pull requests (fails on tamper)",
+  )
+  .argument("[dir]", "Project directory", ".")
+  .option(
+    "--base <ref>",
+    "Base git ref to compare against (e.g. origin/main, HEAD~1)",
+    "HEAD~1",
+  )
+  .option(
+    "--format <format>",
+    "Output format: agent, sarif, json, text",
+    "agent",
+  )
+  .option("--snippets", "Include sanitized code snippets in untrusted_snippet")
+  .action(
+    async (
+      dir: string,
+      opts: { base?: string; format?: string; snippets?: boolean },
+    ) => {
+      try {
+        const { executeVerify } = await import("./commands/verify.js");
+        await executeVerify(dir, {
+          base: opts.base,
+          format: opts.format as any,
+          snippets: opts.snippets,
+        });
+      } catch (error) {
+        printError(error);
+        process.exitCode = 3;
+      }
+    },
+  );
+
 // ─── bilt doctor ─────────────────────────────────────────────────────────────
 
 program
