@@ -1,6 +1,6 @@
 # Bilt
 
-[![npm version](https://img.shields.io/badge/npm-v1.0.5-blue.svg)](https://www.npmjs.com/package/bilt)
+[![npm version](https://img.shields.io/badge/npm-v1.0.5-blue.svg)](https://www.npmjs.com/package/bilt-toolkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
 [![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
@@ -25,6 +25,8 @@ Bilt is a developer-focused CLI utility designed to keep environment configurati
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+  - [Installation](#installation)
+  - [First Steps](#first-steps)
 - [Health Report Visualizer](#health-report-visualizer)
 - [CLI Command Reference](#cli-command-reference)
 - [Core Command Breakdown](#core-command-breakdown)
@@ -48,14 +50,37 @@ Bilt is a developer-focused CLI utility designed to keep environment configurati
 
 ## Quick Start
 
-Install Bilt globally or run directly on any repository using `npx`:
+### Installation
+
+Install **`bilt-toolkit`** from npm using your preferred package manager:
 
 ```bash
-# Global installation
-npm install -g bilt
+# Option 1: Install as a project devDependency (Recommended for teams, CI & AI agents)
+npm install -D bilt-toolkit
 
-# Initialize Bilt in your project root
+# Option 2: Install globally to run the 'bilt' command anywhere
+npm install -g bilt-toolkit
+```
+
+> [!IMPORTANT]
+> **Package Name vs. CLI Binary Command:**
+> - The package name on npm is **`bilt-toolkit`** (`npm i bilt-toolkit`).
+> - Once installed, the CLI binary command you execute in your terminal is **`bilt`** (or **`npx bilt`** if installed locally in `node_modules`).
+
+### First Steps
+
+After installing `bilt-toolkit`, use the **`bilt`** command to run checks:
+
+```bash
+# 1. Initialize Bilt guardrails, templates & .gitignore protection
 bilt init
+# (or if installed locally: npx bilt init)
+
+# 2. Run a full security and health scan
+bilt scan
+
+# 3. For coding agents / CI: verify changes introduced against base branch
+bilt verify --base origin/main --format agent
 ```
 
 Running `bilt init` executes an automated health scan, constructs `.gitignore` protection rules, scaffolds required environment variable templates, and displays a summary health report.
@@ -517,24 +542,32 @@ Bilt provides a first-class, deterministic security and testing layer purpose-bu
 
 ### Quick Setup for Agents
 
+Install **`bilt-toolkit`** into the project:
+
+```bash
+npm install -D bilt-toolkit
+```
+
 Initialize agent guidelines and hooks:
 
 ```bash
-bilt init --agent
+npx bilt init --agent
 ```
 
 Or view the agent guidelines prompt directly:
 
 ```bash
-bilt prompt --agent claude
+npx bilt prompt --agent claude
 ```
 
-### Scoped Scan for Changed Files
+### Scoped Verification for Changed Files
 
 Instruct your coding agent to verify only its own modifications:
 
 ```bash
-bilt scan --format agent --changed
+npx bilt verify --base origin/main --format agent
+# or for uncommitted working tree edits:
+npx bilt scan --format agent --changed
 ```
 
 ### Claude Code & Cursor Integration
@@ -550,7 +583,7 @@ Configure Claude Code to automatically run Bilt verification on turn completion:
     "Stop": [
       {
         "type": "command",
-        "command": "bilt scan --format agent --changed"
+        "command": "npx bilt verify --base origin/main --format agent"
       }
     ]
   }
@@ -564,7 +597,10 @@ Add verification rules to `AGENTS.md` or `.cursorrules`:
 ```markdown
 # Agent Verification Guidelines
 
-1. Before completing tasks or proposing commits, run `bilt scan --format agent --changed`.
+Install: `npm install -D bilt-toolkit`
+Execute: `npx bilt verify --base origin/main --format agent`
+
+1. Before completing tasks or proposing commits, run `npx bilt verify --base origin/main --format agent`.
 2. Remediate ONLY findings marked with `"introduced_by_change": true`.
 3. Never weaken `.biltrc` or add unapproved blanket ignores.
 4. If output status is `"escalate"` (exit code 4), stop immediately and request human review.

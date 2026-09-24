@@ -315,9 +315,12 @@ export async function reportInitComplete(
 
   // Next steps
   console.log(sectionHeader("Next steps"));
-  await maybeSleep();
   console.log(
     colors.slateDim.dim(`     ${text.bold("bilt scan")}     Full project scan`),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(`     ${text.bold("bilt verify")}   Verify PR diff vs base branch (for CI & AI agents)`),
   );
   await maybeSleep();
   console.log(

@@ -1,12 +1,19 @@
 # Bilt Integration Guidelines for Claude Code
 
+> **Installation**: `npm install -D bilt-toolkit`
+> **Command**: `npx bilt` (or `bilt` if globally installed)
+
 When writing or modifying code in this project with Claude Code:
 
 1. **Automatic Verification**:
    Run the following verification step before finishing any coding turn:
 
    ```bash
-   bilt scan --format agent --changed
+   npx bilt scan --format agent --changed
+   ```
+   Or against a PR base branch:
+   ```bash
+   npx bilt verify --base origin/main --format agent
    ```
 
 2. **Fix Rules**:

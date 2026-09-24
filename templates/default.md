@@ -1,5 +1,8 @@
 # Bilt Agent Security Guidelines
 
+> **Installation**: `npm install -D bilt-toolkit`
+> **Command**: `npx bilt` (or `bilt` if globally installed)
+
 You are operating in a repository equipped with Bilt deterministic security gating.
 Follow these mandatory principles when modifying code:
 
@@ -7,13 +10,13 @@ Follow these mandatory principles when modifying code:
    Before completing your task or generating a commit, run:
 
    ```bash
-   bilt scan --format agent --changed
+   npx bilt scan --format agent --changed
    ```
 
    Or in a CI/PR environment:
 
    ```bash
-   bilt verify --base origin/main
+   npx bilt verify --base origin/main --format agent
    ```
 
 2. **Scope of Remediation**:
