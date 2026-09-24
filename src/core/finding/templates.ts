@@ -42,7 +42,7 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate> = {
       "Attach the appropriate authentication middleware (e.g., requireAuth, verifyToken) to the route before processing request parameters.",
     severity: "critical",
     precision: "high",
-    maturity: "experimental",
+    maturity: "stable",
     category: "authentication",
   },
   // Input validation rules
@@ -55,7 +55,7 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate> = {
       "Validate the request body using a strict schema library (such as Zod, Joi, or Yup) before accessing payload fields.",
     severity: "warning",
     precision: "high",
-    maturity: "experimental",
+    maturity: "stable",
     category: "input-validation",
   },
   // Method restriction rules
@@ -68,7 +68,7 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate> = {
       "Replace catch-all or wildcard HTTP handlers with explicit method bindings (e.g. app.get(), app.post()).",
     severity: "warning",
     precision: "high",
-    maturity: "experimental",
+    maturity: "stable",
     category: "api-design",
   },
   // IDOR / authz rules

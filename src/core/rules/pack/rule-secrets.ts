@@ -18,7 +18,6 @@ export function evaluateHardcodedSecrets(
       lineContent: f.message,
     });
     finding.rule_id = "RULE-SEC-001";
-    finding.maturity = "experimental"; // Will graduate via benchmark in Section L
     finding.precision = "high";
     return finding;
   });
