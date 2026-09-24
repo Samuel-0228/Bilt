@@ -248,14 +248,34 @@ program
     "Initialize Bilt — scan, auto-fix safe issues, and show health report",
   )
   .argument("[dir]", "Project directory", ".")
-  .action(async (dir: string) => {
-    try {
-      await executeInit(dir);
-    } catch (error) {
-      printError(error);
-      process.exitCode = 2;
-    }
-  });
+  .option(
+    "--agent [name]",
+    "Initialize agent guidelines and hooks (e.g. claude, cursor, default)",
+  )
+  .option("--dry-run", "Preview changes without writing files")
+  .option("--force", "Overwrite existing agent configuration files")
+  .action(
+    async (
+      dir: string,
+      opts: { agent?: string | boolean; dryRun?: boolean; force?: boolean },
+    ) => {
+      try {
+        if (opts.agent !== undefined) {
+          const { executeInitAgent } = await import("./commands/init-agent.js");
+          await executeInitAgent(dir, {
+            agent: typeof opts.agent === "string" ? opts.agent : "default",
+            dryRun: opts.dryRun,
+            force: opts.force,
+          });
+        } else {
+          await executeInit(dir);
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
 
 // ─── bilt fix ────────────────────────────────────────────────────────────────
 
@@ -493,6 +513,26 @@ program
     } catch (error) {
       printError(error);
       process.exitCode = 3;
+    }
+  });
+
+// ─── bilt prompt ─────────────────────────────────────────────────────────────
+
+program
+  .command("prompt")
+  .description("Print agent prompt instructions for LLM coding agents")
+  .option(
+    "--agent <name>",
+    "Target agent name (e.g., claude, cursor, default)",
+    "default",
+  )
+  .action(async (opts: { agent?: string }) => {
+    try {
+      const { executePrompt } = await import("./commands/prompt.js");
+      await executePrompt({ agent: opts.agent });
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
     }
   });
 
