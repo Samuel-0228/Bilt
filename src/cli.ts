@@ -479,6 +479,23 @@ program
     },
   );
 
+// ─── bilt mcp ────────────────────────────────────────────────────────────────
+
+program
+  .command("mcp")
+  .description(
+    "Start the Model Context Protocol (MCP) stdio server for AI agents",
+  )
+  .action(async () => {
+    try {
+      const { startMcpServer } = await import("./mcp/server.js");
+      startMcpServer();
+    } catch (error) {
+      printError(error);
+      process.exitCode = 3;
+    }
+  });
+
 // ─── bilt doctor ─────────────────────────────────────────────────────────────
 
 program
