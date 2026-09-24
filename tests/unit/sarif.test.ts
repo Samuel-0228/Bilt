@@ -40,22 +40,47 @@ describe("SARIF Output Formatter", () => {
     const sarif = formatSarifOutput(findings, "1.0.5");
 
     expect(sarif.version).toBe("2.1.0");
+    expect(sarif.$schema).toBe("https://json.schemastore.org/sarif-2.1.0.json");
     expect(sarif.runs.length).toBe(1);
 
     const run = sarif.runs[0]!;
     expect(run.tool.driver.name).toBe("bilt");
     expect(run.tool.driver.version).toBe("1.0.5");
     expect(run.tool.driver.rules.length).toBe(2);
+    expect(run.originalUriBaseIds?.["%SRCROOT%"]?.uri).toBe("file:///");
+    expect(run.columnKind).toBe("utf16CodeUnits");
+
+    const rule0 = run.tool.driver.rules[0]!;
+    expect(rule0.id).toBe("RULE-SEC-001");
+    expect(rule0.help.text).toContain("Hardcoded Secret");
+    expect(rule0.properties?.["security-severity"]).toBe("9.0");
+    expect(rule0.properties?.precision).toBe("high");
+    expect(rule0.properties?.tags).toContain("security");
 
     expect(run.results.length).toBe(2);
     expect(run.results[0]!.level).toBe("error"); // critical -> error
     expect(run.results[0]!.ruleId).toBe("RULE-SEC-001");
-    expect(run.results[0]!.fingerprints["bilt/v1"]).toBe("11".repeat(32));
+    expect(run.results[0]!.ruleIndex).toBe(0);
+    expect(run.results[0]!.fingerprints?.["bilt/v1"]).toBe("11".repeat(32));
+    expect(run.results[0]!.partialFingerprints?.["primaryLocationLineHash"]).toBe(
+      "11".repeat(32),
+    );
     expect(
       run.results[0]!.locations[0]!.physicalLocation.artifactLocation.uri,
     ).toBe("src/config/keys.ts");
+    expect(
+      run.results[0]!.locations[0]!.physicalLocation.artifactLocation.uriBaseId,
+    ).toBe("%SRCROOT%");
+    expect(
+      run.results[0]!.locations[0]!.physicalLocation.region.startColumn,
+    ).toBe(1);
+    expect(
+      run.results[0]!.locations[0]!.physicalLocation.region.endColumn,
+    ).toBe(80);
 
     expect(run.results[1]!.level).toBe("warning"); // warning -> warning
     expect(run.results[1]!.ruleId).toBe("RULE-HTTP-001");
+    expect(run.results[1]!.ruleIndex).toBe(1);
+    expect(run.results[1]!.properties?.["security-severity"]).toBeUndefined();
   });
 });

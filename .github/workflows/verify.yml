@@ -15,6 +15,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read
 
     steps:
       - name: Checkout repository
@@ -45,6 +46,7 @@ jobs:
           echo "Verifying against base: $BASE_REF"
           node dist/cli.js verify --base "$BASE_REF" --format sarif > bilt-results.sarif || VERIFY_EXIT=$?
           echo "verify_exit=${VERIFY_EXIT:-0}" >> $GITHUB_OUTPUT
+          echo "SARIF generated (size: $(wc -c < bilt-results.sarif) bytes)"
 
       - name: Upload SARIF results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -52,6 +54,7 @@ jobs:
         continue-on-error: true
         with:
           sarif_file: bilt-results.sarif
+          category: bilt
 
       - name: Enforce Verification Status
         run: |

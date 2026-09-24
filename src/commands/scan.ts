@@ -569,7 +569,11 @@ export async function executeScan(
       console.log(JSON.stringify(agentOutput, null, 2));
       process.exitCode = statusToExitCode(agentOutput.status);
     } else if (options.format === "sarif") {
-      const agentFindings = result.findings.map((f) =>
+      const scopedFindings =
+        options.changed || options.base
+          ? result.findings.filter((f) => f.introducedByChange !== false)
+          : result.findings;
+      const agentFindings = scopedFindings.map((f) =>
         toAgentFinding(f, {
           introducedByChange: f.introducedByChange !== false,
           surroundingSnippet: f.preview,
@@ -577,7 +581,7 @@ export async function executeScan(
       );
       const sarif = formatSarifOutput(agentFindings, "1.0.5");
       console.log(JSON.stringify(sarif, null, 2));
-      const criticalCount = findings.filter(
+      const criticalCount = scopedFindings.filter(
         (f) => f.severity === "critical",
       ).length;
       if (criticalCount > 0) process.exitCode = 1;

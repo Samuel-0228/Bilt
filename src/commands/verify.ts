@@ -47,13 +47,21 @@ export async function executeVerify(
   // 3. Detect any tampering with config/rules vs baseRef
   const tamperFindings = await detectTampering(rootDir, baseRef);
 
+  const introducedFindings = agentFindings.filter(
+    (af) => af.introduced_by_change !== false,
+  );
+
   // 4. Check loop progress and iteration budget
-  const { checkLoopProgress } = await import("../core/loop/state.js");
+  const { checkLoopProgress, resetLoopState } = await import("../core/loop/state.js");
   const loopResult = await checkLoopProgress(
     rootDir,
-    agentFindings.map((af) => af.fingerprint),
+    introducedFindings.map((af) => af.fingerprint),
     { maxIterations: options.maxIterations },
   );
+
+  if (introducedFindings.length === 0) {
+    await resetLoopState(rootDir);
+  }
 
   // 5. Construct Agent output
   const agentOutput = formatAgentOutput({
@@ -73,7 +81,7 @@ export async function executeVerify(
   if (format === "agent" || format === "json") {
     console.log(JSON.stringify(agentOutput, null, 2));
   } else if (format === "sarif") {
-    const sarif = formatSarifOutput(agentFindings, "1.0.5");
+    const sarif = formatSarifOutput(agentOutput.findings, "1.0.5");
     console.log(JSON.stringify(sarif, null, 2));
   } else {
     // Human readable text summary for CI
