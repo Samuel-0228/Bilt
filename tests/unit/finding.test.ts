@@ -96,8 +96,22 @@ describe("Finding Model & Fingerprinting", () => {
       line: 12,
     };
 
-    const result = toAgentFinding(authFinding);
-    expect(result.precision).toBe("high");
-    expect(result.maturity).toBe("experimental");
+    const authResult = toAgentFinding(authFinding);
+    expect(authResult.precision).toBe("high");
+    expect(authResult.maturity).toBe("stable");
+
+    const idorFinding: ScanFinding = {
+      id: "finding-3",
+      ruleId: "RULE-IDOR-001",
+      severity: "warning",
+      category: "authorization",
+      message: "IDOR risk",
+      file: "src/routes/user.ts",
+      line: 15,
+    };
+
+    const idorResult = toAgentFinding(idorFinding);
+    expect(idorResult.precision).toBe("medium");
+    expect(idorResult.maturity).toBe("experimental");
   });
 });
