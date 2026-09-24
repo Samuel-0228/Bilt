@@ -127,11 +127,16 @@ export async function executeScan(
   const config = await loadConfig(rootDir);
   const findings: ScanFinding[] = [];
 
-  const isQuiet = !!options.quiet;
-  const isJson = !!options.json;
+  const isMachineFormat =
+    !!options.json ||
+    options.format === "agent" ||
+    options.format === "sarif" ||
+    options.format === "json";
+  const isQuiet = !!options.quiet || isMachineFormat;
+  const isJson = !!options.json || options.format === "json";
   const detailsEnabled = options.details !== false;
 
-  if (!isQuiet && !isJson) {
+  if (!isQuiet && !isJson && !isMachineFormat) {
     console.log("");
     const require = createRequire(import.meta.url);
     const pkg = require("../../package.json") as { version: string };
