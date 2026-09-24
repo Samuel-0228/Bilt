@@ -1,0 +1,58 @@
+name: Verify
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: Deterministic Security & Tamper Verification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run Bilt Verify (SARIF)
+        id: bilt_verify
+        run: |
+          BASE_REF="${{ github.base_ref || 'HEAD~1' }}"
+          echo "Verifying against base: $BASE_REF"
+          node dist/cli.js verify --base "$BASE_REF" --format sarif > bilt-results.sarif || VERIFY_EXIT=$?
+          echo "verify_exit=${VERIFY_EXIT:-0}" >> $GITHUB_OUTPUT
+
+      - name: Upload SARIF results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: bilt-results.sarif
+
+      - name: Enforce Verification Status
+        run: |
+          EXIT_CODE="${{ steps.bilt_verify.outputs.verify_exit }}"
+          if [ -n "$EXIT_CODE" ] && [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::Bilt verification failed with exit code $EXIT_CODE"
+            exit "$EXIT_CODE"
+          fi
