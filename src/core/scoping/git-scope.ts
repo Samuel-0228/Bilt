@@ -115,6 +115,19 @@ export function isFindingIntroducedByChange(
 
   const normPath = findingFile.replace(/\\/g, "/").replace(/^\.\//, "");
 
+  // Test files and fixtures should not be flagged as introduced production vulnerabilities
+  const isTestOrFixture =
+    normPath.includes("/test/") ||
+    normPath.includes("/tests/") ||
+    normPath.includes("/fixtures/") ||
+    normPath.startsWith("tests/") ||
+    normPath.startsWith("test/") ||
+    /\.(test|spec)\.[a-z0-9]+$/i.test(normPath);
+
+  if (isTestOrFixture) {
+    return false;
+  }
+
   if (scope.newFiles.has(normPath)) {
     return true;
   }

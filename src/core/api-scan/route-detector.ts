@@ -15,7 +15,7 @@ function nextRouteId(): string {
 
 export async function detectApiRoutes(
   rootDir: string,
-  files?: Array<{ path: string; content: string }>
+  files?: Array<{ path: string; content: string }>,
 ): Promise<APIRouteInfo[]> {
   const routes: APIRouteInfo[] = [];
 
@@ -25,7 +25,14 @@ export async function detectApiRoutes(
   } else {
     const matchedFiles = await fg(["**/*.{ts,js,tsx,jsx,py,rb}"], {
       cwd: rootDir,
-      ignore: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**", "**/vendor/**", "**/venv/**"],
+      ignore: [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/.git/**",
+        "**/vendor/**",
+        "**/venv/**",
+      ],
       onlyFiles: true,
     });
 
@@ -46,12 +53,32 @@ export async function detectApiRoutes(
     const ext = path.extname(file.path).toLowerCase();
     const normalizedPath = file.path.replace(/\\/g, "/");
 
+    // Skip test files, fixtures, and internal scanner engine files
+    if (
+      normalizedPath.includes("/test/") ||
+      normalizedPath.includes("/tests/") ||
+      normalizedPath.includes("/fixtures/") ||
+      normalizedPath.startsWith("tests/") ||
+      normalizedPath.startsWith("test/") ||
+      /\.(test|spec)\.[a-z0-9]+$/i.test(normalizedPath)
+    ) {
+      continue;
+    }
+
     // 1. Next.js App Router route handlers (e.g. app/api/users/route.ts)
-    if (normalizedPath.match(/(?:^|\/)(?:src\/)?app\/.*route\.(?:ts|js|jsx|tsx)$/i)) {
+    if (
+      normalizedPath.match(
+        /(?:^|\/)(?:src\/)?app\/.*route\.(?:ts|js|jsx|tsx)$/i,
+      )
+    ) {
       extractNextJsAppRoutes(normalizedPath, file.content, routes);
     }
     // 2. Next.js Pages Router API routes (e.g. pages/api/users.ts)
-    else if (normalizedPath.match(/(?:^|\/)(?:src\/)?pages\/api\/.*\.(?:ts|js|jsx|tsx)$/i)) {
+    else if (
+      normalizedPath.match(
+        /(?:^|\/)(?:src\/)?pages\/api\/.*\.(?:ts|js|jsx|tsx)$/i,
+      )
+    ) {
       extractNextJsPagesRoutes(normalizedPath, file.content, routes);
     }
 
@@ -78,7 +105,7 @@ export async function detectApiRoutes(
 function extractNextJsAppRoutes(
   filePath: string,
   content: string,
-  outRoutes: APIRouteInfo[]
+  outRoutes: APIRouteInfo[],
 ): void {
   // Infer route path from folder structure: e.g. app/api/users/route.ts -> /api/users
   let apiPath = filePath
@@ -88,12 +115,24 @@ function extractNextJsAppRoutes(
   apiPath = apiPath.replace(/\[([^\]]+)\]/g, ":$1"); // Convert [id] to :id
 
   const lines = content.split("\n");
-  const methods: HTTPMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "ALL"];
+  const methods: HTTPMethod[] = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+    "HEAD",
+    "ALL",
+  ];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     for (const method of methods) {
-      const funcRegex = new RegExp(`export\\s+(?:async\\s+)?function\\s+${method}\\b`, "i");
+      const funcRegex = new RegExp(
+        `export\\s+(?:async\\s+)?function\\s+${method}\\b`,
+        "i",
+      );
       const constRegex = new RegExp(`export\\s+const\\s+${method}\\b`, "i");
 
       if (funcRegex.test(line) || constRegex.test(line)) {
@@ -117,7 +156,7 @@ function extractNextJsAppRoutes(
 function extractNextJsPagesRoutes(
   filePath: string,
   content: string,
-  outRoutes: APIRouteInfo[]
+  outRoutes: APIRouteInfo[],
 ): void {
   let apiPath = filePath
     .replace(/^.*?(?:src\/)?pages\//i, "/")
@@ -127,7 +166,9 @@ function extractNextJsPagesRoutes(
   apiPath = apiPath.replace(/\[([^\]]+)\]/g, ":$1");
 
   const lines = content.split("\n");
-  const reqMethodMatches = content.matchAll(/req\.method\s*===\s*['"](GET|POST|PUT|PATCH|DELETE)['"]/gi);
+  const reqMethodMatches = content.matchAll(
+    /req\.method\s*===\s*['"](GET|POST|PUT|PATCH|DELETE)['"]/gi,
+  );
   const foundMethods = new Set<HTTPMethod>();
   for (const m of reqMethodMatches) {
     if (m[1]) foundMethods.add(m[1].toUpperCase() as HTTPMethod);
@@ -164,23 +205,38 @@ function extractNextJsPagesRoutes(
 function extractExpressFastifyRoutes(
   filePath: string,
   content: string,
-  outRoutes: APIRouteInfo[]
+  outRoutes: APIRouteInfo[],
 ): void {
   const lines = content.split("\n");
   // Match app.get('/path', ...), router.post('/path', ...), fastify.post('/path', ...), app.all(...)
-  const routeRegex = /(?:app|router|fastify|server)\.(get|post|put|patch|delete|all|use|route)\s*\(\s*['"`]([^'"`]+)['"`]/gi;
+  const routeRegex =
+    /(?:app|router|fastify|server)\.(get|post|put|patch|delete|all|use|route)\s*\(\s*['"`]([^'"`]+)['"`]/gi;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    const trimmed = line.trim();
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("*") ||
+      trimmed.startsWith("/*") ||
+      trimmed.includes("routeRegex") ||
+      trimmed.startsWith("const routeRegex")
+    ) {
+      continue;
+    }
     routeRegex.lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = routeRegex.exec(line)) !== null) {
       const rawMethod = match[1]!.toUpperCase();
       const routePath = match[2]!;
-      const method: HTTPMethod = rawMethod === "ALL" || rawMethod === "USE" ? "ALL" : (rawMethod as HTTPMethod);
+      const method: HTTPMethod =
+        rawMethod === "ALL" || rawMethod === "USE"
+          ? "ALL"
+          : (rawMethod as HTTPMethod);
 
-      const isFastify = content.includes("fastify") || content.includes("Fastify");
+      const isFastify =
+        content.includes("fastify") || content.includes("Fastify");
       const framework = isFastify ? "fastify" : "express";
       const handlerContent = extractFunctionBlock(lines, i);
 
@@ -201,11 +257,12 @@ function extractExpressFastifyRoutes(
 function extractFastApiRoutes(
   filePath: string,
   content: string,
-  outRoutes: APIRouteInfo[]
+  outRoutes: APIRouteInfo[],
 ): void {
   const lines = content.split("\n");
   // @app.get("/path"), @router.post("/path"), @app.api_route("/path", methods=["GET", "POST"])
-  const decoratorRegex = /@(app|router|api_router)\.(get|post|put|patch|delete|api_route)\s*\(\s*["']([^"']+)["']/gi;
+  const decoratorRegex =
+    /@(app|router|api_router)\.(get|post|put|patch|delete|api_route)\s*\(\s*["']([^"']+)["']/gi;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
@@ -215,7 +272,8 @@ function extractFastApiRoutes(
     while ((match = decoratorRegex.exec(line)) !== null) {
       const rawMethod = match[2]!.toUpperCase();
       const routePath = match[3]!;
-      const method: HTTPMethod = rawMethod === "API_ROUTE" ? "ALL" : (rawMethod as HTTPMethod);
+      const method: HTTPMethod =
+        rawMethod === "API_ROUTE" ? "ALL" : (rawMethod as HTTPMethod);
 
       const handlerContent = extractPythonDefBlock(lines, i);
 
@@ -236,7 +294,7 @@ function extractFastApiRoutes(
 function extractDjangoRoutes(
   filePath: string,
   content: string,
-  outRoutes: APIRouteInfo[]
+  outRoutes: APIRouteInfo[],
 ): void {
   const lines = content.split("\n");
 
@@ -274,7 +332,8 @@ function extractDjangoRoutes(
 
     while ((match = apiViewRegex.exec(line)) !== null) {
       const methodsStr = match[1]!;
-      const methods = methodsStr.match(/['"](GET|POST|PUT|PATCH|DELETE)['"]/gi) || [];
+      const methods =
+        methodsStr.match(/['"](GET|POST|PUT|PATCH|DELETE)['"]/gi) || [];
       const handlerContent = extractPythonDefBlock(lines, i);
 
       for (const mStr of methods) {
@@ -297,7 +356,7 @@ function extractDjangoRoutes(
 function extractRailsRoutes(
   filePath: string,
   content: string,
-  outRoutes: APIRouteInfo[]
+  outRoutes: APIRouteInfo[],
 ): void {
   const lines = content.split("\n");
   const routeRegex = /(get|post|put|patch|delete|match)\s+["']([^"']+)["']/gi;
@@ -310,7 +369,8 @@ function extractRailsRoutes(
     while ((match = routeRegex.exec(line)) !== null) {
       const rawMethod = match[1]!.toUpperCase();
       const routePath = match[2]!;
-      const method: HTTPMethod = rawMethod === "MATCH" ? "ALL" : (rawMethod as HTTPMethod);
+      const method: HTTPMethod =
+        rawMethod === "MATCH" ? "ALL" : (rawMethod as HTTPMethod);
 
       outRoutes.push({
         id: nextRouteId(),
@@ -334,7 +394,13 @@ function extractRailsRoutes(
 
     while ((match = resourcesRegex.exec(line)) !== null) {
       const resource = match[1]!;
-      const stdMethods: HTTPMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+      const stdMethods: HTTPMethod[] = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+      ];
       for (const m of stdMethods) {
         outRoutes.push({
           id: nextRouteId(),

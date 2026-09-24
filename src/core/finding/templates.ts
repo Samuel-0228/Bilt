@@ -13,7 +13,7 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate> = {
     explanation:
       "Hardcoded secrets in source files or git history can be extracted by anyone with repository read access. Committed credentials frequently lead to unauthorized API access and data breaches.",
     agent_action:
-      "Remove the hardcoded secret immediately. Replace it with an environment variable reference (e.g., process.env.API_KEY) and rotate the compromised credential at the provider.",
+      "Remove the hardcoded secret immediately. Replace it with a secure environment variable reference and rotate the compromised credential at the provider.",
     severity: "critical",
     precision: "high",
     maturity: "stable",
