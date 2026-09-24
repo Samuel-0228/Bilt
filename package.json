@@ -28,6 +28,7 @@
     "test:perf": "vitest run --project perf",
     "test:coverage": "vitest run --coverage",
     "test:all": "vitest run",
+    "test:bench": "tsx tests/bench/benchmark.ts",
     "clean": "rimraf dist",
     "lint": "eslint .",
     "format": "prettier --write ."

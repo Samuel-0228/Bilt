@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BiltAgentOutput",
+  "description": "Structured machine-readable output format for autonomous coding agents",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_version",
+    "status",
+    "iteration",
+    "summary",
+    "findings",
+    "suppressed",
+    "tamper"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pass", "fail", "needs_review", "error", "escalate"]
+    },
+    "iteration": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total_findings",
+        "introduced_findings",
+        "critical",
+        "warning",
+        "info",
+        "suppressed",
+        "tamper"
+      ],
+      "properties": {
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "introduced_findings": { "type": "integer", "minimum": 0 },
+        "critical": { "type": "integer", "minimum": 0 },
+        "warning": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 },
+        "suppressed": { "type": "integer", "minimum": 0 },
+        "tamper": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "fingerprint",
+          "severity",
+          "precision",
+          "maturity",
+          "category",
+          "file",
+          "line",
+          "end_line",
+          "title",
+          "explanation",
+          "agent_action",
+          "fixable"
+        ],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "fingerprint": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "warning", "info"]
+          },
+          "precision": { "type": "string", "enum": ["high", "medium", "low"] },
+          "maturity": { "type": "string", "enum": ["stable", "experimental"] },
+          "category": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "end_line": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "explanation": { "type": "string" },
+          "agent_action": { "type": "string" },
+          "fixable": { "type": "boolean" },
+          "introduced_by_change": { "type": "boolean" },
+          "untrusted_snippet": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "suppressed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "fingerprint", "reason", "file"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "fingerprint": { "type": "string" },
+          "reason": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "expires": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tamper": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "severity", "message", "file"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "severity": { "type": "string", "enum": ["critical", "warning"] },
+          "message": { "type": "string" },
+          "file": { "type": "string" },
+          "details": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "escalation_message": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

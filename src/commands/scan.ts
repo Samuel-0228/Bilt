@@ -16,7 +16,10 @@ import { loadConfig } from "../config/config.js";
 import { detectEcosystem } from "../core/ecosystem/detector.js";
 import { generateAIExplanation } from "../core/ai/explainer.js";
 import { performEnvScan, findEnvFiles } from "../core/scan/env.js";
-import { checkEnvFilesIgnoredWithGit, checkCommonDirsIgnored } from "../core/scan/gitignore.js";
+import {
+  checkEnvFilesIgnoredWithGit,
+  checkCommonDirsIgnored,
+} from "../core/scan/gitignore.js";
 import { scanFileForSecrets, scanGitHistory } from "../core/scan/secrets.js";
 import { scanGitRepository } from "../core/scan/git.js";
 import { scanDependencies } from "../core/scan/dependencies.js";
@@ -40,6 +43,20 @@ import {
 import { formatFinding } from "../ui/format.js";
 import { playSound } from "../ui/sound.js";
 import { VERIFIERS } from "../core/scan/verifiers/index.js";
+import {
+  getGitScope,
+  isFindingIntroducedByChange,
+} from "../core/scoping/git-scope.js";
+import {
+  loadBaseline,
+  isFingerprintInBaseline,
+} from "../core/scoping/baseline.js";
+import { computeFingerprint } from "../core/finding/fingerprint.js";
+import { toAgentFinding } from "../core/finding/mapper.js";
+import { formatAgentOutput } from "../core/output/formatters/agent.js";
+import { formatSarifOutput } from "../core/output/formatters/sarif.js";
+import { statusToExitCode } from "../core/output/types.js";
+import { checkLoopProgress } from "../core/loop/state.js";
 import { createRequire } from "node:module";
 
 // Helper to run a scan step and stream findings
@@ -110,11 +127,16 @@ export async function executeScan(
   const config = await loadConfig(rootDir);
   const findings: ScanFinding[] = [];
 
-  const isQuiet = !!options.quiet;
-  const isJson = !!options.json;
+  const isMachineFormat =
+    !!options.json ||
+    options.format === "agent" ||
+    options.format === "sarif" ||
+    options.format === "json";
+  const isQuiet = !!options.quiet || isMachineFormat;
+  const isJson = !!options.json || options.format === "json";
   const detailsEnabled = options.details !== false;
 
-  if (!isQuiet && !isJson) {
+  if (!isQuiet && !isJson && !isMachineFormat) {
     console.log("");
     const require = createRequire(import.meta.url);
     const pkg = require("../../package.json") as { version: string };
@@ -125,14 +147,15 @@ export async function executeScan(
 
   // Auto-detect ecosystem
   const ecosystem = await detectEcosystem(rootDir);
-  const detectedFramework: FrameworkInfo | undefined = ecosystem.primaryFramework
-    ? {
-        name: ecosystem.primaryFramework.id,
-        displayName: ecosystem.primaryFramework.name,
-        clientExposedPrefixes: ecosystem.clientExposedPrefixes,
-        configFiles: ecosystem.primaryFramework.configFiles || [],
-      }
-    : undefined;
+  const detectedFramework: FrameworkInfo | undefined =
+    ecosystem.primaryFramework
+      ? {
+          name: ecosystem.primaryFramework.id,
+          displayName: ecosystem.primaryFramework.name,
+          clientExposedPrefixes: ecosystem.clientExposedPrefixes,
+          configFiles: ecosystem.primaryFramework.configFiles || [],
+        }
+      : undefined;
 
   try {
     // 1. Environment & Gitignore Step
@@ -141,7 +164,10 @@ export async function executeScan(
       isQuiet || isJson,
       async () => {
         const envFiles = await findEnvFiles(rootDir);
-        const stepFindings = await checkEnvFilesIgnoredWithGit(rootDir, envFiles);
+        const stepFindings = await checkEnvFilesIgnoredWithGit(
+          rootDir,
+          envFiles,
+        );
         const commonDirsFindings = await checkCommonDirsIgnored(rootDir);
         stepFindings.push(...commonDirsFindings);
 
@@ -150,7 +176,11 @@ export async function executeScan(
         });
         stepFindings.push(...gitRepoFindings);
 
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -183,10 +213,38 @@ export async function executeScan(
         });
 
         const textExtensions = new Set([
-          ".ts", ".js", ".tsx", ".jsx", ".mjs", ".cjs", ".py", ".rb", ".go", ".rs",
-          ".java", ".kt", ".json", ".yaml", ".yml", ".toml", ".xml", ".env", ".cfg",
-          ".conf", ".ini", ".properties", ".sh", ".bash", ".zsh", ".fish", ".tf",
-          ".hcl", ".dockerfile", ".md", ".txt", ".csv",
+          ".ts",
+          ".js",
+          ".tsx",
+          ".jsx",
+          ".mjs",
+          ".cjs",
+          ".py",
+          ".rb",
+          ".go",
+          ".rs",
+          ".java",
+          ".kt",
+          ".json",
+          ".yaml",
+          ".yml",
+          ".toml",
+          ".xml",
+          ".env",
+          ".cfg",
+          ".conf",
+          ".ini",
+          ".properties",
+          ".sh",
+          ".bash",
+          ".zsh",
+          ".fish",
+          ".tf",
+          ".hcl",
+          ".dockerfile",
+          ".md",
+          ".txt",
+          ".csv",
         ]);
 
         for (const file of scanTargets) {
@@ -206,7 +264,10 @@ export async function executeScan(
               content,
               file,
               SECRET_RULES,
-              { entropyThreshold: config.entropyThreshold, includeTests: options.includeTests },
+              {
+                entropyThreshold: config.entropyThreshold,
+                includeTests: options.includeTests,
+              },
             );
             stepFindings.push(...secretFindings);
             scannedFiles++;
@@ -255,7 +316,11 @@ export async function executeScan(
           }
         }
 
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -268,11 +333,14 @@ export async function executeScan(
       async () => {
         const stepFindings: ScanFinding[] = [];
         const ruleEngine = new SecurityRuleEngine();
-        const scanTargets = await fg(["**/*.{ts,js,tsx,jsx,json,yml,yaml,md,env*,Dockerfile}"], {
-          cwd: rootDir,
-          ignore: config.ignore,
-          onlyFiles: true,
-        });
+        const scanTargets = await fg(
+          ["**/*.{ts,js,tsx,jsx,json,yml,yaml,md,env*,Dockerfile}"],
+          {
+            cwd: rootDir,
+            ignore: config.ignore,
+            onlyFiles: true,
+          },
+        );
 
         const filePayloads: Array<{ path: string; content: string }> = [];
         for (const relPath of scanTargets) {
@@ -289,7 +357,7 @@ export async function executeScan(
 
         const engineFindings = ruleEngine.analyzeProject(
           filePayloads,
-          detectedFramework ? [detectedFramework.name] : []
+          detectedFramework ? [detectedFramework.name] : [],
         );
 
         engineFindings.forEach((ef: SecurityFindingDetails) => {
@@ -315,7 +383,11 @@ export async function executeScan(
           });
         });
 
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -327,7 +399,11 @@ export async function executeScan(
       isQuiet || isJson,
       async () => {
         const { findings: apiFindings } = await performApiScan(rootDir);
-        return applyOverridesAndFilter(apiFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          apiFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -338,7 +414,11 @@ export async function executeScan(
       isQuiet || isJson,
       async () => {
         const stepFindings = await scanDependencies(rootDir);
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -350,7 +430,11 @@ export async function executeScan(
       isQuiet || isJson,
       async () => {
         const stepFindings = await scanConfigurations(rootDir);
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -362,7 +446,11 @@ export async function executeScan(
       isQuiet || isJson,
       async () => {
         const stepFindings = await scanPerformance(rootDir);
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
@@ -390,14 +478,40 @@ export async function executeScan(
         } catch {
           // Skip
         }
-        return applyOverridesAndFilter(stepFindings, config, options.severity as Severity);
+        return applyOverridesAndFilter(
+          stepFindings,
+          config,
+          options.severity as Severity,
+        );
       },
       detailsEnabled,
     );
     findings.push(...pluginsStepFindings);
 
-    // Enriched findings with structured AI explanations
+    // Resolve git scope and baseline
+    const scope = await getGitScope(rootDir, {
+      changed: options.changed,
+      base: options.base,
+    });
+    const baseline = await loadBaseline(rootDir);
+
+    // Enriched findings with structured AI explanations, fingerprints, and scope tagging
     for (const f of findings) {
+      if (!f.fingerprint) {
+        f.fingerprint = computeFingerprint({
+          ruleId: f.ruleId || f.category,
+          file: f.file,
+          snippet: f.preview,
+        });
+      }
+      const introducedByGit = isFindingIntroducedByChange(
+        f.file,
+        f.line || 1,
+        scope,
+      );
+      const inBaseline = isFingerprintInBaseline(f.fingerprint, baseline);
+      f.introducedByChange = introducedByGit && !inBaseline;
+
       if (!f.aiExplanation) {
         f.aiExplanation = generateAIExplanation(f);
       }
@@ -405,8 +519,12 @@ export async function executeScan(
 
     // Sort live findings first
     findings.sort((a, b) => {
-      const aLive = a.category === "secret-detected" && a.verificationState === "verified-live";
-      const bLive = b.category === "secret-detected" && b.verificationState === "verified-live";
+      const aLive =
+        a.category === "secret-detected" &&
+        a.verificationState === "verified-live";
+      const bLive =
+        b.category === "secret-detected" &&
+        b.verificationState === "verified-live";
       if (aLive && !bLive) return -1;
       if (!aLive && bLive) return 1;
       return 0;
@@ -426,14 +544,63 @@ export async function executeScan(
       duration,
     };
 
-    if (isJson) {
+    if (options.format === "agent") {
+      const agentFindings = result.findings.map((f) =>
+        toAgentFinding(f, {
+          introducedByChange: f.introducedByChange !== false,
+          surroundingSnippet: f.preview,
+        }),
+      );
+
+      const loopResult = await checkLoopProgress(
+        rootDir,
+        agentFindings.map((af) => af.fingerprint),
+        { maxIterations: options.maxIterations },
+      );
+
+      const agentOutput = formatAgentOutput({
+        toolVersion: "1.0.5",
+        findings: agentFindings,
+        introducedOnly: Boolean(options.changed || options.base),
+        iteration: loopResult.iteration,
+        statusOverride: loopResult.shouldEscalate ? "escalate" : undefined,
+        escalationMessage: loopResult.escalationReason,
+      });
+      console.log(JSON.stringify(agentOutput, null, 2));
+      process.exitCode = statusToExitCode(agentOutput.status);
+    } else if (options.format === "sarif") {
+      const scopedFindings =
+        options.changed || options.base
+          ? result.findings.filter((f) => f.introducedByChange !== false)
+          : result.findings;
+      const agentFindings = scopedFindings.map((f) =>
+        toAgentFinding(f, {
+          introducedByChange: f.introducedByChange !== false,
+          surroundingSnippet: f.preview,
+        }),
+      );
+      const sarif = formatSarifOutput(agentFindings, "1.0.5");
+      console.log(JSON.stringify(sarif, null, 2));
+      const criticalCount = scopedFindings.filter(
+        (f) => f.severity === "critical",
+      ).length;
+      if (criticalCount > 0) process.exitCode = 1;
+    } else if (isJson || options.format === "json") {
       console.log(JSON.stringify(result, null, 2));
+      const criticalCount = findings.filter(
+        (f) => f.severity === "critical",
+      ).length;
+      if (criticalCount > 0) process.exitCode = 1;
     } else if (!isQuiet) {
       console.log(pulseBar(score));
       console.log("");
 
-      const criticalCount = findings.filter((f) => f.severity === "critical").length;
-      const warningCount = findings.filter((f) => f.severity === "warning").length;
+      const criticalCount = findings.filter(
+        (f) => f.severity === "critical",
+      ).length;
+      const warningCount = findings.filter(
+        (f) => f.severity === "warning",
+      ).length;
       const issuesCount = criticalCount + warningCount;
 
       if (criticalCount > 0 && config.sound) {
@@ -444,18 +611,28 @@ export async function executeScan(
       if (issuesCount === 0) {
         parts.push(colors.mintClear.apply("all clear"));
       } else {
-        parts.push(colors.pulseCoral.apply(`${issuesCount} issue${issuesCount > 1 ? "s" : ""}`));
+        parts.push(
+          colors.pulseCoral.apply(
+            `${issuesCount} issue${issuesCount > 1 ? "s" : ""}`,
+          ),
+        );
       }
 
       parts.push(colors.slateDim.apply("bilt fix"));
       const isPlain = isPlainMode();
-      const mode = options.verbose || options.details !== false || isPlain ? "detail" : "headline";
+      const mode =
+        options.verbose || options.details !== false || isPlain
+          ? "detail"
+          : "headline";
       if (mode !== "detail") {
         parts.push(colors.slateDim.apply("bilt scan"));
       }
 
       console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
       console.log("");
+      if (criticalCount > 0) {
+        process.exitCode = 1;
+      }
     }
 
     return result;

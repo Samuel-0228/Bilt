@@ -43,7 +43,8 @@ export type HealthDomain =
   | "configuration"
   | "performance";
 
-export type VerificationState = "verified-live" | "verified-dead" | "unverified";
+export type VerificationState =
+  "verified-live" | "verified-dead" | "unverified";
 
 export type ConfidenceBucket = "low" | "medium" | "high";
 
@@ -91,6 +92,10 @@ export interface ScanFinding {
   aiExplanation?: AIExplanation;
   /** OWASP Top 10 mapping string */
   owaspMapping?: string;
+  /** Stable fingerprint for the finding */
+  fingerprint?: string;
+  /** Whether finding was introduced by git diff scope */
+  introducedByChange?: boolean;
 }
 
 // ─── Scan Result ─────────────────────────────────────────────────────────────
@@ -308,6 +313,10 @@ export interface ScanOptions {
   debug?: boolean;
   retainSecrets?: boolean;
   includeTests?: boolean;
+  changed?: boolean;
+  base?: string;
+  format?: "text" | "json" | "agent" | "sarif";
+  maxIterations?: number;
 }
 
 export interface FixOptions {

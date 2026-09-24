@@ -1,0 +1,71 @@
+name: Verify
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: Deterministic Security & Tamper Verification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run Bilt Verify (SARIF)
+        id: bilt_verify
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            BASE_REF="origin/${{ github.base_ref }}"
+          else
+            BASE_REF="HEAD~1"
+          fi
+          echo "Verifying against base: $BASE_REF"
+          node dist/cli.js verify --base "$BASE_REF" --format sarif > bilt-results.sarif || VERIFY_EXIT=$?
+          echo "verify_exit=${VERIFY_EXIT:-0}" >> $GITHUB_OUTPUT
+          echo "SARIF generated (size: $(wc -c < bilt-results.sarif) bytes)"
+
+      - name: Upload SARIF results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: bilt-results.sarif
+          category: bilt
+
+      - name: Enforce Verification Status
+        run: |
+          EXIT_CODE="${{ steps.bilt_verify.outputs.verify_exit }}"
+          echo "Verification exited with code: $EXIT_CODE"
+          if [ "$EXIT_CODE" -eq 1 ]; then
+            echo "::error::Bilt verification hard failure (stable high-precision rule or configuration tampering)"
+            exit 1
+          elif [ "$EXIT_CODE" -ge 3 ]; then
+            echo "::error::Bilt verification encountered an error or runaway loop escalation (exit code $EXIT_CODE)"
+            exit "$EXIT_CODE"
+          elif [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::notice::Bilt verification produced findings requiring human review (needs_review). Non-blocking."
+          fi
