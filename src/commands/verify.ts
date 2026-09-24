@@ -16,6 +16,7 @@ export interface VerifyOptions {
   base?: string;
   format?: OutputFormat;
   snippets?: boolean;
+  maxIterations?: number;
 }
 
 export async function executeVerify(
@@ -46,12 +47,23 @@ export async function executeVerify(
   // 3. Detect any tampering with config/rules vs baseRef
   const tamperFindings = await detectTampering(rootDir, baseRef);
 
-  // 4. Construct Agent output
+  // 4. Check loop progress and iteration budget
+  const { checkLoopProgress } = await import("../core/loop/state.js");
+  const loopResult = await checkLoopProgress(
+    rootDir,
+    agentFindings.map((af) => af.fingerprint),
+    { maxIterations: options.maxIterations },
+  );
+
+  // 5. Construct Agent output
   const agentOutput = formatAgentOutput({
     toolVersion: "1.0.5",
     findings: agentFindings,
     tamper: tamperFindings,
     introducedOnly: true,
+    iteration: loopResult.iteration,
+    statusOverride: loopResult.shouldEscalate ? "escalate" : undefined,
+    escalationMessage: loopResult.escalationReason,
   });
 
   const exitCode = statusToExitCode(agentOutput.status);

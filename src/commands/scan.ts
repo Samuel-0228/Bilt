@@ -56,6 +56,7 @@ import { toAgentFinding } from "../core/finding/mapper.js";
 import { formatAgentOutput } from "../core/output/formatters/agent.js";
 import { formatSarifOutput } from "../core/output/formatters/sarif.js";
 import { statusToExitCode } from "../core/output/types.js";
+import { checkLoopProgress } from "../core/loop/state.js";
 import { createRequire } from "node:module";
 
 // Helper to run a scan step and stream findings
@@ -545,10 +546,20 @@ export async function executeScan(
           surroundingSnippet: f.preview,
         }),
       );
+
+      const loopResult = await checkLoopProgress(
+        rootDir,
+        agentFindings.map((af) => af.fingerprint),
+        { maxIterations: options.maxIterations },
+      );
+
       const agentOutput = formatAgentOutput({
         toolVersion: "1.0.5",
         findings: agentFindings,
         introducedOnly: Boolean(options.changed || options.base),
+        iteration: loopResult.iteration,
+        statusOverride: loopResult.shouldEscalate ? "escalate" : undefined,
+        escalationMessage: loopResult.escalationReason,
       });
       console.log(JSON.stringify(agentOutput, null, 2));
       process.exitCode = statusToExitCode(agentOutput.status);

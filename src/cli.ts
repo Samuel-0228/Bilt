@@ -124,6 +124,11 @@ program
     "--base <ref>",
     "Scan only changes between base git ref and current branch",
   )
+  .option(
+    "--max-iterations <n>",
+    "Maximum allowed loop iterations before escalating (default 5)",
+    "5",
+  )
   .action(
     async (
       dir: string,
@@ -142,6 +147,7 @@ program
         includeTests?: boolean;
         changed?: boolean;
         base?: string;
+        maxIterations?: string;
       },
     ) => {
       try {
@@ -160,6 +166,9 @@ program
           includeTests: opts.includeTests,
           changed: opts.changed,
           base: opts.base,
+          maxIterations: opts.maxIterations
+            ? parseInt(opts.maxIterations, 10)
+            : undefined,
         });
 
         // Exit code based on findings
@@ -438,10 +447,20 @@ program
     "agent",
   )
   .option("--snippets", "Include sanitized code snippets in untrusted_snippet")
+  .option(
+    "--max-iterations <n>",
+    "Maximum allowed loop iterations before escalating (default 5)",
+    "5",
+  )
   .action(
     async (
       dir: string,
-      opts: { base?: string; format?: string; snippets?: boolean },
+      opts: {
+        base?: string;
+        format?: string;
+        snippets?: boolean;
+        maxIterations?: string;
+      },
     ) => {
       try {
         const { executeVerify } = await import("./commands/verify.js");
@@ -449,6 +468,9 @@ program
           base: opts.base,
           format: opts.format as any,
           snippets: opts.snippets,
+          maxIterations: opts.maxIterations
+            ? parseInt(opts.maxIterations, 10)
+            : undefined,
         });
       } catch (error) {
         printError(error);

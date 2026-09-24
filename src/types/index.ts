@@ -316,6 +316,7 @@ export interface ScanOptions {
   changed?: boolean;
   base?: string;
   format?: "text" | "json" | "agent" | "sarif";
+  maxIterations?: number;
 }
 
 export interface FixOptions {
