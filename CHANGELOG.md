@@ -5,7 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-24
+## [1.1.0] - 2026-09-25
+
+### Added - Production Readiness Gate for AI-Built Software
+
+- **`bilt check` Production Gate**: Added new primary pre-production verification command (`bilt check`) with `--format human|agent|json`, `--changed`, and `--base` flags. Evaluates applications against an honest 14-category production readiness gate.
+- **14-Category Readiness Taxonomy**: Implemented canonical taxonomy across 14 security, data, and infrastructure domains:
+  - Enforced (automated): `secrets-and-env`, `auth`, `input-validation`.
+  - Guided: `authorization`, `api-abuse-and-cost`.
+  - Partial: `database`, `dependencies`, `error-handling-logs`, `transport-and-headers`, `deploy-config`.
+  - Coming Soon: `file-uploads`, `payments`, `privacy-and-pii`, `monitoring-rollback`.
+- **Mandatory Category Invariant**: Defined 6 core categories (`secrets-and-env`, `auth`, `authorization`, `input-validation`, `api-abuse-and-cost`, `database`) that must be verified or fixed before production gate passes.
+- **Automated Ground-Truth Route Map (3B)**: Independent route extraction engine covering Express, Fastify, Next.js (App & Pages Router), FastAPI, Django, and Rails, cross-checking guided agent claims against actual endpoints.
+- **Evidence Fabrication Heuristics (14B)**: Enforced anti-gaming validation on guided check submissions:
+  - Completeness verification against canonical route map.
+  - Uniqueness checks preventing duplicate evidence locations.
+  - Existence verification ensuring every reported line exists in the repository.
+  - Timing checks flagging unrealistically rapid evidence generation.
+- **Distinct Risk Acceptance Mechanism (8B)**: Added `bilt accept-risk <id> --reason "..." --owner "<name>" [--expires <date>]` storing formally accepted non-mandatory risks in `.bilt/accepted-risk.json`. Explicitly forbids risk acceptance on mandatory categories.
+- **Concepts & Educational Layer**: Added `bilt explain <category>` with 14 comprehensive markdown concept guides explaining real-world consequences and remediation steps for AI-built software.
+- **Non-Suppressible Disclaimer (15B)**: Every `bilt check` output guarantees explicit signaling: *"Bilt is an automated readiness check, not a certified security audit. A 'production-ready' result means known common gaps were checked and not found; it does not guarantee the absence of vulnerabilities."*
+- **File-Hash Caching & Safety Bounds (16B)**: Added SHA-256 content caching in `.bilt/cache/readiness-cache.json` and 1MB per-file scanning size guardrails.
+- **Strict Integer Schema Versioning (9B)**: Machine-readable agent output (`--format agent`) uses integer `schemaVersion: 1` with backward-compatible additive evolution guarantees.
+
+## [1.0.5] - 2026-09-24
 
 ### Added - Agent-Native Security & Testing Interface
 

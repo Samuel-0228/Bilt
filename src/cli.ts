@@ -89,6 +89,103 @@ program
     "Plain output for CI — no banner, no color, greppable text",
   );
 
+// ─── bilt check ─────────────────────────────────────────────────────────────
+
+program
+  .command("check")
+  .description(
+    "Comprehensive production-readiness verification for AI-built software",
+  )
+  .argument("[dir]", "Project directory", ".")
+  .option("--format <format>", "Output format: human, agent, json", "human")
+  .option("--changed", "Scan only files modified in working tree vs HEAD")
+  .option(
+    "--base <ref>",
+    "Scan only changes between base git ref and current branch",
+  )
+  .option("--categories <list>", "Comma-separated list of categories to check")
+  .action(
+    async (
+      dir: string,
+      opts: {
+        format?: "human" | "agent" | "json";
+        changed?: boolean;
+        base?: string;
+        categories?: string;
+      },
+    ) => {
+      try {
+        const { executeCheck } = await import("./commands/check.js");
+        const exitCode = await executeCheck(dir, opts);
+        process.exitCode = exitCode;
+      } catch (error) {
+        printError(error);
+        process.exitCode = 3;
+      }
+    },
+  );
+
+// ─── bilt explain ───────────────────────────────────────────────────────────
+
+program
+  .command("explain")
+  .description("Explain production-readiness concepts and inspection guidelines")
+  .argument("[category]", "Category to explain (e.g. auth, authorization, secrets, api)")
+  .action(async (category?: string) => {
+    try {
+      const { executeExplain } = await import("./commands/explain.js");
+      const exitCode = await executeExplain(category);
+      process.exitCode = exitCode;
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+// ─── bilt accept-risk ───────────────────────────────────────────────────────
+
+program
+  .command("accept-risk")
+  .description(
+    "Formally record an accepted risk for a non-mandatory readiness finding",
+  )
+  .argument("<finding-id>", "Rule or finding ID to accept risk for")
+  .requiredOption(
+    "--reason <reason>",
+    "Detailed explanation why the risk is accepted",
+  )
+  .requiredOption(
+    "--owner <owner>",
+    "Person or team taking ownership of the accepted risk",
+  )
+  .option("--category <category>", "Finding category")
+  .option(
+    "--expires <date>",
+    "ISO expiry date (YYYY-MM-DD) after which risk re-flags",
+  )
+  .option("--dir <dir>", "Project directory", ".")
+  .action(
+    async (
+      findingId: string,
+      opts: {
+        reason: string;
+        owner: string;
+        category?: string;
+        expires?: string;
+        dir?: string;
+      },
+    ) => {
+      try {
+        const { executeAcceptRisk } = await import("./commands/accept-risk.js");
+        const exitCode = await executeAcceptRisk(findingId, opts);
+        process.exitCode = exitCode;
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
+
 // ─── bilt scan ───────────────────────────────────────────────────────────────
 
 program

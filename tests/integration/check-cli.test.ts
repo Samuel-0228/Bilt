@@ -1,0 +1,77 @@
+import { describe, it, expect } from "vitest";
+import { execa } from "execa";
+import path from "node:path";
+
+const CLI_PATH = path.resolve(__dirname, "../../dist/cli.js");
+
+describe("bilt check CLI Integration", () => {
+  it("should show help for bilt check", async () => {
+    const { stdout } = await execa("node", [CLI_PATH, "check", "--help"]);
+    expect(stdout).toContain("Comprehensive production-readiness verification");
+    expect(stdout).toContain("--format");
+    expect(stdout).toContain("--changed");
+  });
+
+  it("should output valid Agent JSON with schemaVersion 1 and disclaimer", async () => {
+    const { stdout, exitCode } = await execa(
+      "node",
+      [CLI_PATH, "check", "tests/fixtures/clean-project", "--format", "agent"],
+      { reject: false },
+    );
+
+    const json = JSON.parse(stdout);
+    expect(json.schemaVersion).toBe(1);
+    expect(json.toolVersion).toBeTruthy();
+    expect(json.status).toBeDefined();
+    expect(json.summary).toBeDefined();
+    expect(json.disclaimer).toContain("Bilt is an automated readiness check");
+    expect(exitCode).toBeLessThanOrEqual(2);
+  });
+
+  it("should detect vulnerabilities and return exit code 1 for leaky project", async () => {
+    const { stdout, exitCode } = await execa(
+      "node",
+      [
+        CLI_PATH,
+        "check",
+        "tests/fixtures/vulnerable-readiness-app",
+        "--format",
+        "agent",
+      ],
+      { reject: false },
+    );
+
+    const json = JSON.parse(stdout);
+    expect(json.status).toBe("not-ready");
+    expect(exitCode).toBe(1);
+    expect(json.summary.critical).toBeGreaterThan(0);
+  });
+
+  it("should explain authentication concept via bilt explain auth", async () => {
+    const { stdout } = await execa("node", [CLI_PATH, "explain", "auth"]);
+    expect(stdout).toContain("# Authentication");
+    expect(stdout).toContain("## What It Is");
+    expect(stdout).toContain("## What Bilt Can Verify");
+  });
+
+  it("should forbid risk acceptance on mandatory category (Section 8B)", async () => {
+    const { stderr, exitCode } = await execa(
+      "node",
+      [
+        CLI_PATH,
+        "accept-risk",
+        "RULE-SEC-001",
+        "--category",
+        "secrets-and-env",
+        "--reason",
+        "We want to deploy with secrets",
+        "--owner",
+        "DevTeam",
+      ],
+      { reject: false },
+    );
+
+    expect(stderr).toContain("Risk Acceptance Prohibited for Mandatory Category");
+    expect(exitCode).toBe(1);
+  });
+});

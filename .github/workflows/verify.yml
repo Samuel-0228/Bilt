@@ -35,6 +35,19 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Run Test Suite
+        run: npm test
+
+      - name: Run Production Readiness Check (bilt check)
+        id: bilt_check
+        run: |
+          node dist/cli.js check --format agent > bilt-check.json || CHECK_EXIT=$?
+          echo "Bilt check exited with code: ${CHECK_EXIT:-0}"
+          if [ "${CHECK_EXIT:-0}" -eq 1 ]; then
+            echo "::error::Bilt production-readiness check failed with blocking findings"
+            exit 1
+          fi
+
       - name: Run Bilt Verify (SARIF)
         id: bilt_verify
         run: |

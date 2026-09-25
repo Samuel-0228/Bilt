@@ -548,8 +548,8 @@ async function generateFixActions(
             apply: async () => {
               const stepsApplied: string[] = [];
               try {
-                const { execSync } = await import("node:child_process");
-                execSync(`git rm --cached "${targetFile}"`, { cwd: rootDir, stdio: "ignore" });
+                const { execFileSync } = await import("node:child_process");
+                execFileSync("git", ["rm", "--cached", targetFile], { cwd: rootDir, stdio: "ignore" });
                 stepsApplied.push(`Untracked ${targetFile} from Git index`);
               } catch {
                 // Ignore if untracked or git error
@@ -569,8 +569,8 @@ async function generateFixActions(
             },
             verify: async () => {
               try {
-                const { execSync } = await import("node:child_process");
-                const out = execSync(`git ls-files "${targetFile}"`, { cwd: rootDir, encoding: "utf-8" }).trim();
+                const { execFileSync } = await import("node:child_process");
+                const out = execFileSync("git", ["ls-files", targetFile], { cwd: rootDir, encoding: "utf-8" }).trim();
                 if (!out) {
                   return { passed: true, message: `Verified ${targetFile} is untracked from Git.` };
                 }

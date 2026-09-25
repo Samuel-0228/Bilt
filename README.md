@@ -5,7 +5,10 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
 [![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
 
-> Zero-configuration project health toolkit. Detect hardcoded secrets, resolve environment variable mismatches, enforce safe local practices, and maintain repository integrity before code reaches Git.
+> **Bilt is the production-readiness gate for software built with AI coding agents.**
+> 
+> AI coding agents (Claude, ChatGPT, Cursor, Codex) can build web applications quickly, but vibecoders and autonomous agents often miss critical security, authentication, and architectural guardrails before shipping.
+> Bilt automatically verifies what can be verified deterministically, guides AI agents through what requires professional review, and enforces an honest production-readiness gate before exposing code to real users.
 
 ---
 
@@ -18,7 +21,66 @@
   |____/
 ```
 
-Bilt is a developer-focused CLI utility designed to keep environment configurations healthy, prevent credential leaks, and provide automated safety guardrails for codebases. It operates offline by default, requires zero initial configuration, and offers non-destructive automated fixes backed by full git snapshot rollback capabilities.
+Bilt is an automated readiness check, not a certified security audit. A "production-ready" result means known common gaps were checked and not found; it does not guarantee the absence of vulnerabilities. Bilt helps identify common security and production-readiness gaps and guides deeper review where automated verification is not possible.
+
+---
+
+## The Production Readiness Command
+
+Run Bilt's pre-production readiness gate:
+
+```bash
+# Human-readable production gate report
+bilt check
+
+# Agent-native JSON format for coding assistants (Claude Code, Cursor, Codex, CI)
+bilt check --format agent
+
+# Scoped to uncommitted changes
+bilt check --format agent --changed
+
+# Learn concepts and inspection procedures
+bilt explain authorization
+bilt explain api-abuse-and-cost
+```
+
+### Production Readiness Taxonomy
+
+Bilt classifies production readiness across 14 deterministic and guided categories:
+
+| Category | Mode | Enforcement | Description |
+| :--- | :---: | :---: | :--- |
+| **`secrets-and-env`** | Automated | **ENFORCED** | Hardcoded API keys, database credentials, committed `.env`, client secret leakage. |
+| **`auth`** | Automated | **ENFORCED** | Plaintext passwords, JWT verification, missing expiration, insecure cookies, auth stubs. |
+| **`authorization`** | Guided | **GUIDED** | ID-based resource ownership, tenant isolation, role checks, admin privileges. |
+| **`input-validation`** | Automated | **ENFORCED** | SQL/Command injection, path traversal, unsafe HTML rendering, mutating schema validation. |
+| **`api-abuse-and-cost`** | Guided | **GUIDED** | Unauthenticated expensive AI calls, rate limiting, request size limits, proxy abuse. |
+| **`database`** | Mixed | **PARTIAL** | Database credentials, client-db boundaries, SSL transport, backup & PITR strategy. |
+| **`dependencies`** | Automated | **PARTIAL** | Lockfile presence, package manager consistency, supply-chain checks. |
+| **`error-handling-logs`** | Automated | **PARTIAL** | Stack trace leakage in HTTP responses, credential/token logging. |
+| **`transport-and-headers`** | Automated | **PARTIAL** | Wildcard CORS with credentials, HTTP security headers (Helmet). |
+| **`deploy-config`** | Automated | **PARTIAL** | Production debug flags (`NODE_ENV=development`), browser source-map exposure. |
+| **`file-uploads`** | Guided | **COMING SOON** | MIME allowlists, file size limits, storage isolation. |
+| **`payments`** | Guided | **COMING SOON** | Webhook signature verification, server-side validation, zero raw card handling. |
+| **`privacy-and-pii`** | Guided | **COMING SOON** | PII data encryption at rest, retention, and deletion flows. |
+| **`monitoring-rollback`** | Guided | **COMING SOON** | Error reporting SDK (Sentry), observability, rollback procedures. |
+
+> [!IMPORTANT]
+> **Stack Scoping (Section 4B):**
+> Bilt v1 fully enforces automated checks for: **Express, Fastify, Next.js (App & Pages Router), Nuxt, SvelteKit, FastAPI, Django REST Framework, and Rails**.
+> Guided checks are language-agnostic since they instruct a human/agent procedure, but their completeness verification requires a route extractor for the detected stack. For any detected stack without a route extractor or without automated rule support, `bilt check` reports `UNSUPPORTED STACK — guided review required, route completeness cannot be verified`.
+
+### Risk Acceptance vs. Suppression (Section 8B)
+
+Suppression (`// bilt-ignore`) means *"this finding is incorrect (false positive)"*.
+Risk acceptance (`bilt accept-risk`) means *"this finding is correct and we are deliberately accepting the operational risk to ship"*.
+
+```bash
+bilt accept-risk RULE-ID --reason "Legacy endpoint to be retired in Q4" --owner "BackendTeam" [--expires 2026-12-31]
+```
+
+* **Mandatory Category Invariant**: The 6 core categories (`secrets-and-env`, `auth`, `authorization`, `input-validation`, `api-abuse-and-cost`, `database`) **CANNOT** bypass the production gate via risk acceptance. They must be resolved or suppressed with an explicit false-positive justification.
+* Accepted risks remain visible in every report under the `ACCEPTED RISK` section.
 
 ---
 
