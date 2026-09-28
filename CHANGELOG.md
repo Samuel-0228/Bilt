@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-09-28
+
+### Added & Fixed - Hardening & AI Agent Ergonomics
+
+- **Framework-Aware Dependency Detection**: Automatic framework heuristic detection (Next.js, Remix, Vite, Nuxt, Astro, SvelteKit) eliminates false-positive `dep-unused` warnings for framework runtimes like `react-dom` in Next.js.
+- **Configurable `ignoreUnused` & Framework Presets**: Added `ignoreUnused: string[]` and `framework: string` in `.biltrc.json` to allow granular dependency overrides.
+- **Supabase SSR Cookie Security Analysis**: Suppressed false positives for cookie options forwarded dynamically through `@supabase/ssr` (`createServerClient`, `setAll(cookiesToSet)`). Added context-aware diagnostics and official `getAll`/`setAll` code snippets when static cookies lack required flags.
+- **Resilient CLI Argument Parsing for `accept-risk`**: Supports flexible flag ordering, positional IDs, `--id <id>`, `--finding <id>`, and multi-word reasons. Provides actionable error diagnostics with examples and fuzzy matching for approximate rule IDs.
+- **Infinite Loop & Agent Oscillation Prevention**: Upgraded agent loop detection to escalate on $N \ge 3$ consecutive duplicate iterations and detect $A \to B \to A \to B$ oscillation thrashing, terminating cleanly with exit code 4 (`status: "escalate"`). Persists state in `.bilt/.agent-state.json` and `.bilt/loop-state.json`.
+
 ## [1.1.0] - 2026-09-25
 
 ### Added - Production Readiness Gate for AI-Built Software
