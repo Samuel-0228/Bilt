@@ -15,6 +15,7 @@ export interface LoopState {
 
 export interface LoopCheckOptions {
   maxIterations?: number;
+  noProgressThreshold?: number;
   taskId?: string;
 }
 
@@ -24,20 +25,31 @@ export interface LoopCheckResult {
   escalationReason?: string;
 }
 
+export function getAgentStatePath(rootDir: string): string {
+  return path.join(rootDir, ".bilt", ".agent-state.json");
+}
+
 export function getLoopStatePath(rootDir: string): string {
   return path.join(rootDir, ".bilt", "loop-state.json");
 }
 
 export async function readLoopState(rootDir: string): Promise<LoopState> {
-  const filePath = getLoopStatePath(rootDir);
+  const agentPath = getAgentStatePath(rootDir);
+  const loopPath = getLoopStatePath(rootDir);
+
   try {
-    const raw = await fs.readFile(filePath, "utf-8");
+    const raw = await fs.readFile(agentPath, "utf-8");
     return JSON.parse(raw) as LoopState;
   } catch {
-    return {
-      currentIteration: 0,
-      history: [],
-    };
+    try {
+      const raw = await fs.readFile(loopPath, "utf-8");
+      return JSON.parse(raw) as LoopState;
+    } catch {
+      return {
+        currentIteration: 0,
+        history: [],
+      };
+    }
   }
 }
 
@@ -47,23 +59,31 @@ export async function writeLoopState(
 ): Promise<void> {
   const biltDir = path.join(rootDir, ".bilt");
   await fs.mkdir(biltDir, { recursive: true });
-  const filePath = getLoopStatePath(rootDir);
-  await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf-8");
+  const payload = JSON.stringify(state, null, 2);
+  await Promise.all([
+    fs.writeFile(getAgentStatePath(rootDir), payload, "utf-8"),
+    fs.writeFile(getLoopStatePath(rootDir), payload, "utf-8"),
+  ]);
 }
 
 export async function resetLoopState(rootDir: string): Promise<void> {
-  try {
-    await fs.unlink(getLoopStatePath(rootDir));
-  } catch {
-    // Ignore if not exists
-  }
+  await Promise.allSettled([
+    fs.unlink(getAgentStatePath(rootDir)),
+    fs.unlink(getLoopStatePath(rootDir)),
+  ]);
+}
+
+function areFingerprintSetsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((fp, idx) => fp === b[idx]);
 }
 
 /**
- * Check iteration count and fingerprint delta against previous runs.
+ * Check iteration count, consecutive identical findings, and oscillation thrashing.
  * Returns escalation signal if:
- * 1. Consecutive runs yielded the exact same non-empty fingerprint set (no progress)
- * 2. Iteration count >= maxIterations (budget exhaustion)
+ * 1. N >= 3 consecutive iterations produce the exact same non-empty fingerprint set (no progress)
+ * 2. Thrashing oscillation detected alternating between conflicting states (A -> B -> A -> B)
+ * 3. Iteration count >= maxIterations (budget exhaustion)
  */
 export async function checkLoopProgress(
   rootDir: string,
@@ -71,6 +91,7 @@ export async function checkLoopProgress(
   options: LoopCheckOptions = {},
 ): Promise<LoopCheckResult> {
   const maxIterations = options.maxIterations ?? 5;
+  const noProgressThreshold = options.noProgressThreshold ?? 3;
   const state = await readLoopState(rootDir);
 
   const nextIteration = state.currentIteration + 1;
@@ -79,23 +100,40 @@ export async function checkLoopProgress(
   let shouldEscalate = false;
   let escalationReason: string | undefined;
 
-  // Check 1: No progress on consecutive iterations
-  if (state.history.length > 0 && sortedCurrent.length > 0) {
-    const lastRecord = state.history[state.history.length - 1]!;
-    const lastSorted = Array.from(new Set(lastRecord.fingerprints)).sort();
+  // Check 1: N >= 3 consecutive iterations with identical findings (no progress)
+  if (state.history.length >= noProgressThreshold - 1 && sortedCurrent.length > 0) {
+    const priorRuns = state.history.slice(-(noProgressThreshold - 1));
+    const allIdentical = priorRuns.every((record) => {
+      const priorSorted = Array.from(new Set(record.fingerprints)).sort();
+      return areFingerprintSetsEqual(sortedCurrent, priorSorted);
+    });
 
-    const areEqual =
-      sortedCurrent.length === lastSorted.length &&
-      sortedCurrent.every((fp, idx) => fp === lastSorted[idx]);
-
-    if (areEqual) {
+    if (allIdentical) {
       shouldEscalate = true;
-      escalationReason =
-        "Loop escalated: consecutive runs produced an identical set of findings with no progress. Stop automated retries and ask the human maintainer for guidance.";
+      escalationReason = `Loop escalated: no progress across ${noProgressThreshold} consecutive iterations with identical findings. Stop automated retries and ask the human maintainer for guidance.`;
     }
   }
 
-  // Check 2: Iteration budget exhaustion
+  // Check 2: Oscillation thrashing detection (A -> B -> A -> B)
+  if (!shouldEscalate && state.history.length >= 3) {
+    const sigCurrent = sortedCurrent.join("|");
+    const sigLast1 = Array.from(new Set(state.history[state.history.length - 1]!.fingerprints)).sort().join("|");
+    const sigLast2 = Array.from(new Set(state.history[state.history.length - 2]!.fingerprints)).sort().join("|");
+    const sigLast3 = Array.from(new Set(state.history[state.history.length - 3]!.fingerprints)).sort().join("|");
+
+    if (
+      sigCurrent === sigLast2 &&
+      sigLast1 === sigLast3 &&
+      sigCurrent !== sigLast1 &&
+      (sigCurrent.length > 0 || sigLast1.length > 0)
+    ) {
+      shouldEscalate = true;
+      escalationReason =
+        "Loop escalated: agent oscillation detected alternating between conflicting states (A -> B -> A -> B). Stop automated retries and ask the human maintainer for guidance.";
+    }
+  }
+
+  // Check 3: Iteration budget exhaustion
   if (!shouldEscalate && nextIteration > maxIterations) {
     shouldEscalate = true;
     escalationReason = `Loop escalated: iteration budget of ${maxIterations} runs exhausted. Stop automated retries and ask the human maintainer for guidance.`;

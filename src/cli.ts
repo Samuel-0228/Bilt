@@ -171,12 +171,20 @@ program
   .description(
     "Formally record an accepted risk for a non-mandatory readiness finding",
   )
-  .argument("<finding-id>", "Rule or finding ID to accept risk for")
-  .requiredOption(
+  .argument("[finding-id...]", "Rule or finding ID to accept risk for")
+  .option(
+    "--id <id>",
+    "Finding or rule ID to accept risk for",
+  )
+  .option(
+    "--finding <id>",
+    "Alias for --id",
+  )
+  .option(
     "--reason <reason>",
     "Detailed explanation why the risk is accepted",
   )
-  .requiredOption(
+  .option(
     "--owner <owner>",
     "Person or team taking ownership of the accepted risk",
   )
@@ -188,10 +196,12 @@ program
   .option("--dir <dir>", "Project directory", ".")
   .action(
     async (
-      findingId: string,
+      findingIdArg: string | string[] | undefined,
       opts: {
-        reason: string;
-        owner: string;
+        id?: string;
+        finding?: string;
+        reason?: string;
+        owner?: string;
         category?: string;
         expires?: string;
         dir?: string;
@@ -199,7 +209,7 @@ program
     ) => {
       try {
         const { executeAcceptRisk } = await import("./commands/accept-risk.js");
-        const exitCode = await executeAcceptRisk(findingId, opts);
+        const exitCode = await executeAcceptRisk(findingIdArg, opts);
         process.exitCode = exitCode;
       } catch (error) {
         printError(error);

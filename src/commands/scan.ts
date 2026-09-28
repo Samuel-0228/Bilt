@@ -425,7 +425,7 @@ export async function executeScan(
     const depStepFindings = await runStep(
       "Auditing dependencies & lockfiles",
       async () => {
-        const stepFindings = await scanDependencies(rootDir);
+        const stepFindings = await scanDependencies(rootDir, config);
         return applyOverridesAndFilter(
           stepFindings,
           config,

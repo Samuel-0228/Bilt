@@ -34,7 +34,7 @@ export const authChecker: CategoryChecker = {
       // Run each check
       findings.push(...checkJwtDecode(file.path, lines));
       findings.push(...checkPasswordHashing(file.path, lines, file.content));
-      findings.push(...checkCookieSecurity(file.path, lines));
+      findings.push(...checkCookieSecurity(file.path, lines, file.content));
       findings.push(...checkAuthBypass(file.path, lines));
       findings.push(...checkHardcodedCredentials(file.path, lines));
       findings.push(...checkJwtExpiry(file.path, lines, file.content));
@@ -160,10 +160,38 @@ function checkPasswordHashing(filePath: string, lines: string[], content: string
   return findings;
 }
 
+const SUPABASE_COOKIE_GUIDANCE = `
+In Supabase SSR, use the recommended getAll() and setAll() handlers to synchronize cookies between client and server:
+
+cookies: {
+  getAll() {
+    return request.cookies.getAll();
+  },
+  setAll(cookiesToSet) {
+    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+    supabaseResponse = NextResponse.next({ request });
+    cookiesToSet.forEach(({ name, value, options }) =>
+      supabaseResponse.cookies.set(name, value, options)
+    );
+  },
+}
+
+Why it matters:
+- Refresh tokens are managed by @supabase/ssr and kept httpOnly to prevent XSS exfiltration.
+- Auth coordination cookies (e.g. PKCE verifiers) require appropriate client/server accessibility.
+- Forwarding the dynamic options object ensures each cookie receives the correct security flags without breaking SSR session synchronization.
+`.trim();
+
 // ─── Cookie: missing security flags ──────────────────────────────────────────
 
-function checkCookieSecurity(filePath: string, lines: string[]): BiltCheckFinding[] {
+function checkCookieSecurity(filePath: string, lines: string[], fullContent: string = ""): BiltCheckFinding[] {
   const findings: BiltCheckFinding[] = [];
+
+  const isSupabaseSSR =
+    fullContent.includes("@supabase/ssr") ||
+    fullContent.includes("@supabase/auth-helpers") ||
+    fullContent.includes("createServerClient") ||
+    fullContent.includes("cookiesToSet");
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
@@ -178,7 +206,28 @@ function checkCookieSecurity(filePath: string, lines: string[]): BiltCheckFindin
       // Check surrounding lines for security flags
       const block = lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 10)).join("\n");
 
+      // In Supabase SSR, cookie options are forwarded dynamically from @supabase/ssr handlers
+      const isForwardedSupabaseCookie =
+        isSupabaseSSR &&
+        (line.includes("options") ||
+          line.includes("...options") ||
+          block.includes("cookiesToSet") ||
+          block.includes("setAll"));
+
+      if (isForwardedSupabaseCookie) {
+        // Forwarded options are handled contextually by @supabase/ssr (e.g. PKCE vs refresh token)
+        continue;
+      }
+
       if (!block.includes("httpOnly")) {
+        const technicalDetail = isSupabaseSSR
+          ? `Cookie set at ${filePath}:${i + 1} does not include httpOnly: true or forward dynamic Supabase options.\n\n${SUPABASE_COOKIE_GUIDANCE}`
+          : `Cookie set at ${filePath}:${i + 1} does not include httpOnly: true. Session and authentication cookies should always be httpOnly.`;
+
+        const agentAction = isSupabaseSSR
+          ? `Forward the dynamic options object in Supabase SSR setAll:\n${SUPABASE_COOKIE_GUIDANCE}`
+          : "Add httpOnly: true to the cookie options.";
+
         findings.push({
           ruleId: "CHECK-AUTH-004",
           category: CATEGORY,
@@ -191,11 +240,8 @@ function checkCookieSecurity(filePath: string, lines: string[]): BiltCheckFindin
           whyItMatters:
             "Without httpOnly, cookies are accessible to JavaScript. " +
             "A cross-site scripting (XSS) vulnerability can steal session tokens.",
-          technicalDetail:
-            `Cookie set at ${filePath}:${i + 1} does not include httpOnly: true. ` +
-            "Session and authentication cookies should always be httpOnly.",
-          agentAction:
-            "Add httpOnly: true to the cookie options.",
+          technicalDetail,
+          agentAction,
           fixable: true,
           file: filePath,
           line: i + 1,
@@ -204,6 +250,14 @@ function checkCookieSecurity(filePath: string, lines: string[]): BiltCheckFindin
       }
 
       if (!block.includes("secure")) {
+        const technicalDetail = isSupabaseSSR
+          ? `Cookie set at ${filePath}:${i + 1} does not include secure: true or forward dynamic Supabase options.\n\n${SUPABASE_COOKIE_GUIDANCE}`
+          : `Cookie set at ${filePath}:${i + 1} does not include secure: true.`;
+
+        const agentAction = isSupabaseSSR
+          ? `Forward the dynamic options object in Supabase SSR setAll:\n${SUPABASE_COOKIE_GUIDANCE}`
+          : "Add secure: true to the cookie options for production.";
+
         findings.push({
           ruleId: "CHECK-AUTH-005",
           category: CATEGORY,
@@ -216,10 +270,8 @@ function checkCookieSecurity(filePath: string, lines: string[]): BiltCheckFindin
           whyItMatters:
             "Without the secure flag, cookies may be sent over unencrypted HTTP, " +
             "allowing network attackers to intercept session tokens.",
-          technicalDetail:
-            `Cookie set at ${filePath}:${i + 1} does not include secure: true.`,
-          agentAction:
-            "Add secure: true to the cookie options for production.",
+          technicalDetail,
+          agentAction,
           fixable: true,
           file: filePath,
           line: i + 1,

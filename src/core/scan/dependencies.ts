@@ -3,9 +3,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import fg from "fast-glob";
-import type { ScanFinding } from "../../types/index.js";
+import type { ScanFinding, BiltConfig } from "../../types/index.js";
 
 let idCounter = 0;
 function nextId(prefix: string): string {
@@ -13,9 +14,142 @@ function nextId(prefix: string): string {
 }
 
 /**
+ * Identify implicit framework packages and transitive peer dependencies that should not
+ * be flagged as unused even if not directly imported in user source files.
+ */
+function getImplicitFrameworkDeps(
+  rootDir: string,
+  allDeps: Record<string, string>,
+  config?: Partial<BiltConfig>,
+): Set<string> {
+  const allowlist = new Set<string>();
+
+  const frameworkPreset = config?.framework?.toLowerCase().trim();
+
+  // Next.js
+  const isNext =
+    frameworkPreset === "next" ||
+    frameworkPreset === "nextjs" ||
+    Boolean(allDeps["next"]) ||
+    fsSync.existsSync(path.join(rootDir, "next.config.js")) ||
+    fsSync.existsSync(path.join(rootDir, "next.config.mjs")) ||
+    fsSync.existsSync(path.join(rootDir, "next.config.ts"));
+
+  if (isNext) {
+    allowlist.add("react");
+    allowlist.add("react-dom");
+    allowlist.add("@types/react");
+    allowlist.add("@types/react-dom");
+    allowlist.add("@types/node");
+    allowlist.add("sharp");
+    allowlist.add("next");
+  }
+
+  // Remix
+  const isRemix =
+    frameworkPreset === "remix" ||
+    Boolean(allDeps["@remix-run/react"]) ||
+    Boolean(allDeps["@remix-run/node"]) ||
+    fsSync.existsSync(path.join(rootDir, "remix.config.js")) ||
+    fsSync.existsSync(path.join(rootDir, "remix.config.ts"));
+
+  if (isRemix) {
+    allowlist.add("react");
+    allowlist.add("react-dom");
+    allowlist.add("@remix-run/node");
+    allowlist.add("@remix-run/react");
+    allowlist.add("@remix-run/serve");
+    allowlist.add("@types/react");
+    allowlist.add("@types/react-dom");
+  }
+
+  // Vite
+  const isVite =
+    frameworkPreset === "vite" ||
+    Boolean(allDeps["vite"]) ||
+    fsSync.existsSync(path.join(rootDir, "vite.config.js")) ||
+    fsSync.existsSync(path.join(rootDir, "vite.config.ts")) ||
+    fsSync.existsSync(path.join(rootDir, "vite.config.mjs"));
+
+  if (isVite) {
+    allowlist.add("@vitejs/plugin-react");
+    allowlist.add("@vitejs/plugin-react-swc");
+    allowlist.add("@vitejs/plugin-vue");
+    allowlist.add("@vitejs/plugin-vue-jsx");
+    allowlist.add("@sveltejs/vite-plugin-svelte");
+    allowlist.add("vite-plugin-inspect");
+  }
+
+  // Nuxt
+  const isNuxt =
+    frameworkPreset === "nuxt" ||
+    Boolean(allDeps["nuxt"]) ||
+    fsSync.existsSync(path.join(rootDir, "nuxt.config.ts")) ||
+    fsSync.existsSync(path.join(rootDir, "nuxt.config.js"));
+
+  if (isNuxt) {
+    allowlist.add("vue");
+    allowlist.add("vue-router");
+    allowlist.add("@nuxt/devtools");
+    allowlist.add("nuxt");
+  }
+
+  // Astro
+  const isAstro =
+    frameworkPreset === "astro" ||
+    Boolean(allDeps["astro"]) ||
+    fsSync.existsSync(path.join(rootDir, "astro.config.mjs")) ||
+    fsSync.existsSync(path.join(rootDir, "astro.config.ts")) ||
+    fsSync.existsSync(path.join(rootDir, "astro.config.js"));
+
+  if (isAstro) {
+    allowlist.add("@astrojs/tailwind");
+    allowlist.add("@astrojs/react");
+    allowlist.add("@astrojs/vue");
+    allowlist.add("@astrojs/svelte");
+    allowlist.add("@astrojs/mdx");
+    allowlist.add("astro");
+  }
+
+  // SvelteKit
+  const isSvelteKit =
+    frameworkPreset === "sveltekit" ||
+    Boolean(allDeps["@sveltejs/kit"]) ||
+    fsSync.existsSync(path.join(rootDir, "svelte.config.js")) ||
+    fsSync.existsSync(path.join(rootDir, "svelte.config.ts"));
+
+  if (isSvelteKit) {
+    allowlist.add("svelte");
+    allowlist.add("@sveltejs/kit");
+    allowlist.add("@sveltejs/adapter-auto");
+    allowlist.add("@sveltejs/adapter-node");
+    allowlist.add("@sveltejs/adapter-static");
+    allowlist.add("@sveltejs/adapter-vercel");
+    allowlist.add("@sveltejs/adapter-cloudflare");
+  }
+
+  // Supabase SSR & helper libraries
+  const hasSupabase =
+    Boolean(allDeps["@supabase/ssr"]) ||
+    Boolean(allDeps["@supabase/supabase-js"]) ||
+    Boolean(allDeps["@supabase/auth-helpers-nextjs"]);
+
+  if (hasSupabase) {
+    allowlist.add("@supabase/ssr");
+    allowlist.add("@supabase/supabase-js");
+    allowlist.add("@supabase/auth-helpers-nextjs");
+  }
+
+  return allowlist;
+}
+
+/**
  * Scan package dependencies and usage.
  */
-export async function scanDependencies(rootDir: string): Promise<ScanFinding[]> {
+export async function scanDependencies(
+  rootDir: string,
+  config?: Partial<BiltConfig>,
+): Promise<ScanFinding[]> {
   const findings: ScanFinding[] = [];
   const pkgPath = path.join(rootDir, "package.json");
 
@@ -95,8 +229,16 @@ export async function scanDependencies(rootDir: string): Promise<ScanFinding[]> 
   ]);
 
   const scriptsContent = pkg.scripts ? JSON.stringify(pkg.scripts) : "";
+  const userIgnored = new Set(config?.ignoreUnused || []);
+  const implicitFrameworkDeps = getImplicitFrameworkDeps(rootDir, allDeps, config);
 
   const depNames = Object.keys(dependencies).filter((name) => {
+    if (userIgnored.has(name)) {
+      return false;
+    }
+    if (implicitFrameworkDeps.has(name)) {
+      return false;
+    }
     if (name.startsWith("@types/") || name.includes("plugin") || name.includes("preset") || name.includes("config")) {
       return false;
     }

@@ -227,6 +227,10 @@ export interface BiltConfig {
   funMode: boolean;
   /** Play subtle terminal sound on critical findings */
   sound?: boolean;
+  /** Dependencies to ignore in unused dependency check */
+  ignoreUnused?: string[];
+  /** Target framework preset (e.g. "nextjs", "remix", "vite", "nuxt", "astro", "sveltekit") */
+  framework?: string;
 }
 
 // ─── Framework Detection ─────────────────────────────────────────────────────
