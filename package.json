@@ -1,6 +1,6 @@
 {
   "name": "bilt-toolkit",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Zero-configuration developer security and project-health CLI toolkit.",
   "type": "module",
   "main": "dist/cli.js",
@@ -10,7 +10,9 @@
   "files": [
     "dist",
     "bin",
-    "templates"
+    "templates",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -50,12 +52,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Samuel-0228/bilt.git"
+    "url": "git+https://github.com/Samuel-0228/Bilt.git"
   },
   "bugs": {
-    "url": "https://github.com/Samuel-0228/bilt/issues"
+    "url": "https://github.com/Samuel-0228/Bilt/issues"
   },
-  "homepage": "https://github.com/Samuel-0228/bilt#readme",
+  "homepage": "https://github.com/Samuel-0228/Bilt#readme",
   "dependencies": {
     "chalk": "^5.6.2",
     "chokidar": "^4.0.3",
