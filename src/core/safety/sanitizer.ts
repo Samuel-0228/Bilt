@@ -64,12 +64,19 @@ export function redactSecret(
  * Known secret patterns to universally redact in any user-facing or agent-facing string.
  */
 const COMMON_SECRET_PATTERNS = [
-  /ghp_[a-zA-Z0-9]{36}/g,
+  /ghp_[a-zA-Z0-9]{32,40}/g,
   /github_pat_[a-zA-Z0-9_]{82}/g,
   /AKIA[0-9A-Z]{16}/g,
   /AIza[0-9A-Za-z\\-_]{35}/g,
   /sk-(?:live|test|proj)-[a-zA-Z0-9]{20,}/g,
+  /(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{20,}/g,
+  /sk-ant-api[0-9a-zA-Z_\-]{20,}/g,
   /xox[baprs]-[0-9a-zA-Z]{10,}/g,
+  /SG\.[a-zA-Z0-9_\-\.]{50,}/g,
+  /re_[a-zA-Z0-9]{24,}/g,
+  /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g,
+  /(?:postgres(?:ql)?|mongodb(?:\+srv)?|mysql):\/\/[^\s:]+:([^\s@]+)@[^\s\/]+/gi,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
   /bearer\s+[a-zA-Z0-9_\-\.]{25,}/gi,
 ];
 
@@ -81,7 +88,12 @@ export function redactKnownSecrets(text: string): string {
 
   let result = text;
   for (const pattern of COMMON_SECRET_PATTERNS) {
-    result = result.replace(pattern, (match) => redactSecret(match));
+    result = result.replace(pattern, (match) => {
+      if (match.startsWith("-----BEGIN")) {
+        return "[PRIVATE_KEY_REDACTED]";
+      }
+      return redactSecret(match);
+    });
   }
 
   return result;

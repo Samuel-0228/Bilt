@@ -1,4 +1,5 @@
 import type { Finding } from "../../finding/types.js";
+import { VERSION } from "../../../version.js";
 
 export interface SarifRule {
   id: string;
@@ -98,7 +99,7 @@ function precisionToSarif(precision: string): "very-high" | "high" | "medium" | 
 
 export function formatSarifOutput(
   findings: Finding[],
-  toolVersion: string = "1.0.5",
+  toolVersion: string = VERSION,
 ): SarifReport {
   const rulesMap = new Map<string, SarifRule>();
   const ruleIndices = new Map<string, number>();

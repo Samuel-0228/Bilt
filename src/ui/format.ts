@@ -191,23 +191,34 @@ import { generateAIExplanation } from "../core/ai/explainer.js";
 import { canFixFinding } from "../core/fix/can-fix.js";
 
 function renderFiveQuestions(finding: ScanFinding, defaultDetail: string): string {
-  const loc = defaultDetail.split(" ")[0];
+  let loc = "";
+  if (finding.file) {
+    const file = truncatePath(finding.file);
+    loc = finding.line ? `${file}:${finding.line}` : file;
+  } else if (defaultDetail) {
+    loc = defaultDetail.startsWith("in ") ? defaultDetail.slice(3) : defaultDetail;
+  } else {
+    loc = "repository";
+  }
+
   const exp = finding.aiExplanation || generateAIExplanation(finding);
   const what = finding.knowledge?.whatItIs || exp.whatIsIt;
   const why = finding.knowledge?.why || exp.whyIsItAProblem;
   const confidence = finding.confidence ?? (finding.category.includes("secret") ? "medium" : "high");
   const action = finding.knowledge?.action || exp.howToFix;
   const fixable = canFixFinding(finding)
-    ? "yes → bilt fix"
-    : "no → manual";
+    ? colors.mintClear.apply("yes → bilt fix")
+    : colors.slateDim.dim("no → manual");
+
+  const label = (lbl: string) => colors.slateDim.dim(`     ${lbl.padEnd(12)}`);
 
   const lines = [
-    `     loc         ${loc}`,
-    `     what        ${what}`,
-    `     why         ${why}`,
-    `     confidence  ${confidence}`,
-    `     action      ${action}`,
-    `     fixable     ${fixable}`
+    `${label("loc")}${colors.vitalTeal.apply(loc)}`,
+    `${label("what")}${what}`,
+    `${label("why")}${why}`,
+    `${label("confidence")}${confidence}`,
+    `${label("action")}${action}`,
+    `${label("fixable")}${fixable}`,
   ];
   return lines.join("\n");
 }

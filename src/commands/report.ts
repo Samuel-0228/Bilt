@@ -6,13 +6,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { executeScan } from "./scan.js";
 import { colors } from "../ui/theme.js";
+import { validateProjectDirectory, isPathContained } from "../core/safety/index.js";
 
 export async function executeReport(
   projectDir: string,
   options: { format?: string; output?: string; export?: string; stdout?: boolean } = {},
 ): Promise<void> {
-  const rootDir = path.resolve(projectDir);
-  const result = await executeScan(rootDir, { quiet: true });
+  const rootDir = await validateProjectDirectory(projectDir);
+  const result = await executeScan(rootDir, { silent: true });
 
   const format = (options.format || "markdown").toLowerCase();
 
@@ -26,6 +27,9 @@ export async function executeReport(
     const jsonOutput = JSON.stringify(result, null, 2);
     if (outputPath) {
       const fullPath = path.resolve(rootDir, outputPath);
+      if (!isPathContained(fullPath, rootDir)) {
+        throw new Error(`Report output destination must be within the project directory: ${outputPath}`);
+      }
       await fs.writeFile(fullPath, jsonOutput, "utf-8");
       console.log(colors.mintClear.apply(`✔ Report saved to ${outputPath}`));
     } else {
@@ -70,6 +74,9 @@ export async function executeReport(
 
   if (outputPath) {
     const fullPath = path.resolve(rootDir, outputPath);
+    if (!isPathContained(fullPath, rootDir)) {
+      throw new Error(`Report output destination must be within the project directory: ${outputPath}`);
+    }
     await fs.writeFile(fullPath, md, "utf-8");
     console.log(colors.mintClear.apply(`✔ Report saved to ${outputPath}`));
   } else {

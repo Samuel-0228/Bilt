@@ -2,8 +2,8 @@
 // Runs static, local API security analysis against local source code & OpenAPI specs.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import path from "node:path";
-import { createRequire } from "node:module";
+import { validateProjectDirectory } from "../core/safety/index.js";
+import { VERSION } from "../version.js";
 import type { ScanFinding, ScanOptions, ScanResult, Severity } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
 import { performApiScan } from "../core/api-scan/index.js";
@@ -17,27 +17,31 @@ export async function executeApiScan(
   options: ScanOptions = {}
 ): Promise<ScanResult> {
   const start = Date.now();
-  const rootDir = path.resolve(projectDir);
+  const rootDir = await validateProjectDirectory(projectDir);
   const config = await loadConfig(rootDir);
 
+  const isSilent = !!options.silent;
   const isQuiet = !!options.quiet;
   const isJson = !!options.json;
   const detailsEnabled = options.details !== false || options.verbose;
 
-  if (!isQuiet && !isJson) {
+  if (!isQuiet && !isSilent && !isJson) {
     console.log("");
-    const require = createRequire(import.meta.url);
-    const pkg = require("../../package.json") as { version: string };
-    showBliptBanner(pkg.version);
+    showBliptBanner(VERSION);
   }
 
-  const spinner = isQuiet || isJson ? null : new Spinner("Analyzing local API routes & spec files").start();
+  const spinner = isQuiet || isSilent || isJson ? null : new Spinner("Analyzing local API routes & spec files").start();
 
-  const { findings, routes } = await performApiScan(rootDir);
-
-  if (spinner) {
-    spinner.stop();
+  let scanOutput: { findings: ScanFinding[]; routes: any[] };
+  try {
+    scanOutput = await performApiScan(rootDir);
+  } finally {
+    if (spinner) {
+      spinner.stop();
+    }
   }
+
+  const { findings, routes } = scanOutput;
 
   // Enrich findings with AI explanations if missing
   for (const f of findings) {
@@ -74,7 +78,16 @@ export async function executeApiScan(
 
   if (isJson) {
     console.log(JSON.stringify(result, null, 2));
-  } else if (!isQuiet) {
+  } else if (isQuiet) {
+    if (filteredFindings.length > 0) {
+      for (const f of filteredFindings) {
+        console.log(formatFinding(f, "headline"));
+        console.log("");
+      }
+    }
+    const criticalCount = filteredFindings.filter((f) => f.severity === "critical").length;
+    if (criticalCount > 0) process.exitCode = 1;
+  } else if (!isSilent) {
     const isPlain = isPlainMode();
     const mode = detailsEnabled || isPlain ? "detail" : "headline";
 
@@ -103,6 +116,7 @@ export async function executeApiScan(
 
     console.log(`  ${parts.join(colors.slateDim.dim(" \u00B7 "))}`);
     console.log("");
+    if (criticalCount > 0) process.exitCode = 1;
   }
 
   return result;

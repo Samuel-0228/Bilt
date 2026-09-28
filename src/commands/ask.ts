@@ -28,7 +28,7 @@ export async function executeAsk(
   // 2. Perform quiet local scan to gather current context
   console.log(text.dim(`Gathering project context and scanning ${dir}...`));
   const scanResult = await executeScan(dir, {
-    quiet: true,
+    silent: true,
     retainSecrets: true,
   });
 

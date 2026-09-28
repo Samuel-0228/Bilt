@@ -11,6 +11,8 @@ import {
 } from "../core/output/types.js";
 import { colors, glyphs } from "../ui/theme.js";
 import { sanitizeSnippet } from "../core/safety/sanitizer.js";
+import { validateProjectDirectory } from "../core/safety/index.js";
+import { VERSION } from "../version.js";
 
 export interface VerifyOptions {
   base?: string;
@@ -23,14 +25,14 @@ export async function executeVerify(
   dir: string = ".",
   options: VerifyOptions = {},
 ): Promise<{ output: AgentOutput; exitCode: number }> {
-  const rootDir = path.resolve(dir);
+  const rootDir = await validateProjectDirectory(dir);
   const baseRef = options.base || "HEAD~1";
   const format = options.format || "agent";
 
   // 1. Run git-scoped scan against base ref
   const scanResult = await executeScan(rootDir, {
     base: baseRef,
-    quiet: true,
+    silent: true,
   });
 
   // 2. Map findings into Agent Finding model
@@ -65,7 +67,7 @@ export async function executeVerify(
 
   // 5. Construct Agent output
   const agentOutput = formatAgentOutput({
-    toolVersion: "1.0.5",
+    toolVersion: VERSION,
     findings: agentFindings,
     tamper: tamperFindings,
     introducedOnly: true,
@@ -81,7 +83,7 @@ export async function executeVerify(
   if (format === "agent" || format === "json") {
     console.log(JSON.stringify(agentOutput, null, 2));
   } else if (format === "sarif") {
-    const sarif = formatSarifOutput(agentOutput.findings, "1.0.5");
+    const sarif = formatSarifOutput(agentOutput.findings, VERSION);
     console.log(JSON.stringify(sarif, null, 2));
   } else {
     // Human readable text summary for CI

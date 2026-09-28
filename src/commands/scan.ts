@@ -57,27 +57,41 @@ import { formatAgentOutput } from "../core/output/formatters/agent.js";
 import { formatSarifOutput } from "../core/output/formatters/sarif.js";
 import { statusToExitCode } from "../core/output/types.js";
 import { checkLoopProgress } from "../core/loop/state.js";
-import { createRequire } from "node:module";
+import { validateProjectDirectory } from "../core/safety/index.js";
+import { VERSION } from "../version.js";
 
 // Helper to run a scan step and stream findings
 async function runScanStep(
   name: string,
-  quiet: boolean,
+  spinnerQuiet: boolean,
   action: () => Promise<ScanFinding[]>,
   detailsEnabled: boolean,
+  isSilent: boolean = false,
+  isQuiet: boolean = false,
 ): Promise<ScanFinding[]> {
-  const spinner = quiet ? null : new Spinner(name).start();
-  const stepFindings = await action();
-  if (spinner) {
-    spinner.stop();
+  const spinner = spinnerQuiet || isSilent ? null : new Spinner(name).start();
+  let stepFindings: ScanFinding[] = [];
+  try {
+    stepFindings = await action();
+  } finally {
+    if (spinner) {
+      spinner.stop();
+    }
   }
 
-  if (!quiet && stepFindings.length > 0) {
+  if (!isSilent && stepFindings.length > 0) {
     const isPlain = isPlainMode();
-    const mode = detailsEnabled || isPlain ? "detail" : "headline";
+    const mode = isQuiet
+      ? detailsEnabled && !isPlain
+        ? "headline"
+        : "headline"
+      : detailsEnabled || isPlain
+        ? "detail"
+        : "headline";
+
     for (const f of stepFindings) {
       console.log(formatFinding(f, mode));
-      if (!isPlain) {
+      if (!isPlain && !isQuiet) {
         await new Promise((resolve) => setTimeout(resolve, 60));
       }
       console.log("");
@@ -123,7 +137,7 @@ export async function executeScan(
   options: ScanOptions = {},
 ): Promise<ScanResult> {
   const start = Date.now();
-  const rootDir = path.resolve(projectDir);
+  const rootDir = await validateProjectDirectory(projectDir);
   const config = await loadConfig(rootDir);
   const findings: ScanFinding[] = [];
 
@@ -132,16 +146,25 @@ export async function executeScan(
     options.format === "agent" ||
     options.format === "sarif" ||
     options.format === "json";
-  const isQuiet = !!options.quiet || isMachineFormat;
+  const isSilent = !!options.silent || isMachineFormat;
+  const isQuiet = !!options.quiet;
   const isJson = !!options.json || options.format === "json";
   const detailsEnabled = options.details !== false;
 
-  if (!isQuiet && !isJson && !isMachineFormat) {
+  if (!isQuiet && !isSilent && !isJson && !isMachineFormat) {
     console.log("");
-    const require = createRequire(import.meta.url);
-    const pkg = require("../../package.json") as { version: string };
-    showBliptBanner(pkg.version);
+    showBliptBanner(VERSION);
   }
+
+  const runStep = (name: string, action: () => Promise<ScanFinding[]>) =>
+    runScanStep(
+      name,
+      isQuiet || isSilent || isJson,
+      action,
+      detailsEnabled,
+      isSilent,
+      isQuiet,
+    );
 
   let scannedFiles = 0;
 
@@ -159,9 +182,8 @@ export async function executeScan(
 
   try {
     // 1. Environment & Gitignore Step
-    const gitignoreStepFindings = await runScanStep(
+    const gitignoreStepFindings = await runStep(
       "Checking Git & Environment hygiene",
-      isQuiet || isJson,
       async () => {
         const envFiles = await findEnvFiles(rootDir);
         const stepFindings = await checkEnvFilesIgnoredWithGit(
@@ -182,28 +204,24 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...gitignoreStepFindings);
 
     // 2. Environment Variables Step
-    const envStepFindings = await runScanStep(
+    const envStepFindings = await runStep(
       "Checking environment variable usage",
-      isQuiet || isJson,
       async () => {
         return await performEnvScan(rootDir, config, {
           severity: options.severity,
           debug: options.debug,
         });
       },
-      detailsEnabled,
     );
     findings.push(...envStepFindings);
 
     // 3. Secret Intelligence & Credentials Step
-    const secretsStepFindings = await runScanStep(
+    const secretsStepFindings = await runStep(
       "Scanning code & history for secrets",
-      isQuiet || isJson,
       async () => {
         const stepFindings: ScanFinding[] = [];
         const scanTargets = await fg(["**/*"], {
@@ -322,14 +340,12 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...secretsStepFindings);
 
     // 3.5. Security Rule Engine Step (Deterministic Anti-Patterns)
-    const securityEngineStepFindings = await runScanStep(
+    const securityEngineStepFindings = await runStep(
       "Auditing deterministic security anti-patterns",
-      isQuiet || isJson,
       async () => {
         const stepFindings: ScanFinding[] = [];
         const ruleEngine = new SecurityRuleEngine();
@@ -389,14 +405,12 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...securityEngineStepFindings);
 
     // 3.6. API Security Scan Step (Static Local Analysis)
-    const apiScanStepFindings = await runScanStep(
+    const apiScanStepFindings = await runStep(
       "Auditing local API routes & spec files",
-      isQuiet || isJson,
       async () => {
         const { findings: apiFindings } = await performApiScan(rootDir);
         return applyOverridesAndFilter(
@@ -405,13 +419,11 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...apiScanStepFindings);
 
-    const depStepFindings = await runScanStep(
+    const depStepFindings = await runStep(
       "Auditing dependencies & lockfiles",
-      isQuiet || isJson,
       async () => {
         const stepFindings = await scanDependencies(rootDir);
         return applyOverridesAndFilter(
@@ -420,14 +432,12 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...depStepFindings);
 
     // 5. Configuration Intelligence Step
-    const configStepFindings = await runScanStep(
+    const configStepFindings = await runStep(
       "Auditing tool & deployment configurations",
-      isQuiet || isJson,
       async () => {
         const stepFindings = await scanConfigurations(rootDir);
         return applyOverridesAndFilter(
@@ -436,14 +446,12 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...configStepFindings);
 
     // 6. Performance Insights Step
-    const perfStepFindings = await runScanStep(
+    const perfStepFindings = await runStep(
       "Analyzing performance & bundle health",
-      isQuiet || isJson,
       async () => {
         const stepFindings = await scanPerformance(rootDir);
         return applyOverridesAndFilter(
@@ -452,14 +460,12 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...perfStepFindings);
 
     // 7. Plugin Execution Step
-    const pluginsStepFindings = await runScanStep(
+    const pluginsStepFindings = await runStep(
       "Running third-party plugins",
-      isQuiet || isJson,
       async () => {
         const stepFindings: ScanFinding[] = [];
         try {
@@ -484,7 +490,6 @@ export async function executeScan(
           options.severity as Severity,
         );
       },
-      detailsEnabled,
     );
     findings.push(...pluginsStepFindings);
 
@@ -559,7 +564,7 @@ export async function executeScan(
       );
 
       const agentOutput = formatAgentOutput({
-        toolVersion: "1.0.5",
+        toolVersion: VERSION,
         findings: agentFindings,
         introducedOnly: Boolean(options.changed || options.base),
         iteration: loopResult.iteration,
@@ -579,7 +584,7 @@ export async function executeScan(
           surroundingSnippet: f.preview,
         }),
       );
-      const sarif = formatSarifOutput(agentFindings, "1.0.5");
+      const sarif = formatSarifOutput(agentFindings, VERSION);
       console.log(JSON.stringify(sarif, null, 2));
       const criticalCount = scopedFindings.filter(
         (f) => f.severity === "critical",
@@ -591,7 +596,12 @@ export async function executeScan(
         (f) => f.severity === "critical",
       ).length;
       if (criticalCount > 0) process.exitCode = 1;
-    } else if (!isQuiet) {
+    } else if (isQuiet) {
+      const criticalCount = findings.filter(
+        (f) => f.severity === "critical",
+      ).length;
+      if (criticalCount > 0) process.exitCode = 1;
+    } else if (!isSilent) {
       console.log(pulseBar(score));
       console.log("");
 

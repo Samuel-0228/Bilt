@@ -6,18 +6,19 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "../config/config.js";
 import { colors, glyphs } from "../ui/theme.js";
+import { validateProjectDirectory, isPathContained } from "../core/safety/index.js";
 
 export async function executePlugin(
   action: string,
   pluginName?: string,
   options: { dir?: string } = {},
 ): Promise<void> {
-  const rootDir = path.resolve(options.dir || ".");
+  const rootDir = await validateProjectDirectory(options.dir || ".");
 
   if (action === "list") {
     const config = await loadConfig(rootDir);
     console.log("");
-    console.log(colors.vitalTeal.bold("  BILT PLUGINS"));
+    console.log(colors.vitalTeal.bold("  BILT PLUGINS (Experimental)"));
     console.log("");
     console.log("  Official Installed Plugins:");
     console.log(`    • ${colors.mintClear.apply("docker")} (built-in Docker & container auditor)`);
@@ -26,9 +27,9 @@ export async function executePlugin(
     console.log("");
 
     if (config.plugins.length === 0) {
-      console.log(colors.slateDim.dim("  No third-party plugins configured in .biltrc"));
+      console.log(colors.slateDim.dim("  No third-party plugins configured in .biltrc.json"));
     } else {
-      console.log("  Third-Party Plugins:");
+      console.log("  Configured Plugins:");
       for (const p of config.plugins) {
         console.log(`    • ${colors.vitalTeal.apply(p)}`);
       }
@@ -38,9 +39,8 @@ export async function executePlugin(
   }
 
   if (action === "install") {
-    if (!pluginName) {
-      console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Please specify a plugin name: bilt plugin install <name>"));
-      return;
+    if (!pluginName || pluginName.trim() === "") {
+      throw new Error("Please specify a plugin name: bilt plugin install <name>");
     }
 
     const configPath = path.join(rootDir, ".biltrc.json");
@@ -69,21 +69,29 @@ export async function executePlugin(
   }
 
   if (action === "create") {
-    if (!pluginName) {
-      console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Please specify a plugin name: bilt plugin create <name>"));
-      return;
+    if (!pluginName || pluginName.trim() === "") {
+      throw new Error("Please specify a plugin name: bilt plugin create <name>");
     }
 
-    const filename = `bilt-plugin-${pluginName}.ts`;
+    const safeName = pluginName.replace(/[^a-zA-Z0-9_-]/g, "");
+    if (!safeName) {
+      throw new Error(`Invalid plugin name "${pluginName}". Plugin name must contain alphanumeric characters.`);
+    }
+
+    const filename = `bilt-plugin-${safeName}.ts`;
     const targetPath = path.join(rootDir, filename);
 
-    const scaffold = `// ─── Custom Bilt Plugin: ${pluginName} ──────────────────────────────────────
+    if (!isPathContained(targetPath, rootDir)) {
+      throw new Error(`Plugin destination escapes root directory: ${targetPath}`);
+    }
+
+    const scaffold = `// ─── Custom Bilt Plugin: ${safeName} ──────────────────────────────────────
 import type { PluginManifest, PluginContext, PluginResult, ScanFinding } from "bilt-toolkit";
 
 const plugin: PluginManifest = {
-  name: "bilt-plugin-${pluginName}",
+  name: "bilt-plugin-${safeName}",
   version: "1.0.0",
-  description: "Custom health check plugin for ${pluginName}",
+  description: "Custom health check plugin for ${safeName}",
 
   async check(context: PluginContext): Promise<PluginResult> {
     const findings: ScanFinding[] = [];
@@ -105,5 +113,5 @@ export default plugin;
     return;
   }
 
-  console.log("Unknown plugin action. Available actions: list, install <name>, create <name>");
+  throw new Error(`Unknown plugin action "${action}". Available actions: list, install <name>, create <name>`);
 }

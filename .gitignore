@@ -15,3 +15,4 @@ video_intro/
 bilt-report.*
 bilt-health-card.png
 .tmp_home/
+*.tgz

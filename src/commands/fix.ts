@@ -32,6 +32,8 @@ import { SECRET_RULES } from "../core/rules/secret-rules.js";
 import { canFixFinding } from "../core/fix/can-fix.js";
 import { ALL_SECURITY_RULES } from "../core/security-engine/rules/index.js";
 
+import { validateProjectDirectory } from "../core/safety/index.js";
+
 /**
  * Execute the `bilt fix` command.
  *
@@ -45,12 +47,12 @@ export async function executeFix(
   projectDir: string,
   options: FixOptions = {},
 ): Promise<void> {
-  const rootDir = path.resolve(projectDir);
+  const rootDir = await validateProjectDirectory(projectDir);
   const config = await loadConfig(rootDir);
 
   // ── Run scan ────────────────────────────────────────────────────────
   const result = await executeScan(rootDir, {
-    quiet: true,
+    silent: true,
     debug: options.debug,
     retainSecrets: true,
   });
@@ -549,7 +551,7 @@ async function generateFixActions(
               const stepsApplied: string[] = [];
               try {
                 const { execFileSync } = await import("node:child_process");
-                execFileSync("git", ["rm", "--cached", targetFile], { cwd: rootDir, stdio: "ignore" });
+                execFileSync("git", ["rm", "--cached", "--", targetFile], { cwd: rootDir, stdio: "ignore" });
                 stepsApplied.push(`Untracked ${targetFile} from Git index`);
               } catch {
                 // Ignore if untracked or git error
@@ -570,7 +572,7 @@ async function generateFixActions(
             verify: async () => {
               try {
                 const { execFileSync } = await import("node:child_process");
-                const out = execFileSync("git", ["ls-files", targetFile], { cwd: rootDir, encoding: "utf-8" }).trim();
+                const out = execFileSync("git", ["ls-files", "--", targetFile], { cwd: rootDir, encoding: "utf-8" }).trim();
                 if (!out) {
                   return { passed: true, message: `Verified ${targetFile} is untracked from Git.` };
                 }

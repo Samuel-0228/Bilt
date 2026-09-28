@@ -40,15 +40,24 @@ import {
   spinnerFrames,
 } from "./ui/theme.js";
 import { severityIcon, formatFinding, formatHealthScore } from "./ui/format.js";
+import { VERSION } from "./version.js";
+import { redactKnownSecrets } from "./core/safety/sanitizer.js";
+
+// ─── Process Signal Handlers ─────────────────────────────────────────────────
+
+process.on("SIGINT", () => {
+  process.stderr.write("\n");
+  process.exit(130);
+});
+
+process.on("SIGTERM", () => {
+  process.stderr.write("\n");
+  process.exit(143);
+});
 
 // ─── Color Support ───────────────────────────────────────────────────────────
 
 initColorSupport();
-
-// ─── Version ─────────────────────────────────────────────────────────────────
-
-const require = createRequire(import.meta.url);
-const pkg = require("../package.json") as { version: string };
 
 // ─── Program Setup ───────────────────────────────────────────────────────────
 
@@ -82,7 +91,7 @@ program
   .description(
     "Zero-configuration project health toolkit. Catch secrets, fix env issues, and keep your repo clean.",
   )
-  .version(pkg.version, "-v, --version")
+  .version(VERSION, "-v, --version")
   .option("--no-color", "Disable colored output")
   .option(
     "--plain",
@@ -130,17 +139,30 @@ program
 program
   .command("explain")
   .description("Explain production-readiness concepts and inspection guidelines")
-  .argument("[category]", "Category to explain (e.g. auth, authorization, secrets, api)")
-  .action(async (category?: string) => {
-    try {
-      const { executeExplain } = await import("./commands/explain.js");
-      const exitCode = await executeExplain(category);
-      process.exitCode = exitCode;
-    } catch (error) {
-      printError(error);
-      process.exitCode = 2;
-    }
-  });
+  .argument(
+    "[target]",
+    "Category or Rule ID to explain (e.g. auth, authorization, RULE-SEC-001)",
+  )
+  .option("--json", "Output explanation as JSON")
+  .option("--format <format>", "Output format: text, json, agent", "text")
+  .action(
+    async (
+      target?: string,
+      opts?: { json?: boolean; format?: "text" | "json" | "agent" },
+    ) => {
+      try {
+        const { executeExplain } = await import("./commands/explain.js");
+        const exitCode = await executeExplain(target, {
+          json: opts?.json,
+          format: opts?.format,
+        });
+        process.exitCode = exitCode;
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
 
 // ─── bilt accept-risk ───────────────────────────────────────────────────────
 
@@ -268,15 +290,17 @@ program
             : undefined,
         });
 
-        // Exit code based on findings
-        const criticals = result.findings.filter(
-          (f) => f.severity === "critical",
-        ).length;
-        if (criticals > 0) {
-          process.exitCode = 1;
+        // Exit code based on findings (preserve agent and sarif status exit codes)
+        if (opts.format !== "agent" && opts.format !== "sarif") {
+          const criticals = result.findings.filter(
+            (f) => f.severity === "critical",
+          ).length;
+          if (criticals > 0) {
+            process.exitCode = 1;
+          }
         }
       } catch (error) {
-        printError(error);
+        printError(error, opts.debug);
         process.exitCode = 2;
       }
     },
@@ -815,15 +839,17 @@ program
 // ─── Error Handler ───────────────────────────────────────────────────────────
 
 function printError(error: unknown, debug?: boolean): void {
-  const message = error instanceof Error ? error.message : String(error);
+  const isDebug = debug || process.env.DEBUG === "1" || process.env.DEBUG === "true";
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const message = redactKnownSecrets(rawMessage);
   console.error("");
   console.error(
     colors.pulseCoral.bold(`  ${glyphs.critical} Error: ${message}`),
   );
-  if (debug && error instanceof Error && error.stack) {
-    const stackLines = error.stack.split("\n").slice(1, 4);
+  if (isDebug && error instanceof Error && error.stack) {
+    const stackLines = error.stack.split("\n").slice(1, 6);
     for (const line of stackLines) {
-      console.error(colors.slateDim.dim(`  ${line.trim()}`));
+      console.error(colors.slateDim.dim(`  ${redactKnownSecrets(line.trim())}`));
     }
   }
   console.error("");

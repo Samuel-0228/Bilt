@@ -9,7 +9,7 @@ export async function executeBaselineCreate(
   options: { json?: boolean } = {},
 ): Promise<string> {
   const rootDir = path.resolve(dir);
-  const scanResult = await executeScan(rootDir, { quiet: true });
+  const scanResult = await executeScan(rootDir, { silent: true });
 
   const fingerprints = scanResult.findings.map((f) => {
     const af = toAgentFinding(f);

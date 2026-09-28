@@ -2,15 +2,12 @@
 // Main production-readiness verification command for AI-built software.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import path from "node:path";
-import { createRequire } from "node:module";
 import { runChecks } from "../core/readiness/check-runner.js";
 import { formatHumanOutput } from "../core/readiness/formatters/human.js";
 import { formatAgentCheckOutput } from "../core/readiness/formatters/agent.js";
 import type { ReadinessCategory } from "../core/readiness/taxonomy.js";
-
-const require = createRequire(import.meta.url);
-const pkg = require("../../package.json") as { version: string };
+import { validateProjectDirectory } from "../core/safety/index.js";
+import { VERSION } from "../version.js";
 
 export interface CheckCommandOptions {
   format?: "human" | "agent" | "json";
@@ -23,7 +20,7 @@ export async function executeCheck(
   dir: string = ".",
   options: CheckCommandOptions = {},
 ): Promise<number> {
-  const targetDir = path.resolve(dir);
+  const targetDir = await validateProjectDirectory(dir);
   const format = options.format || "human";
 
   const selectedCategories = options.categories
@@ -39,7 +36,7 @@ export async function executeCheck(
   });
 
   if (format === "agent" || format === "json") {
-    const agentOutput = formatAgentCheckOutput(result, pkg.version);
+    const agentOutput = formatAgentCheckOutput(result, VERSION);
     console.log(JSON.stringify(agentOutput, null, 2));
   } else {
     const humanOutput = formatHumanOutput(result);

@@ -2,6 +2,7 @@
 // Single source of truth for all visual output in Bilt.
 // No chalk calls should exist outside this file.
 
+import readline from "node:readline";
 import chalk from "chalk";
 import type { Severity } from "../types/index.js";
 
@@ -293,6 +294,10 @@ export class Spinner {
       this.frameIndex++;
     }, 80);
 
+    if (typeof this.interval.unref === "function") {
+      this.interval.unref();
+    }
+
     return this;
   }
 
@@ -302,7 +307,12 @@ export class Spinner {
       this.interval = null;
     }
     if (!_plainMode) {
-      process.stderr.write("\r" + " ".repeat(80) + "\r");
+      if (process.stderr.isTTY) {
+        readline.clearLine(process.stderr, 0);
+        readline.cursorTo(process.stderr, 0);
+      } else {
+        process.stderr.write("\r");
+      }
     }
   }
 

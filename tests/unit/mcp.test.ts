@@ -8,7 +8,9 @@ describe("Model Context Protocol (MCP) Server", () => {
     expect(toolNames).toContain("bilt_check");
     expect(toolNames).toContain("bilt_explain");
     expect(toolNames).toContain("bilt_list_rules");
-    expect(MCP_TOOLS.length).toBe(3);
+    expect(toolNames).toContain("bilt_scan");
+    expect(toolNames).toContain("bilt_doctor");
+    expect(MCP_TOOLS.length).toBe(5);
   });
 
   it("should execute bilt_list_rules and return rule definitions", async () => {

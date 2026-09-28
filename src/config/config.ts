@@ -44,13 +44,6 @@ const explorer = cosmiconfig("bilt", {
     ".biltrc.json",
     ".biltrc.yaml",
     ".biltrc.yml",
-    ".biltrc.js",
-    ".biltrc.cjs",
-    ".biltrc.mjs",
-    "bilt.config.js",
-    "bilt.config.cjs",
-    "bilt.config.mjs",
-    "bilt.config.ts",
   ],
 });
 

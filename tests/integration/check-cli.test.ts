@@ -49,9 +49,9 @@ describe("bilt check CLI Integration", () => {
 
   it("should explain authentication concept via bilt explain auth", async () => {
     const { stdout } = await execa("node", [CLI_PATH, "explain", "auth"]);
-    expect(stdout).toContain("# Authentication");
-    expect(stdout).toContain("## What It Is");
-    expect(stdout).toContain("## What Bilt Can Verify");
+    expect(stdout).toContain("Authentication");
+    expect(stdout).toContain("What It Is");
+    expect(stdout).toContain("What Bilt can verify");
   });
 
   it("should forbid risk acceptance on mandatory category (Section 8B)", async () => {

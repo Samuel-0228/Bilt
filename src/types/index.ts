@@ -306,6 +306,7 @@ export interface ScanOptions {
   severity?: Severity;
   verbose?: boolean;
   quiet?: boolean;
+  silent?: boolean;
   dryRun?: boolean;
   fun?: boolean;
   details?: boolean;

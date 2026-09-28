@@ -39,7 +39,7 @@ export async function executeWatch(
   // ── Initial live baseline ─────────────────────────────────────────
   if (options.live !== false) {
     const baseline = await executeScan(rootDir, {
-      quiet: true,
+      silent: true,
       noVerify: true,
     });
 

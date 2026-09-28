@@ -1,11 +1,11 @@
 import { simpleGit } from "simple-git";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface AffectedCommit {
   hash: string;
@@ -206,8 +206,20 @@ walk('.');
 
   try {
     const scriptPath = tmpFile.replace(/\\/g, "/");
-    const cmd = `git filter-branch --force --tree-filter "node \\\"${scriptPath}\\\"" --tag-name-filter cat -- --all`;
-    await execAsync(cmd, { cwd: rootDir });
+    await execFileAsync(
+      "git",
+      [
+        "filter-branch",
+        "--force",
+        "--tree-filter",
+        `node "${scriptPath}"`,
+        "--tag-name-filter",
+        "cat",
+        "--",
+        "--all",
+      ],
+      { cwd: rootDir },
+    );
 
     const git = simpleGit(rootDir);
     const refsRaw = await git.raw(["for-each-ref", "--format=%(refname)", "refs/original/"]);

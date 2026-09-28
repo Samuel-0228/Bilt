@@ -7,7 +7,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import type { AIProviderId } from "./types.js";
 
-const BILT_DIR = path.join(os.homedir(), ".bilt");
+const BILT_DIR = process.env.BILT_HOME || path.join(os.homedir(), ".bilt");
 const CREDENTIALS_FILE = path.join(BILT_DIR, "credentials");
 const SECRET_KEY_FILE = path.join(BILT_DIR, ".key");
 

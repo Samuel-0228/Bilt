@@ -120,7 +120,7 @@ export async function executeInit(projectDir: string): Promise<void> {
 
   // ── Re-run scan to get updated results ──────────────────────────────
   const updatedResult =
-    fixesApplied > 0 ? await executeScan(rootDir, { quiet: true }) : result;
+    fixesApplied > 0 ? await executeScan(rootDir, { silent: true }) : result;
 
   // ── Report ──────────────────────────────────────────────────────────
   await reportInitComplete(updatedResult, fixesApplied);

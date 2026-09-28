@@ -15,7 +15,8 @@ import {
   showBliptBanner,
   text,
 } from "../ui/theme.js";
-import { createRequire } from "node:module";
+import { validateProjectDirectory } from "../core/safety/index.js";
+import { VERSION } from "../version.js";
 
 export function getOWASPMapping(f: ScanFinding): { id: string; name: string } {
   if (f.owaspMapping) {
@@ -63,10 +64,10 @@ export async function executeDoctor(
   projectDir: string,
   options: { card?: boolean; owasp?: boolean; fun?: boolean; debug?: boolean } = {},
 ): Promise<void> {
-  const rootDir = path.resolve(projectDir);
+  const rootDir = await validateProjectDirectory(projectDir);
 
   const result = await executeScan(rootDir, {
-    quiet: true,
+    silent: true,
     fullHistory: true,
     debug: options.debug,
   });
@@ -110,8 +111,19 @@ export async function executeDoctor(
       console.log(colors.slateDim.apply("  Share this card on social media:"));
       console.log(colors.vitalTeal.bold(`  Score: ${healthScore}/100 — scanned with bilt \u2192 bilt.dev`));
       console.log("");
-    } catch (err: any) {
-      console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Failed to generate card PNG: " + err.message));
+    } catch {
+      // Graceful fallback to SVG if optional sharp dependency is not installed
+      try {
+        const { promises: fsPromises } = await import("node:fs");
+        const svgPath = path.join(rootDir, "bilt-health-card.svg");
+        await fsPromises.writeFile(svgPath, cardSvg, "utf-8");
+        console.log("");
+        console.log(colors.mintClear.apply("  " + glyphs.fixed + " Generated card: " + svgPath));
+        console.log(colors.slateDim.dim("  (Install optional dependency 'sharp' to export as PNG)"));
+        console.log("");
+      } catch (err: any) {
+        console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Failed to generate card: " + err.message));
+      }
     }
     return;
   }
@@ -124,9 +136,7 @@ export async function executeDoctor(
   };
 
   console.log("");
-  const require = createRequire(import.meta.url);
-  const pkg = require("../../package.json") as { version: string };
-  showBliptBanner(pkg.version);
+  showBliptBanner(VERSION);
   await maybeSleep();
   console.log("");
   console.log(colors.vitalTeal.bold("  BILT DOCTOR \u2014 Repository Health Report"));

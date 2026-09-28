@@ -1,20 +1,33 @@
 // ─── Plugin Loader ───────────────────────────────────────────────────────────
-// Discovers, loads, and validates plugins from node_modules and config paths.
+// Discovers, loads, and validates plugins from explicit config paths and built-ins.
+// Untrusted code is never executed without explicit declaration in config.plugins.
 
 import { createRequire } from "node:module";
 import path from "node:path";
-import { promises as fs } from "node:fs";
 import type { BiltConfig, PluginManifest } from "../types/index.js";
 import { validatePlugin } from "./interface.js";
+import dockerPlugin from "./official/docker.js";
+import terraformPlugin from "./official/terraform.js";
+import prismaPlugin from "./official/prisma.js";
 
 const require = createRequire(import.meta.url);
 
+const OFFICIAL_PLUGINS: Record<string, PluginManifest> = {
+  docker: dockerPlugin,
+  "bilt-plugin-docker": dockerPlugin,
+  terraform: terraformPlugin,
+  "bilt-plugin-terraform": terraformPlugin,
+  prisma: prismaPlugin,
+  "bilt-plugin-prisma": prismaPlugin,
+};
+
 /**
- * Load all plugins from:
- * 1. `bilt-plugin-*` packages in node_modules
- * 2. Explicit paths in config.plugins
+ * Load all explicitly configured plugins from:
+ * 1. Official built-in plugins (docker, terraform, prisma)
+ * 2. Explicit paths/packages declared in config.plugins
  *
- * Each module is dynamically imported and validated at runtime.
+ * Security Invariant: Never automatically executes arbitrary code found in node_modules
+ * without explicit declaration in config.plugins.
  */
 export async function loadPlugins(
   config: BiltConfig,
@@ -23,51 +36,38 @@ export async function loadPlugins(
   const plugins: PluginManifest[] = [];
   const seen = new Set<string>();
 
-  // ── 1. Discover bilt-plugin-* in node_modules ────────────────────────
-  const nodeModulesDir = path.join(rootDir, "node_modules");
-  try {
-    const entries = await fs.readdir(nodeModulesDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory() && entry.name.startsWith("bilt-plugin-")) {
-        const pluginPath = path.join(nodeModulesDir, entry.name);
-        const loaded = await tryLoadPlugin(pluginPath);
-        if (loaded && !seen.has(loaded.name)) {
-          seen.add(loaded.name);
-          plugins.push(loaded);
-        }
-      }
-
-      // Also check @bilt/ scoped packages
-      if (entry.isDirectory() && entry.name === "@bilt") {
-        const scopedDir = path.join(nodeModulesDir, "@bilt");
-        try {
-          const scopedEntries = await fs.readdir(scopedDir, {
-            withFileTypes: true,
-          });
-          for (const se of scopedEntries) {
-            if (se.isDirectory() && se.name.startsWith("plugin-")) {
-              const pluginPath = path.join(scopedDir, se.name);
-              const loaded = await tryLoadPlugin(pluginPath);
-              if (loaded && !seen.has(loaded.name)) {
-                seen.add(loaded.name);
-                plugins.push(loaded);
-              }
-            }
-          }
-        } catch {
-          // Scoped directory not readable
-        }
-      }
-    }
-  } catch {
-    // node_modules doesn't exist — fine
+  if (!Array.isArray(config.plugins) || config.plugins.length === 0) {
+    return plugins;
   }
 
-  // ── 2. Load explicit plugin paths from config ────────────────────────
   for (const pluginRef of config.plugins) {
-    const resolved = path.isAbsolute(pluginRef)
-      ? pluginRef
-      : path.resolve(rootDir, pluginRef);
+    if (!pluginRef || typeof pluginRef !== "string") continue;
+
+    const trimmed = pluginRef.trim();
+
+    // 1. Check official built-in plugins first
+    if (OFFICIAL_PLUGINS[trimmed]) {
+      const official = OFFICIAL_PLUGINS[trimmed]!;
+      if (!seen.has(official.name)) {
+        seen.add(official.name);
+        plugins.push(official);
+      }
+      continue;
+    }
+
+    // 2. Resolve explicit file path or node_modules package
+    let resolved = trimmed;
+    if (trimmed.startsWith("./") || trimmed.startsWith("../") || path.isAbsolute(trimmed)) {
+      resolved = path.isAbsolute(trimmed) ? trimmed : path.resolve(rootDir, trimmed);
+    } else {
+      // Check node_modules in rootDir
+      const inNodeModules = path.join(rootDir, "node_modules", trimmed);
+      try {
+        resolved = inNodeModules;
+      } catch {
+        resolved = trimmed;
+      }
+    }
 
     const loaded = await tryLoadPlugin(resolved);
     if (loaded && !seen.has(loaded.name)) {
@@ -80,19 +80,17 @@ export async function loadPlugins(
 }
 
 /**
- * Attempt to dynamically import a plugin from a given path, validate, return.
+ * Attempt to dynamically import a plugin from a given path, validate, and return.
  * Returns null if loading fails or validation fails.
  */
 async function tryLoadPlugin(
   pluginPath: string,
 ): Promise<PluginManifest | null> {
   try {
-    // Try dynamic import (ESM)
     let mod: unknown;
     try {
       mod = await import(pluginPath);
     } catch {
-      // Fallback to require (CJS)
       try {
         mod = require(pluginPath) as unknown;
       } catch {
