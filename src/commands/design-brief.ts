@@ -1,21 +1,173 @@
-import { readDesignBrief, writeDesignBrief } from "../core/design/brief/storage.js";
-import { runDesignBriefQuestionnaire } from "../core/design/brief/questionnaire.js";
-import type { DesignBriefAgentOutput, DesignConstraintType } from "../core/design/brief/types.js";
+import {
+  readDesignBrief,
+  writeDesignBrief,
+  clearDesignBrief,
+} from "../core/design/brief/storage.js";
+import {
+  runDesignBriefQuestionnaire,
+  parseColorInput,
+} from "../core/design/brief/questionnaire.js";
+import type {
+  DesignBrief,
+  DesignBriefAgentOutput,
+  DesignConstraintType,
+  CreativeFreedom,
+  DesignBriefField,
+} from "../core/design/brief/types.js";
+import { colors, text, divider } from "../ui/theme.js";
+
+export interface ExecuteDesignBriefOptions {
+  format?: "human" | "agent";
+  nonInteractive?: boolean;
+  interactive?: boolean;
+  purpose?: string;
+  visual?: string;
+  colors?: string;
+  feeling?: string;
+  creativeFreedom?: CreativeFreedom;
+  json?: string;
+}
 
 export async function executeDesignBrief(
   dir: string,
   subcommand: string | undefined,
-  options: { format?: "human" | "agent"; nonInteractive?: boolean }
+  options: ExecuteDesignBriefOptions = {},
 ): Promise<number> {
   const isAgent = options.format === "agent";
+  const normalizedSubcommand = subcommand?.toLowerCase();
+
+  // ─── Subcommand: clear ────────────────────────────────────────────────────
+  if (normalizedSubcommand === "clear") {
+    await clearDesignBrief(dir);
+    if (isAgent) {
+      console.log(JSON.stringify(formatAgentOutput(null), null, 2));
+    } else {
+      console.log(colors.mintClear.apply("  ✓ Cleared Bilt Design Brief (.bilt/design-brief.json)"));
+    }
+    return 0;
+  }
+
+  // ─── Subcommand: set ──────────────────────────────────────────────────────
+  if (normalizedSubcommand === "set") {
+    let briefToSave: DesignBrief;
+
+    if (options.json) {
+      try {
+        const parsed = JSON.parse(options.json);
+        const now = new Date().toISOString();
+        briefToSave = {
+          schemaVersion: "1",
+          createdAt: parsed.createdAt || now,
+          updatedAt: now,
+          purpose: parsed.purpose?.value !== undefined ? parsed.purpose : {
+            value: parsed.purpose || null,
+            source: parsed.purpose ? "developer" : "not-provided",
+          },
+          audience: parsed.audience?.value !== undefined ? parsed.audience : {
+            value: parsed.audience || null,
+            source: parsed.audience ? "developer" : "not-provided",
+          },
+          visualDirection: parsed.visualDirection?.value !== undefined ? parsed.visualDirection : {
+            value: parsed.visualDirection ? (Array.isArray(parsed.visualDirection) ? parsed.visualDirection : [parsed.visualDirection]) : null,
+            source: parsed.visualDirection ? "developer" : "not-provided",
+          },
+          brandColors: parsed.brandColors?.value !== undefined ? parsed.brandColors : {
+            value: parsed.brandColors ? (Array.isArray(parsed.brandColors) ? parsed.brandColors : parseColorInput(parsed.brandColors)) : null,
+            source: parsed.brandColors ? "developer" : "not-provided",
+            type: "requirement",
+          },
+          desiredFeeling: parsed.desiredFeeling?.value !== undefined ? parsed.desiredFeeling : {
+            value: parsed.desiredFeeling ? (Array.isArray(parsed.desiredFeeling) ? parsed.desiredFeeling : [parsed.desiredFeeling]) : null,
+            source: parsed.desiredFeeling ? "developer" : "not-provided",
+          },
+          creativeFreedom: parsed.creativeFreedom || "balanced",
+        };
+      } catch (err) {
+        console.error(colors.pulseCoral.apply("Invalid JSON provided for --json"));
+        return 1;
+      }
+    } else {
+      const isSurprise = (val?: string) => {
+        if (!val) return false;
+        const norm = val.trim().toLowerCase();
+        return norm === "surprise me" || norm === "surprise";
+      };
+
+      const purposeField: DesignBriefField<string | null> = options.purpose
+        ? isSurprise(options.purpose)
+          ? { value: null, source: "creative-freedom" }
+          : { value: options.purpose.trim(), source: "developer" }
+        : { value: null, source: "not-provided" };
+
+      const visualField: DesignBriefField<string[] | null> = options.visual
+        ? isSurprise(options.visual)
+          ? { value: null, source: "creative-freedom" }
+          : { value: options.visual.split(/[\s,]+/).filter(Boolean), source: "developer" }
+        : { value: null, source: "not-provided" };
+
+      const colorsField: DesignBriefField<string[] | null> = options.colors
+        ? isSurprise(options.colors)
+          ? { value: null, source: "creative-freedom" }
+          : {
+              value: parseColorInput(options.colors),
+              source: "developer",
+              type: "requirement",
+            }
+        : { value: null, source: "not-provided" };
+
+      const feelingField: DesignBriefField<string[] | null> = options.feeling
+        ? isSurprise(options.feeling)
+          ? { value: null, source: "creative-freedom" }
+          : { value: options.feeling.split(/[\s,]+/).filter(Boolean), source: "developer" }
+        : { value: null, source: "not-provided" };
+
+      const surprises = [purposeField, visualField, colorsField, feelingField].filter(
+        (f) => f.source === "creative-freedom",
+      ).length;
+      const devs = [purposeField, visualField, colorsField, feelingField].filter(
+        (f) => f.source === "developer",
+      ).length;
+
+      let freedom: CreativeFreedom = options.creativeFreedom || "balanced";
+      if (!options.creativeFreedom) {
+        if (surprises > devs) freedom = "creative";
+        else if (devs > 0) freedom = "guided";
+      }
+
+      const now = new Date().toISOString();
+      briefToSave = {
+        schemaVersion: "1",
+        createdAt: now,
+        updatedAt: now,
+        purpose: purposeField,
+        audience: { value: null, source: "not-provided" },
+        visualDirection: visualField,
+        brandColors: colorsField,
+        desiredFeeling: feelingField,
+        creativeFreedom: freedom,
+      };
+    }
+
+    await writeDesignBrief(dir, briefToSave);
+    if (isAgent) {
+      console.log(JSON.stringify(formatAgentOutput(briefToSave), null, 2));
+    } else {
+      console.log(colors.mintClear.apply("  ✓ Successfully saved Bilt Design Brief to .bilt/design-brief.json\n"));
+      printHumanBrief(briefToSave);
+    }
+    return 0;
+  }
+
   let brief = await readDesignBrief(dir);
 
-  // Agent mode is always non-interactive: output stable JSON immediately
+  // ─── Agent Mode ───────────────────────────────────────────────────────────
+  // Always non-interactive: output stable JSON immediately
   if (isAgent) {
     console.log(JSON.stringify(formatAgentOutput(brief), null, 2));
     return 0;
   }
 
+  // ─── Explicit Non-Interactive Mode ────────────────────────────────────────
   if (options.nonInteractive) {
     if (brief) {
       printHumanBrief(brief);
@@ -26,7 +178,23 @@ export async function executeDesignBrief(
     return 0;
   }
 
-  if (subcommand === "edit" || (!subcommand && !brief)) {
+  // ─── Interactive Questionnaire ───────────────────────────────────────────
+  if (normalizedSubcommand === "edit" || (!normalizedSubcommand && !brief)) {
+    // If not running in an interactive TTY and not forced, do not hang on readline
+    if (!process.stdin.isTTY && !options.interactive) {
+      if (brief) {
+        printHumanBrief(brief);
+      } else {
+        console.log("No Bilt Design Brief exists.");
+        console.log("Interactive questionnaire requires a TTY terminal.");
+        console.log("To configure a design brief:");
+        console.log("  • In an interactive terminal: run 'npx bilt design-brief'");
+        console.log("  • In an AI coding agent: ask the developer in chat, then run 'npx bilt design-brief set ...'");
+        console.log("Design creativity remains agent-controlled.");
+      }
+      return 0;
+    }
+
     const newBrief = await runDesignBriefQuestionnaire(dir);
     if (newBrief) {
       await writeDesignBrief(dir, newBrief);
@@ -37,22 +205,20 @@ export async function executeDesignBrief(
     }
   }
 
-  if (subcommand === "show" || (!subcommand && brief)) {
-    if (isAgent) {
-      console.log(JSON.stringify(formatAgentOutput(brief), null, 2));
+  // ─── Show Brief ───────────────────────────────────────────────────────────
+  if (normalizedSubcommand === "show" || (!normalizedSubcommand && brief)) {
+    if (brief) {
+      printHumanBrief(brief);
     } else {
-      if (brief) {
-        printHumanBrief(brief);
-      } else {
-        console.log("No Bilt Design Brief exists.");
-      }
+      console.log("No Bilt Design Brief exists.");
+      console.log("Design creativity remains agent-controlled.");
     }
   }
 
   return 0;
 }
 
-function formatAgentOutput(brief: any): DesignBriefAgentOutput {
+function formatAgentOutput(brief: DesignBrief | null): DesignBriefAgentOutput {
   if (!brief) {
     return {
       schemaVersion: "1",
@@ -64,7 +230,18 @@ function formatAgentOutput(brief: any): DesignBriefAgentOutput {
       brandColors: null,
       desiredFeeling: null,
       constraints: [],
-      agentInstructions: "No Bilt Design Brief exists. You are free to use your own design judgment.\\nAvoid stacking recognizable AI/template patterns unnecessarily.\\nRun bilt design-check before declaring the UI complete.\\nIf bilt design-check produces identical findings across 3 runs, STOP and request developer input."
+      agentInstructions:
+        "No Bilt Design Brief exists (`configured: false`).\n" +
+        "CRITICAL HUMAN-INTENT BOUNDARY:\n" +
+        "1. Do NOT autonomously fabricate or guess answers to populate `.bilt/design-brief.json`.\n" +
+        "2. If the user asked you to use, set up, or follow a design brief: PAUSE execution and present the 4 questionnaire questions directly to the developer in chat:\n" +
+        "   Q1 (Purpose): What is the main purpose of this product, and who is it for?\n" +
+        "   Q2 (Visual Direction): What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', Custom)\n" +
+        "   Q3 (Brand Colors): Do you have brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n" +
+        "   Q4 (Desired Feeling): What should the interface feel like? (Trustworthy, calm, energetic, technical, or 'Surprise me')\n" +
+        "   After the developer responds, record their exact answers via `npx bilt design-brief set --purpose ... --visual ... --colors ... --feeling ...` (or write `.bilt/design-brief.json`).\n" +
+        "3. If the user did NOT request a design brief, design creativity remains agent-controlled. Avoid generic AI/vibecoded patterns.\n" +
+        "4. Run `bilt design-check` before declaring UI complete. If identical findings persist across 3 runs, STOP and ask the developer.",
     };
   }
 
@@ -83,13 +260,21 @@ function formatAgentOutput(brief: any): DesignBriefAgentOutput {
     brandColors: brief.brandColors.value ? [...brief.brandColors.value].sort() : null,
     desiredFeeling: brief.desiredFeeling.value ? [...brief.desiredFeeling.value].sort() : null,
     constraints,
-    agentInstructions: "Before making major UI decisions, read this design brief.\\nUse it as design direction, not a rigid component specification.\\nPreserve creative freedom where this brief does not specify a preference.\\nDo not blindly copy these preferences into every component.\\nRun bilt design-check after implementation.\\nIf Bilt reports a conflict with this brief, evaluate the evidence before changing the design.\\nIf bilt design-check produces identical findings across 3 runs, STOP and request developer input."
+    agentInstructions:
+      "A Bilt Design Brief is configured by the developer (`configured: true`).\n" +
+      "1. Before making major UI decisions, read this design brief and follow the developer's authentic design direction.\n" +
+      "2. Use it as design direction, not a rigid component specification.\n" +
+      "3. Preserve creative freedom where this brief does not specify a preference or indicates 'Surprise me' (`creative-freedom`).\n" +
+      "4. Do NOT overwrite or modify `.bilt/design-brief.json` autonomously.\n" +
+      "5. Run `bilt design-check` after implementation.\n" +
+      "6. If Bilt reports a conflict with this brief, evaluate the evidence before changing the design.\n" +
+      "7. If `bilt design-check` produces identical findings across 3 runs, STOP and request developer input.",
   };
 }
 
-function printHumanBrief(brief: any) {
-  console.log("BILT DESIGN BRIEF");
-  console.log("─────────────────────────────\\n");
+function printHumanBrief(brief: DesignBrief) {
+  console.log("\nBILT DESIGN BRIEF");
+  console.log("─────────────────────────────\n");
 
   const fmt = (field: any) => {
     if (field.source === "not-provided") return "Not specified";
@@ -103,5 +288,5 @@ function printHumanBrief(brief: any) {
   console.log(`Visual:       ${fmt(brief.visualDirection)}`);
   console.log(`Colors:       ${fmt(brief.brandColors)}`);
   console.log(`Feeling:      ${fmt(brief.desiredFeeling)}`);
-  console.log(`Creative:     ${brief.creativeFreedom}`);
+  console.log(`Creative:     ${brief.creativeFreedom}\n`);
 }
