@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5] - 2026-10-03
+
+### Added & Enhanced - Anti-Passive Auditor Trap Architecture
+
+- **Action Plan in Readiness Check**: Enhanced `bilt check` human output with an explicit, high-visibility `ACTION PLAN FOR DEVELOPERS & AI CODING AGENTS` detailing runnable commands (`bilt design-check --fix`, `bilt fix --safe`, `bilt baseline create`, `bilt design-brief --format agent`, `bilt explain <rule>`).
+- **Machine-Readable Agent Directive**: Enhanced `bilt check --format agent` JSON output with top-level `agentInstruction` and structured `actionPlan` arrays containing executable bash commands and remediation reasons.
+- **Autonomous Agent Remediation Protocol**: Codified the mandatory `AUTONOMOUS REMEDIATION PROTOCOL (DO NOT MERELY REPORT AND HALT)` across `AGENTS.md`, `templates/default.md`, `templates/claude.md`, `templates/cursor.md`, and `init-agent.ts`.
+- **Integrated Agent Onboarding in `init`**: `bilt init` now automatically scaffolds `AGENTS.md` and agent hooks alongside `.gitignore` and `.env.example`, unifying repository hygiene and agent governance into a single command.
+- **Reporter Next Steps**: Updated `bilt init` completion output to highlight `check`, `baseline`, and `design-check --fix`.
+
 ## [1.1.2] - 2026-09-28
 
 ### Fixed

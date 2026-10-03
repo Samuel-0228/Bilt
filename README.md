@@ -768,12 +768,16 @@ Add verification rules to `AGENTS.md` or `.cursorrules`:
 # Agent Verification Guidelines
 
 Install: `npm install -D bilt-toolkit`
-Execute: `npx bilt verify --base origin/main --format agent`
+Execute: `npx bilt check --format agent` (or `npx bilt verify --base origin/main --format agent`)
 
-1. Before completing tasks or proposing commits, run `npx bilt verify --base origin/main --format agent`.
-2. Remediate ONLY findings marked with `"introduced_by_change": true`.
-3. Never weaken `.biltrc` or add unapproved blanket ignores.
-4. If output status is `"escalate"` (exit code 4), stop immediately and request human review.
+1. Before completing tasks or proposing commits, run verification.
+2. DO NOT merely summarize findings and quit:
+   - Run `npx bilt design-check --fix` and `npx bilt fix --safe` for auto-fixable issues.
+   - Run `npx bilt baseline create` if onboarding an existing codebase with legacy debt.
+   - Query `npx bilt design-brief --format agent` before modifying UI.
+3. Remediate ONLY findings marked with `"introduced_by_change": true`.
+4. Never weaken `.biltrc` or add unapproved blanket ignores.
+5. If output status is `"escalate"` (exit code 4), stop immediately and request human review.
 ```
 
 ### Model Context Protocol (MCP) Server

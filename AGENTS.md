@@ -60,7 +60,49 @@ npx bilt scan --format agent --changed
 
 ---
 
-## 4. DESIGN QUALITY REQUIREMENT
+## 4. AUTONOMOUS REMEDIATION PROTOCOL (DO NOT MERELY REPORT AND HALT)
+
+**CRITICAL INSTRUCTION FOR CODING AGENTS**:
+Do NOT merely print a summary of findings and stop. A result of `NOT READY` or `NEEDS REVIEW` is an active engineering instruction, not a stopping point.
+When Bilt reports findings, you MUST execute the following remediation loop:
+
+1. **Auto-Fix Immediate Issues**:
+   Before manual changes, immediately run:
+   ```bash
+   npx bilt design-check --fix
+   npx bilt fix --safe
+   ```
+   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, and `.env` drift.
+
+2. **Handle Pre-Existing Codebase Debt (Baselining)**:
+   If you were asked to onboard Bilt to an existing codebase and findings belong to pre-existing architecture (e.g. database backup strategy, Sentry monitoring, PII policies):
+   ```bash
+   npx bilt baseline create
+   ```
+   This captures existing debt into `.bilt/baseline.json` so you and future agents focus solely on diffs introduced by current tasks (`introduced_by_change: true`).
+
+3. **Follow the Design Brief for UI Changes**:
+   If design quality issues are flagged (`design-genericity`, uniform card grids, typography):
+   - Check `npx bilt design-brief --format agent`.
+   - If `configured: false`, PAUSE and ask the developer the 4 Design Intent questions.
+   - Refactor repetitive generic AI tropes into intentional, distinctive UI.
+   - Run `npx bilt design-check` until clean.
+
+4. **Investigate Guided Requirements**:
+   For architectural findings (authorization, error monitoring, database recovery):
+   - Run `npx bilt explain <category>` (e.g. `npx bilt explain monitoring-rollback`) for implementation guides and code snippets.
+   - Implement the required pattern, or if the user intentionally defers it, guide the user to run `npx bilt accept-risk <ruleId> --reason "..." --owner "..."`.
+
+5. **Re-Verify Before Declaring Completion**:
+   Always re-run:
+   ```bash
+   npx bilt check --format agent
+   ```
+   Do not declare the task complete until the status reaches `production-ready` (exit code 0) or all remaining issues have been addressed with the user.
+
+---
+
+## 5. DESIGN QUALITY REQUIREMENT
 
 Do not default to recognizable AI-generated website patterns.
 
@@ -80,7 +122,7 @@ Do not remove or weaken Bilt rules simply to obtain a passing result.
 
 ---
 
-## 5. DESIGN BRIEF & HUMAN-INTENT BOUNDARIES
+## 6. DESIGN BRIEF & HUMAN-INTENT BOUNDARIES
 
 Bilt uses a Design Brief (`.bilt/design-brief.json`) to capture authentic human design intent before UI implementation.
 

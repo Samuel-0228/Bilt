@@ -316,23 +316,27 @@ export async function reportInitComplete(
   // Next steps
   console.log(sectionHeader("Next steps"));
   console.log(
-    colors.slateDim.dim(`     ${text.bold("bilt scan")}     Full project scan`),
+    colors.slateDim.dim(`     ${text.bold("bilt check")}               Verify comprehensive production readiness`),
   );
   await maybeSleep();
   console.log(
-    colors.slateDim.dim(`     ${text.bold("bilt verify")}   Verify PR diff vs base branch (for CI & AI agents)`),
+    colors.slateDim.dim(`     ${text.bold("bilt baseline create")}     Snapshot legacy debt into .bilt/baseline.json`),
   );
   await maybeSleep();
   console.log(
-    colors.slateDim.dim(`     ${text.bold("bilt fix")}      Auto-fix issues`),
+    colors.slateDim.dim(`     ${text.bold("bilt design-check --fix")}  Auto-repair UI & focus accessibility issues`),
   );
   await maybeSleep();
   console.log(
-    colors.slateDim.dim(`     ${text.bold("bilt watch")}    Real-time monitoring`),
+    colors.slateDim.dim(`     ${text.bold("bilt verify")}              Verify PR diff vs base branch (CI & AI agents)`),
   );
   await maybeSleep();
   console.log(
-    colors.slateDim.dim(`     ${text.bold("bilt doctor")}   Detailed health report`),
+    colors.slateDim.dim(`     ${text.bold("bilt fix --safe")}          Auto-fix config and environment issues`),
+  );
+  await maybeSleep();
+  console.log(
+    colors.slateDim.dim(`     ${text.bold("bilt watch")}               Real-time background file monitoring`),
   );
   await maybeSleep();
   console.log("");

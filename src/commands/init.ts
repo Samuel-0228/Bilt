@@ -13,6 +13,13 @@ import { reportInitComplete } from "../ui/reporter.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
 import { loadConfig } from "../config/config.js";
 
+export interface InitOptions {
+  agent?: string;
+  dryRun?: boolean;
+  force?: boolean;
+  skipAgent?: boolean;
+}
+
 /**
  * Execute the `bilt init` command.
  *
@@ -20,9 +27,13 @@ import { loadConfig } from "../config/config.js";
  * 2. Run full scan
  * 3. Create snapshot
  * 4. Auto-fix safe issues (.gitignore, .env.example)
- * 5. Report results with the beautiful health card
+ * 5. Configure agent guidelines (AGENTS.md / hooks)
+ * 6. Report results with the beautiful health card
  */
-export async function executeInit(projectDir: string): Promise<void> {
+export async function executeInit(
+  projectDir: string,
+  options: InitOptions = {},
+): Promise<void> {
   const rootDir = path.resolve(projectDir);
   const config = await loadConfig(rootDir);
 
@@ -115,6 +126,43 @@ export async function executeInit(projectDir: string): Promise<void> {
       console.log(colors.mintClear.apply("  " + glyphs.fixed + " Generated .env.example"));
     } catch {
       // Failed to generate .env.example — non-critical
+    }
+  }
+
+  // ── Auto-setup agent guidelines if not skipped ─────────────────────
+  if (!options.skipAgent) {
+    const agentsMdPath = path.join(rootDir, "AGENTS.md");
+    const claudeMdPath = path.join(rootDir, "CLAUDE.md");
+    let hasAgentDoc = false;
+    try {
+      await fs.access(agentsMdPath);
+      hasAgentDoc = true;
+    } catch {
+      try {
+        await fs.access(claudeMdPath);
+        hasAgentDoc = true;
+      } catch {
+        hasAgentDoc = false;
+      }
+    }
+
+    if (!hasAgentDoc || options.force) {
+      try {
+        const { executeInitAgent } = await import("./init-agent.js");
+        await executeInitAgent(rootDir, {
+          agent: options.agent || "default",
+          dryRun: options.dryRun,
+          force: options.force,
+        });
+        fixesApplied++;
+        console.log(
+          colors.mintClear.apply(
+            "  " + glyphs.fixed + " Configured agent guidelines (AGENTS.md)",
+          ),
+        );
+      } catch {
+        // Failed to init agent doc — non-critical
+      }
     }
   }
 

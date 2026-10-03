@@ -478,16 +478,18 @@ program
       opts: { agent?: string | boolean; dryRun?: boolean; force?: boolean },
     ) => {
       try {
-        if (opts.agent !== undefined) {
-          const { executeInitAgent } = await import("./commands/init-agent.js");
-          await executeInitAgent(dir, {
-            agent: typeof opts.agent === "string" ? opts.agent : "default",
-            dryRun: opts.dryRun,
-            force: opts.force,
-          });
-        } else {
-          await executeInit(dir);
-        }
+        const agentName =
+          typeof opts.agent === "string"
+            ? opts.agent
+            : opts.agent
+              ? "default"
+              : undefined;
+        const { executeInit } = await import("./commands/init.js");
+        await executeInit(dir, {
+          agent: agentName,
+          dryRun: opts.dryRun,
+          force: opts.force,
+        });
       } catch (error) {
         printError(error);
         process.exitCode = 2;
