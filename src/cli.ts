@@ -134,6 +134,46 @@ program
     },
   );
 
+// ─── bilt design-check ──────────────────────────────────────────────────────
+
+program
+  .command("design-check")
+  .description(
+    "Detect generic AI/template-driven UI patterns and production UX issues",
+  )
+  .argument("[dir]", "Project directory", ".")
+  .option("--format <format>", "Output format: human, agent, json", "human")
+  .option("--fix", "Apply deterministic safe accessibility and UX fixes")
+  .option("--changed", "Scan only files modified in working tree vs HEAD")
+  .option(
+    "--base <ref>",
+    "Scan only changes between base git ref and current branch",
+  )
+  .option("--debug", "Output debug snapshot and rule timing telemetry")
+  .action(
+    async (
+      dir: string,
+      opts: {
+        format?: "human" | "agent" | "json";
+        fix?: boolean;
+        changed?: boolean;
+        base?: string;
+        debug?: boolean;
+      },
+    ) => {
+      try {
+        const { executeDesignCheck } = await import(
+          "./commands/design-check.js"
+        );
+        const exitCode = await executeDesignCheck(dir, opts);
+        process.exitCode = exitCode;
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
+
 // ─── bilt explain ───────────────────────────────────────────────────────────
 
 program

@@ -116,9 +116,11 @@ export function evaluateGate(
 
   let status: GateStatus = 'production-ready';
 
+  const securityReviewFindings = reviewFindings.filter((f) => f.category !== 'design-quality');
+
   if (blockingFindings.length > 0 || (summary.critical > 0 || summary.high > 0)) {
     status = 'not-ready';
-  } else if (!mandatoryCategoriesMet || reviewFindings.length > 0) {
+  } else if (!mandatoryCategoriesMet || securityReviewFindings.length > 0) {
     status = 'not-ready-needs-review';
   }
 

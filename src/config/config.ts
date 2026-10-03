@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG: BiltConfig = {
   sound: false,
   ignoreUnused: [],
   framework: undefined,
+  designCheck: undefined,
 };
 
 // ─── Config Loader ───────────────────────────────────────────────────────────
@@ -48,6 +49,10 @@ const explorer = cosmiconfig("bilt", {
     ".biltrc.yml",
   ],
 });
+
+export function clearConfigCache(): void {
+  explorer.clearCaches();
+}
 
 /**
  * Load and merge user configuration with defaults.
@@ -84,6 +89,7 @@ export async function loadConfig(searchFrom?: string): Promise<BiltConfig> {
         ? [...userConfig.ignoreUnused]
         : [...(DEFAULT_CONFIG.ignoreUnused ?? [])],
       framework: userConfig.framework ?? DEFAULT_CONFIG.framework,
+      designCheck: userConfig.designCheck ?? DEFAULT_CONFIG.designCheck,
     };
   } catch {
     // If config loading fails, silently use defaults (zero-config philosophy)

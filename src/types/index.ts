@@ -231,6 +231,12 @@ export interface BiltConfig {
   ignoreUnused?: string[];
   /** Target framework preset (e.g. "nextjs", "remix", "vite", "nuxt", "astro", "sveltekit") */
   framework?: string;
+  /** Design and anti-vibecoding check configuration */
+  designCheck?: {
+    ignore?: string[];
+    reason?: Record<string, string>;
+    ignoreAll?: boolean;
+  };
 }
 
 // ─── Framework Detection ─────────────────────────────────────────────────────

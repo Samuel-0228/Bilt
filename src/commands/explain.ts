@@ -9,8 +9,10 @@ import { TAXONOMY } from "../core/readiness/taxonomy.js";
 import { colors, glyphs, divider } from "../ui/theme.js";
 import { RULE_TEMPLATES } from "../core/finding/templates.js";
 import { ALL_SECURITY_RULES } from "../core/security-engine/rules/index.js";
+import { DESIGN_RULES } from "../core/design/catalog.js";
 import type { RuleTemplate } from "../core/finding/types.js";
 import type { SecurityRule } from "../core/security-engine/types.js";
+import type { DesignRule } from "../core/design/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +45,11 @@ const CATEGORY_ALIASES: Record<string, string> = {
   pii: "privacy-and-pii",
   monitoring: "monitoring-rollback",
   rollback: "monitoring-rollback",
+  design: "design",
+  "design-genericity": "design-genericity",
+  "design-quality": "design",
+  vibecoding: "design",
+  "anti-vibecoding": "design",
 };
 
 export interface ExplainOptions {
@@ -273,6 +280,37 @@ function printFormattedSecurityRule(rule: SecurityRule): void {
   console.log("");
 }
 
+function printFormattedDesignRule(rule: DesignRule): void {
+  console.log("");
+  const sevColor =
+    rule.severity === "high"
+      ? colors.pulseCoral
+      : rule.severity === "medium"
+        ? colors.amberFlag
+        : colors.vitalTeal;
+
+  console.log(colors.vitalTeal.bold("  BILT DESIGN & ANTI-VIBECODING RULE"));
+  console.log(`  ${sevColor.bold(rule.id)}: ${rule.title}`);
+  console.log(divider(65));
+  console.log("");
+
+  console.log(colors.slateDim.dim(`  Category:    ${rule.category}`));
+  console.log(colors.slateDim.dim(`  Severity:    ${sevColor.bold(rule.severity.toUpperCase())}`));
+  console.log("");
+
+  console.log(colors.vitalTeal.bold(`  ${glyphs.info} Why It Matters`));
+  console.log(colors.slateDim.apply(`    ${rule.whyItMatters}\n`));
+
+  console.log(colors.mintClear.bold(`  ✓ Actionable Recommendation`));
+  console.log(colors.mintClear.apply(`    ${rule.recommendation}\n`));
+
+  console.log(colors.vitalTeal.bold(`  ◆ Coding Agent Action`));
+  console.log(colors.slateDim.apply(`    ${rule.agentAction}\n`));
+
+  console.log(divider(65));
+  console.log("");
+}
+
 export async function executeExplain(
   targetArg?: string,
   options: ExplainOptions = {},
@@ -315,7 +353,20 @@ export async function executeExplain(
     return 0;
   }
 
-  // 3. Resolve category concept file (e.g. auth, authorization, secrets-and-env)
+  // 3. Check if target is a DesignRule from the catalog (e.g. DESIGN-VISUAL-001, GENERIC-SAAS-COMBINATION-001)
+  const designRule = DESIGN_RULES.find(
+    (r) => r.id.toLowerCase() === normalized.toLowerCase(),
+  );
+  if (designRule) {
+    if (isJson) {
+      console.log(JSON.stringify(designRule, null, 2));
+    } else {
+      printFormattedDesignRule(designRule);
+    }
+    return 0;
+  }
+
+  // 4. Resolve category concept file (e.g. auth, authorization, secrets-and-env, design, design-genericity)
   const categoryId =
     CATEGORY_ALIASES[normalized.toLowerCase()] || normalized.toLowerCase();
 

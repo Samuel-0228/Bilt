@@ -42,6 +42,7 @@ import { fileUploadsChecker } from "./checks/file-uploads.js";
 import { paymentsChecker } from "./checks/payments.js";
 import { privacyAndPiiChecker } from "./checks/privacy-and-pii.js";
 import { monitoringRollbackChecker } from "./checks/monitoring-rollback.js";
+import { designQualityChecker } from "./checks/design-quality.js";
 
 export interface CheckRunnerOptions {
   dir: string;
@@ -107,6 +108,7 @@ const CHECKERS: CategoryChecker[] = [
   paymentsChecker,
   privacyAndPiiChecker,
   monitoringRollbackChecker,
+  designQualityChecker,
 ];
 
 export async function runChecks(options: CheckRunnerOptions): Promise<CheckResult> {
@@ -194,7 +196,8 @@ export async function runChecks(options: CheckRunnerOptions): Promise<CheckResul
   const categoryResults = new Map<ReadinessCategory, CategoryCheckResult>();
   const unsupportedStackCategories: ReadinessCategory[] = [];
 
-  const targetCategories = options.categories || getAllCategories();
+  const targetCategories =
+    options.categories || [...getAllCategories(), "design-quality" as ReadinessCategory];
 
   // 6. Run Checkers across categories
   for (const category of targetCategories) {

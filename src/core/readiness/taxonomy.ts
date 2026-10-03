@@ -14,7 +14,8 @@ export type ReadinessCategory =
   | 'file-uploads'
   | 'payments'
   | 'privacy-and-pii'
-  | 'monitoring-rollback';
+  | 'monitoring-rollback'
+  | 'design-quality';
 
 export type CheckMode = 'automated' | 'guided';
 
@@ -152,7 +153,17 @@ export const TAXONOMY: CategoryMeta[] = [
   }
 ];
 
+export const DESIGN_QUALITY_META: CategoryMeta = {
+  id: 'design-quality',
+  name: 'Design Quality & UX',
+  mode: 'automated',
+  enforcement: 'guided',
+  mandatory: false,
+  description: 'Detect generic AI-generated templates and verify production UX completeness'
+};
+
 export function getCategoryMeta(id: ReadinessCategory): CategoryMeta | undefined {
+  if (id === 'design-quality') return DESIGN_QUALITY_META;
   return TAXONOMY.find(cat => cat.id === id);
 }
 

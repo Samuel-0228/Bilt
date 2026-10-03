@@ -173,8 +173,8 @@ When executing health checks or initialization, Bilt outputs an intuitive diagno
 
 ## CLI Command Reference
 
-| Command                      | Description                                                                                                                                               | Key Flags & Options                                                                            |
-| :--------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------- |
+| `bilt check [dir]`           | Comprehensive production-readiness verification for AI-built software. Categorizes issues across security and design.      | `--format <human\|agent\|json>`, `--changed`, `--base <ref>`, `--categories <list>`           |
+| `bilt design-check [dir]`    | Detects generic AI/template-driven website design patterns and checks production UX states. Includes `--fix` safe repair. | `--format <human\|agent\|json>`, `--fix`, `--changed`, `--base <ref>`                          |
 | `bilt scan [dir]`            | Audits working tree and Git history for leaked secrets, framework misconfigurations, and environment mismatches. Supports agent and SARIF output formats. | `--changed`, `--base <ref>`, `--format <agent\|sarif\|json\|text>`, `--full-history`, `--json` |
 | `bilt verify [dir]`          | Git diff-scoped verification with configuration tamper detection and iteration budgeting for agents & CI.                                                 | `--base <ref>`, `--format <agent\|sarif\|text>`, `--max-iterations <N>`                        |
 | `bilt baseline create [dir]` | Captures pre-existing repository debt into `.bilt/baseline.json` so agents focus solely on new issues.                                                    | None                                                                                           |
@@ -256,7 +256,83 @@ bilt undo
 bilt undo --list
 ```
 
-### 6. `watch` / `live` — Real-Time Daemon
+### 6. `design-check` — Anti-Vibecoding & Production UX Detection
+
+> **Bilt can detect when an interface is heavily dependent on recognizable AI-generated design patterns.**
+
+The goal is **NOT** to decide whether a website is beautiful.
+Bilt does not enforce one visual style (such as brutalism, minimalism, or maximalism).
+Instead, Bilt detects measurable combinations of template tropes and AI-generated design formulas that make websites look interchangeable, then provides coding agents with concrete instructions to make interfaces intentional, product-specific, and distinctive.
+
+#### CLI Usage
+
+```bash
+# Run human-readable design check
+bilt design-check
+
+# Run against a specific directory
+bilt design-check ./frontend
+
+# Agent JSON mode with stable versioned schema
+bilt design-check --format agent
+
+# Scoped to uncommitted git changes
+bilt design-check --changed
+
+# Apply deterministic safe automated fixes (accessibility labels, focus outlines, placeholder cleanup)
+bilt design-check --fix
+
+# Learn how design genericity is evaluated
+bilt explain design
+bilt explain design-genericity
+```
+
+#### Categories & Example Rules
+
+| Category | Rule ID | Severity | Description |
+| :--- | :--- | :---: | :--- |
+| **`design-genericity`** | `GENERIC-SAAS-COMBINATION-001` | **HIGH** | Stacking rounded cards, gradients, radial orbs, sparkle icons, and generic copy formulas. |
+| **`design-genericity`** | `VIBECODED-LANDING-PAGE-001` | **MEDIUM** | Formulaic landing page: Eyebrow → Giant Heading → 2 CTA Buttons → 3 Cards → Fake Testimonial. |
+| **`design-genericity`** | `DESIGN-VISUAL-001` | **MEDIUM** | Excessive gradient text headings and multi-gradient buttons. |
+| **`design-genericity`** | `DESIGN-VISUAL-002` | **LOW** | Default purple-on-black SaaS aesthetic. |
+| **`design-genericity`** | `DESIGN-VISUAL-005` | **MEDIUM** | Decorative sparkle/wand icons on non-AI features. |
+| **`content-quality`** | `CONTENT-QUALITY-001` | **MEDIUM** | Generic marketing slogans ("Supercharge your workflow", "The future of..."). |
+| **`content-quality`** | `CONTENT-QUALITY-003` | **MEDIUM** | Unverified placeholder customer testimonials ("CEO at TechCorp"). |
+| **`accessibility`** | `A11Y-UI-001` | **HIGH** | Icon-only button missing accessible name (`aria-label`). *(Auto-fixable)* |
+| **`accessibility`** | `A11Y-UI-002` | **MEDIUM** | Outline suppressed (`outline-none`) without `focus-visible:` ring. *(Auto-fixable)* |
+| **`accessibility`** | `A11Y-UI-003` | **MEDIUM** | Image missing `alt` attribute. *(Auto-fixable)* |
+| **`production-ux`** | `UX-STATE-001` | **MEDIUM** | Application views missing loading or skeleton states. |
+| **`production-ux`** | `UX-STATE-003` | **MEDIUM** | Desktop navigation bar missing mobile drawer/menu. |
+| **`production-ux`** | `UX-STATE-004` | **HIGH** | Permanent delete actions without confirmation dialog. |
+
+#### Intentional Exceptions & Baselines
+
+Projects intentionally choosing specific aesthetics (e.g. purple theme, Geist font, or minimal cards) can document exceptions in `.biltrc.json`. **Every exception requires an explicit documented reason**:
+
+```json
+{
+  "designCheck": {
+    "ignore": [
+      "DESIGN-VISUAL-002"
+    ],
+    "reason": {
+      "DESIGN-VISUAL-002": "Product brand guidelines intentionally designate violet as primary accent."
+    }
+  }
+}
+```
+
+* Suppressions without a documented reason are rejected.
+* Blanket suppression (`ignoreAll: true` or `ignore: ["*"]`) is prohibited.
+* Suppressed findings remain visible in reports under *Intentional Exceptions*.
+
+#### Agent Loop Protection
+
+If an autonomous coding agent makes repeated changes across consecutive iterations without resolving design findings, Bilt detects the impasse, halts automated loops with `status: "escalate"` (exit code 4), and instructs the agent to ask the human maintainer for guidance.
+
+---
+
+### 7. `watch` / `live` — Real-Time Daemon
 
 Monitors file creation, edits, and deletions in real time. Notifies developer immediately when a secret token is saved.
 
