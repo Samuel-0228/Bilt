@@ -175,6 +175,7 @@ When executing health checks or initialization, Bilt outputs an intuitive diagno
 
 | `bilt check [dir]`           | Comprehensive production-readiness verification for AI-built software. Categorizes issues across security and design.      | `--format <human\|agent\|json>`, `--changed`, `--base <ref>`, `--categories <list>`           |
 | `bilt design-check [dir]`    | Detects generic AI/template-driven website design patterns and checks production UX states. Includes `--fix` safe repair. | `--format <human\|agent\|json>`, `--fix`, `--changed`, `--base <ref>`                          |
+| `bilt design-brief [dir]`    | Developer questionnaire establishing product-specific design intent to guide AI coding agents.                            | `[subcommand: show\|edit]`, `--format <human\|agent>`, `--non-interactive`                    |
 | `bilt scan [dir]`            | Audits working tree and Git history for leaked secrets, framework misconfigurations, and environment mismatches. Supports agent and SARIF output formats. | `--changed`, `--base <ref>`, `--format <agent\|sarif\|json\|text>`, `--full-history`, `--json` |
 | `bilt verify [dir]`          | Git diff-scoped verification with configuration tamper detection and iteration budgeting for agents & CI.                                                 | `--base <ref>`, `--format <agent\|sarif\|text>`, `--max-iterations <N>`                        |
 | `bilt baseline create [dir]` | Captures pre-existing repository debt into `.bilt/baseline.json` so agents focus solely on new issues.                                                    | None                                                                                           |
@@ -332,7 +333,38 @@ If an autonomous coding agent makes repeated changes across consecutive iteratio
 
 ---
 
-### 7. `watch` / `live` — Real-Time Daemon
+### 7. `design-brief` — Developer Design Direction & Intent
+
+> **Allow developers to provide concise, intentional design direction before AI agents build or redesign user interfaces.**
+
+The Design Brief prevents generic, cookie-cutter interfaces by capturing 3–4 high-level design preferences and making them accessible to agents via deterministic JSON and prompt injection.
+
+- **Non-blocking & advisory**: Brief-consistency checks are always advisory and never block security gates.
+- **Creative freedom**: Selecting *"Surprise me"* explicitly grants the agent full creative latitude and generates zero constraints.
+- **Fail-soft**: Missing briefs simply leave creative freedom in agent control with zero false-positive warnings.
+
+#### CLI Usage
+
+```bash
+# Run interactive 4-question questionnaire
+bilt design-brief
+
+# Inspect existing brief in human-readable format
+bilt design-brief show
+
+# Update an existing brief
+bilt design-brief edit
+
+# Output stable JSON for autonomous agents
+bilt design-brief --format agent
+
+# Non-interactive check (does not prompt or invent answers)
+bilt design-brief --non-interactive
+```
+
+---
+
+### 8. `watch` / `live` — Real-Time Daemon
 
 Monitors file creation, edits, and deletions in real time. Notifies developer immediately when a secret token is saved.
 

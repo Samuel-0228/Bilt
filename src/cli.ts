@@ -174,6 +174,34 @@ program
     },
   );
 
+// ─── bilt design-brief ──────────────────────────────────────────────────────
+
+program
+  .command("design-brief")
+  .description("Manage the project design brief")
+  .argument("[subcommand]", "Subcommand: show | edit")
+  .argument("[dir]", "Project directory", ".")
+  .option("--format <format>", "Output format: human, agent", "human")
+  .option("--non-interactive", "Skip questionnaire; print machine-readable status")
+  .action(
+    async (
+      subcommand: string | undefined,
+      dir: string,
+      opts: { format?: "human" | "agent"; nonInteractive?: boolean }
+    ) => {
+      try {
+        const targetDir = subcommand === "show" || subcommand === "edit" ? dir : (subcommand || ".");
+        const actualSubcommand = subcommand === "show" || subcommand === "edit" ? subcommand : undefined;
+        const { executeDesignBrief } = await import("./commands/design-brief.js");
+        const exitCode = await executeDesignBrief(targetDir, actualSubcommand, opts);
+        process.exitCode = exitCode;
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    }
+  );
+
 // ─── bilt explain ───────────────────────────────────────────────────────────
 
 program

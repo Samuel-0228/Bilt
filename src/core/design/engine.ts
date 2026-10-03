@@ -88,9 +88,6 @@ export async function runDesignCheck(
         );
 
         // Check suppression
-        // Suppression rule:
-        // - ignoreAll is NEVER permitted to silently pass
-        // - Rule in ignore array MUST have an explicit documented reason
         const isIgnored = !isIgnoreAll && ignoreList.includes(rule.id);
         const reason = reasonMap[rule.id]?.trim();
 
@@ -120,6 +117,30 @@ export async function runDesignCheck(
             fixable: res.fixable,
           });
         }
+      }
+    }
+  }
+
+  // 5.5 Check Brief Consistency
+  const { readDesignBrief } = await import("./brief/storage.js");
+  const { getBriefConsistencyFindings } = await import("./brief/rules.js");
+  const brief = await readDesignBrief(normalizedRoot);
+  if (brief && brief.creativeFreedom !== "creative") {
+    const briefFindings = getBriefConsistencyFindings(brief, snapshot);
+    for (const finding of briefFindings) {
+      const isIgnored = !isIgnoreAll && ignoreList.includes(finding.ruleId);
+      const reason = reasonMap[finding.ruleId]?.trim();
+      if (isIgnored && reason && reason.length > 0) {
+        suppressedFindings.push({
+          ruleId: finding.ruleId,
+          category: finding.category,
+          severity: finding.severity,
+          title: finding.title,
+          reason,
+          file: finding.file,
+        });
+      } else {
+        rawFindings.push(finding);
       }
     }
   }
