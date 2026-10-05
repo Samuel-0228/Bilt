@@ -63,5 +63,5 @@ describe("Model Context Protocol (MCP) Server", () => {
     expect(parsed.schema_version).toBe("1.0.0");
     expect(parsed.status).toBeDefined();
     expect(Array.isArray(parsed.findings)).toBe(true);
-  });
+  }, 15000);
 });

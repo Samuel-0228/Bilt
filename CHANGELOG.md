@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-10-04
+
+### Added & Enhanced — Agent Protocol & Control Plane Architecture
+
+- **Strict Agent Response Protocol (`src/core/agent/protocol.ts`)**: Built canonical builder for schema version `"1"` returning `status`, `summary`, `findings`, `nextAction` (`type`, `findingIds`, `instruction`), `execution` (`command`, `projectRoot`, `durationMs`), and `progress` (`previous`, `current`, `resolved`, `introduced`, `regressed`, `net`).
+- **Machine-Actionable Finding Contract (`src/core/readiness/finding.ts`)**: Upgraded `BiltCheckFinding` with content-based `id`, structured `agentAction` contract (`objective`, `allowedChanges`, `forbiddenChanges`, `filesToInspect`, `verificationCommand`), `locations[]`, and `lifecycleStatus` ('open', 'in-progress', 'verifying', 'resolved', 'suppressed').
+- **Line-Number-Independent Fingerprints**: `generateCheckFingerprint()` now computes content-normalized SHA256 hashes without raw line numbers so fingerprints survive refactoring and code movement.
+- **Agent Contract Test Suite (`tests/agent/protocol-contract.test.ts`)**: Added unit and behavioral contract tests for `GOOD_AGENT`, `PASSIVE_AGENT`, `LOOPING_AGENT`, progress tracking, and fingerprint stability guarantees.
+- **Agent Protocol Reference Documentation (`docs/agent-protocol.md`)**: Comprehensive documentation covering authority models, schema specifications, decision loops, exit code contracts, and remediation rules.
+- **Loop Escalation Integration**: Integrated loop progress detection into `bilt check --format agent`, returning exit code `4` (`status: "escalate"`) on runaway agent iterations or state thrashing.
+
 ## [1.1.5] - 2026-10-03
 
 ### Added & Enhanced - Anti-Passive Auditor Trap Architecture

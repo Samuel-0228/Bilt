@@ -20,10 +20,12 @@ describe("bilt check CLI Integration", () => {
     );
 
     const json = JSON.parse(stdout);
-    expect(json.schemaVersion).toBe(1);
+    expect(json.schemaVersion).toBe("1");  // v1.2.0 protocol: string literal "1"
     expect(json.toolVersion).toBeTruthy();
     expect(json.status).toBeDefined();
     expect(json.summary).toBeDefined();
+    expect(json.nextAction).toBeDefined();           // new in v1.2.0
+    expect(json.execution).toBeDefined();            // new in v1.2.0
     expect(json.disclaimer).toContain("Bilt is an automated readiness check");
     expect(exitCode).toBeLessThanOrEqual(2);
   });
@@ -42,9 +44,13 @@ describe("bilt check CLI Integration", () => {
     );
 
     const json = JSON.parse(stdout);
-    expect(json.status).toBe("not-ready");
+    // v1.2.0 protocol: status is "fail" (was "not-ready" in legacy schema)
+    expect(json.status).toBe("fail");
     expect(exitCode).toBe(1);
-    expect(json.summary.critical).toBeGreaterThan(0);
+    expect(json.summary.blocking).toBeGreaterThan(0);
+    // nextAction must tell agent what to do next
+    expect(json.nextAction.type).toBe("fix");
+    expect(Array.isArray(json.nextAction.findingIds)).toBe(true);
   });
 
   it("should explain authentication concept via bilt explain auth", async () => {
