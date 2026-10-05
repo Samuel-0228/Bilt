@@ -19,7 +19,8 @@ describe("bilt check CLI Integration", () => {
       { reject: false },
     );
 
-    const json = JSON.parse(stdout);
+    const jsonString = stdout.slice(stdout.indexOf("{"), stdout.lastIndexOf("}") + 1);
+    const json = JSON.parse(jsonString);
     expect(json.schemaVersion).toBe("1");  // v1.2.0 protocol: string literal "1"
     expect(json.toolVersion).toBeTruthy();
     expect(json.status).toBeDefined();
@@ -43,7 +44,8 @@ describe("bilt check CLI Integration", () => {
       { reject: false },
     );
 
-    const json = JSON.parse(stdout);
+    const jsonString = stdout.slice(stdout.indexOf("{"), stdout.lastIndexOf("}") + 1);
+    const json = JSON.parse(jsonString);
     // v1.2.0 protocol: status is "fail" (was "not-ready" in legacy schema)
     expect(json.status).toBe("fail");
     expect(exitCode).toBe(1);

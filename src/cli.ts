@@ -68,6 +68,7 @@ program.hook("preAction", async (thisCommand, actionCommand) => {
     color?: boolean;
     plain?: boolean;
     json?: boolean;
+    format?: string;
   };
   if (opts.color === false) {
     initColorSupport(true);
@@ -75,13 +76,19 @@ program.hook("preAction", async (thisCommand, actionCommand) => {
   if (opts.plain) {
     setPlainMode(true);
   }
+  const isMachineFormat =
+    !!opts.json ||
+    opts.format === "agent" ||
+    opts.format === "json" ||
+    opts.format === "sarif";
+
   if (
     actionCommand.name() !== "welcome" &&
     actionCommand.name() !== "theme-preview"
   ) {
     await checkAndRunFirstTimeOnboarding({
       plain: opts.plain,
-      json: opts.json,
+      json: isMachineFormat,
     });
   }
 });

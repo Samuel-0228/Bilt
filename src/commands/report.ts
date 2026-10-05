@@ -13,8 +13,6 @@ export async function executeReport(
   options: { format?: string; output?: string; export?: string; stdout?: boolean } = {},
 ): Promise<void> {
   const rootDir = await validateProjectDirectory(projectDir);
-  const result = await executeScan(rootDir, { silent: true });
-
   const format = (options.format || "markdown").toLowerCase();
 
   // Determine output target path (defaulting to bilt-report.md or bilt-report.json unless --stdout is passed)
@@ -22,6 +20,16 @@ export async function executeReport(
   if (!outputPath && !options.stdout) {
     outputPath = format === "json" ? "bilt-report.json" : "bilt-report.md";
   }
+
+  // Validate path containment before performing the scan
+  if (outputPath) {
+    const fullPath = path.resolve(rootDir, outputPath);
+    if (!isPathContained(fullPath, rootDir)) {
+      throw new Error(`Report output destination must be within the project directory: ${outputPath}`);
+    }
+  }
+
+  const result = await executeScan(rootDir, { silent: true });
 
   if (format === "json") {
     const jsonOutput = JSON.stringify(result, null, 2);
