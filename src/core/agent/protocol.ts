@@ -19,8 +19,9 @@ export type NextActionType =
   | 'review'     // Agent MUST present findings to human for decision
   | 'verify'     // Agent MUST re-run bilt check after previous fixes
   | 'rerun'      // Agent MUST re-run bilt check (something changed externally)
-  | 'escalate'   // Agent MUST stop and ask human maintainer — Bilt detected a loop
-  | 'none';      // All clear — agent may commit / open PR
+  | 'stop'       // Agent MUST STOP — project satisfies all checks
+  | 'escalate'   // Agent MUST stop and ask human maintainer — loop or regression detected
+  | 'none';      // Alias for stop — all clear
 
 export type EscalationReason =
   | 'no-progress'        // N consecutive runs, same fingerprints — agent is stuck
@@ -232,10 +233,10 @@ function computeNextAction(
 
   if (status === 'pass') {
     return {
-      type: 'none',
+      type: 'stop',
       findingIds: [],
       instruction:
-        'All checks pass. Zero introduced violations. You may commit or open a pull request.',
+        'STOP. All checks pass. Zero introduced violations. STOP making changes solely to satisfy Bilt. You may commit or open a pull request.',
     };
   }
 

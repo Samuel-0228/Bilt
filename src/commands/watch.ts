@@ -1,21 +1,25 @@
 // ─── Watch Command ───────────────────────────────────────────────────────────
-// Real-time file monitoring with instant secret & env scanning.
+// Real-time supervision layer supporting both developer interactive mode
+// and machine-readable agent supervision mode (`bilt watch --format agent`).
+// ─────────────────────────────────────────────────────────────────────────────
 
 import path from "node:path";
-import { colors, glyphs, text, sectionHeader, isPlainMode } from "../ui/theme.js";
+import { colors, glyphs, sectionHeader, isPlainMode } from "../ui/theme.js";
 import type { WatchOptions, WatchEvent } from "../types/index.js";
 import { loadConfig } from "../config/config.js";
 import { startWatcher, stopWatcher } from "../core/watch/watcher.js";
 import { reportWatchEvent } from "../ui/reporter.js";
 import { executeScan } from "./scan.js";
 import { formatFinding } from "../ui/format.js";
+import { BiltSupervisor } from "../core/watch/supervisor.js";
 
 /**
  * Execute the `bilt watch` command.
  *
- * 1. Start file watcher on the project directory
- * 2. On file changes: scan for secrets and report findings
- * 3. Handle SIGINT for graceful shutdown
+ * 1. Initialize BiltSupervisor state machine
+ * 2. Start file watcher on project directory
+ * 3. On file changes: run supervisory analysis & update change ledger
+ * 4. Stream human terminal cards OR machine-readable AgentResponse JSON
  */
 export async function executeWatch(
   projectDir: string,
@@ -24,12 +28,16 @@ export async function executeWatch(
   const rootDir = path.resolve(projectDir);
   const config = await loadConfig(rootDir);
 
+  const isAgentFormat = options.format === "agent" || options.format === "json" || !!options.agent;
+  const supervisor = new BiltSupervisor(rootDir);
+  const session = await supervisor.initialize();
+
   // ── Status banner ───────────────────────────────────────────────────
-  if (!options.quiet) {
+  if (!isAgentFormat && !options.quiet) {
     console.log("");
-    console.log(colors.vitalTeal.bold("  " + glyphs.info + " Bilt Watch Mode"));
+    console.log(colors.vitalTeal.bold("  " + glyphs.info + " Bilt Supervisor Watch Mode"));
     if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
-    console.log(colors.slateDim.dim("  Monitoring " + rootDir + " for changes\u2026"));
+    console.log(colors.slateDim.dim(`  Session: ${session.id} | Monitoring ${rootDir} for changes…`));
     if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
     console.log(colors.slateDim.dim("  Press Ctrl+C to stop."));
     if (!isPlainMode()) await new Promise((resolve) => setTimeout(resolve, 80));
@@ -38,21 +46,25 @@ export async function executeWatch(
 
   // ── Initial live baseline ─────────────────────────────────────────
   if (options.live !== false) {
-    const baseline = await executeScan(rootDir, {
-      silent: true,
-      noVerify: true,
-    });
+    if (isAgentFormat) {
+      await supervisor.handleFileChanges([], true);
+    } else {
+      const baseline = await executeScan(rootDir, {
+        silent: true,
+        noVerify: true,
+      });
 
-    if (!options.quiet) {
-      console.log(sectionHeader("Live Baseline"));
-      if (baseline.findings.length === 0) {
-        console.log(colors.mintClear.apply("  " + glyphs.passed + " No current findings in baseline scan."));
-      } else {
-        for (const finding of baseline.findings) {
-          console.log(formatFinding(finding, "headline"));
+      if (!options.quiet) {
+        console.log(sectionHeader("Live Baseline"));
+        if (baseline.findings.length === 0) {
+          console.log(colors.mintClear.apply("  " + glyphs.passed + " No current findings in baseline scan."));
+        } else {
+          for (const finding of baseline.findings) {
+            console.log(formatFinding(finding, "headline"));
+          }
         }
+        console.log("");
       }
-      console.log("");
     }
   }
 
@@ -61,20 +73,23 @@ export async function executeWatch(
     rootDir,
     config,
     async (event: WatchEvent) => {
-      // Only report if there are findings or the file was deleted
-      if (event.findings.length > 0 || event.type === "unlink") {
-        // Map absolute path back to relative path for formatting
-        const relativePath = path.relative(rootDir, event.file);
-        const relativeFindings = event.findings.map((f) => ({
-          ...f,
-          file: path.relative(rootDir, f.file),
-        }));
+      const relativePath = path.relative(rootDir, event.file);
 
-        await reportWatchEvent({
-          ...event,
-          file: relativePath,
-          findings: relativeFindings,
-        });
+      if (isAgentFormat) {
+        await supervisor.handleFileChanges([relativePath], true);
+      } else {
+        if (event.findings.length > 0 || event.type === "unlink") {
+          const relativeFindings = event.findings.map((f) => ({
+            ...f,
+            file: path.relative(rootDir, f.file),
+          }));
+
+          await reportWatchEvent({
+            ...event,
+            file: relativePath,
+            findings: relativeFindings,
+          });
+        }
       }
     },
     {
@@ -85,12 +100,12 @@ export async function executeWatch(
 
   // ── Graceful shutdown ──────────────────────────────────────────────
   const cleanup = async (): Promise<void> => {
-    if (!options.quiet) {
+    if (!isAgentFormat && !options.quiet) {
       console.log("");
-      console.log(colors.slateDim.dim("  Stopping watcher\u2026"));
+      console.log(colors.slateDim.dim("  Stopping supervisor watcher…"));
     }
     await stopWatcher(watcher);
-    if (!options.quiet) {
+    if (!isAgentFormat && !options.quiet) {
       console.log(colors.mintClear.apply("  " + glyphs.fixed + " Watcher stopped."));
       console.log("");
     }
@@ -106,7 +121,6 @@ export async function executeWatch(
 
   // Keep the process running
   await new Promise(() => {
-    // This promise intentionally never resolves — the process stays alive
-    // until SIGINT/SIGTERM.
+    // Process stays alive until SIGINT/SIGTERM
   });
 }

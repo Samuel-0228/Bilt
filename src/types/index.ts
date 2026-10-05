@@ -343,4 +343,6 @@ export interface WatchOptions {
   debounce?: number;
   poll?: boolean;
   live?: boolean;
+  format?: "human" | "agent" | "json";
+  agent?: boolean;
 }

@@ -221,6 +221,44 @@ program
     }
   );
 
+// ─── bilt requirement ──────────────────────────────────────────────────────
+
+program
+  .command("requirement")
+  .alias("requirements")
+  .description("Manage structured project requirements in .bilt/requirements.json")
+  .argument("[subcommand]", "Subcommand: list | add | remove", "list")
+  .argument("[dir]", "Project directory", ".")
+  .option("--id <id>", "Requirement ID (e.g. REQ-AUTH-001)")
+  .option("--description <text>", "Requirement description")
+  .option("--type <type>", "Requirement type (functional, security, authentication, etc.)")
+  .option("--priority <priority>", "Requirement priority (critical, high, medium, low)")
+  .option("--target <files>", "Comma-separated target files or patterns")
+  .option("--format <format>", "Output format: human, agent, json", "human")
+  .action(
+    async (
+      subcommand: string,
+      dir: string,
+      opts: {
+        id?: string;
+        description?: string;
+        type?: string;
+        priority?: string;
+        target?: string;
+        format?: "human" | "agent" | "json";
+      },
+    ) => {
+      try {
+        const { executeRequirement } = await import("./commands/requirements.js");
+        const exitCode = await executeRequirement(dir, subcommand, opts);
+        process.exitCode = exitCode;
+      } catch (error) {
+        printError(error);
+        process.exitCode = 2;
+      }
+    },
+  );
+
 // ─── bilt explain ───────────────────────────────────────────────────────────
 
 program
@@ -557,6 +595,8 @@ program
   .alias("live")
   .description("Watch the project for changes and scan in real-time")
   .argument("[dir]", "Project directory", ".")
+  .option("--format <format>", "Output format: human, agent, json", "human")
+  .option("--agent", "Agent supervision mode (streams machine-readable AgentResponse JSON)")
   .option("--quiet", "Only show findings, no status messages")
   .option("--debounce <ms>", "Debounce interval in milliseconds", "300")
   .option(
@@ -568,6 +608,8 @@ program
     async (
       dir: string,
       opts: {
+        format?: "human" | "agent" | "json";
+        agent?: boolean;
         quiet?: boolean;
         debounce?: string;
         poll?: boolean;
@@ -576,6 +618,8 @@ program
     ) => {
       try {
         await executeWatch(dir, {
+          format: opts.format,
+          agent: opts.agent,
           quiet: opts.quiet,
           debounce: opts.debounce ? parseInt(opts.debounce, 10) : undefined,
           poll: opts.poll,
