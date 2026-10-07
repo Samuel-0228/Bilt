@@ -12,6 +12,7 @@ import { findEnvFiles, parseEnvFile } from "../core/scan/env.js";
 import { reportInitComplete } from "../ui/reporter.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
 import { loadConfig } from "../config/config.js";
+import { resetLoopState } from "../core/loop/state.js";
 
 export interface InitOptions {
   agent?: string;
@@ -169,6 +170,9 @@ export async function executeInit(
   // ── Re-run scan to get updated results ──────────────────────────────
   const updatedResult =
     fixesApplied > 0 ? await executeScan(rootDir, { silent: true }) : result;
+
+  // ── Reset loop state on init ─────────────────────────────────────────
+  await resetLoopState(rootDir);
 
   // ── Report ──────────────────────────────────────────────────────────
   await reportInitComplete(updatedResult, fixesApplied);

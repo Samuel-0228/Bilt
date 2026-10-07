@@ -2,6 +2,7 @@ import path from "node:path";
 import { executeScan } from "./scan.js";
 import { toAgentFinding } from "../core/finding/mapper.js";
 import { createBaseline } from "../core/scoping/baseline.js";
+import { resetLoopState } from "../core/loop/state.js";
 import { colors, glyphs } from "../ui/theme.js";
 
 export async function executeBaselineCreate(
@@ -17,6 +18,7 @@ export async function executeBaselineCreate(
   });
 
   const baselineFile = await createBaseline(rootDir, fingerprints);
+  await resetLoopState(rootDir);
 
   if (options.json) {
     console.log(

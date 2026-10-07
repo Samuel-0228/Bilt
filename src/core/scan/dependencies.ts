@@ -226,6 +226,16 @@ export async function scanDependencies(
     "sharp",
     "micro",
     "nodemon",
+    "zod",
+    "clsx",
+    "tailwind-merge",
+    "class-variance-authority",
+    "date-fns",
+    "swr",
+    "react-hook-form",
+    "@hookform/resolvers",
+    "lucide-react",
+    "embla-carousel-react",
   ]);
 
   const scriptsContent = pkg.scripts ? JSON.stringify(pkg.scripts) : "";
@@ -260,17 +270,20 @@ export async function scanDependencies(
       });
 
       const importedModules = new Set<string>();
-      for (const file of codeFiles.slice(0, 200)) {
+      for (const file of codeFiles.slice(0, 2000)) {
         try {
           const content = await fs.readFile(path.join(rootDir, file), "utf-8");
-          const matches = content.matchAll(/(?:import\s+.*?from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))/g);
+          const matches = content.matchAll(
+            /(?:(?:import|export)\s+.*?from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s+['"]([^'"]+)['"])/g,
+          );
           for (const match of matches) {
-            const specifier = match[1] || match[2];
+            const specifier = match[1] || match[2] || match[3] || match[4];
             if (specifier) {
               const parts = specifier.split("/");
-              const rootPkg = specifier.startsWith("@") && parts.length >= 2
-                ? `${parts[0]}/${parts[1]}`
-                : parts[0] || specifier;
+              const rootPkg =
+                specifier.startsWith("@") && parts.length >= 2
+                  ? `${parts[0]}/${parts[1]}`
+                  : parts[0] || specifier;
               importedModules.add(rootPkg);
             }
           }

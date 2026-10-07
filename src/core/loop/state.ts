@@ -90,12 +90,22 @@ export async function checkLoopProgress(
   currentFingerprints: string[],
   options: LoopCheckOptions = {},
 ): Promise<LoopCheckResult> {
-  const maxIterations = options.maxIterations ?? 5;
+  const maxIterations = options.maxIterations ?? 15;
   const noProgressThreshold = options.noProgressThreshold ?? 3;
   const state = await readLoopState(rootDir);
 
-  const nextIteration = state.currentIteration + 1;
   const sortedCurrent = Array.from(new Set(currentFingerprints)).sort();
+
+  // If all findings are resolved (clean scan), reset loop state cleanly
+  if (sortedCurrent.length === 0) {
+    await resetLoopState(rootDir);
+    return {
+      iteration: 0,
+      shouldEscalate: false,
+    };
+  }
+
+  const nextIteration = state.currentIteration + 1;
 
   let shouldEscalate = false;
   let escalationReason: string | undefined;

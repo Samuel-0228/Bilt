@@ -46,15 +46,15 @@ export async function applyDesignSafeFixes(rootDir: string): Promise<FixApplyRes
     }
 
     // 2. Fix missing aria-label on icon-only buttons
-    // <button class="..."> <Sparkles ... /> </button>
+    // Preserves exact tag casing (<button> vs <Button>)
     const buttonIconRegex =
-      /<button(?![^>]*\baria-label=)([^>]*)>(\s*<(?:[A-Z][a-zA-Z0-9]*Icon|Sparkles|Check|ArrowRight|X|Menu|Trash)[^>]*\/>|\s*<svg[^>]*>[\s\S]*?<\/svg>)(\s*)<\/button>/gi;
+      /<(button|Button)(?![^>]*\baria-label=)([^>]*)>(\s*<(?:[A-Z][a-zA-Z0-9]*Icon|Sparkles|Check|ArrowRight|X|Menu|Trash)[^>]*\/>|\s*<svg[^>]*>[\s\S]*?<\/svg>)(\s*)<\/\1>/g;
     if (buttonIconRegex.test(modified)) {
-      modified = modified.replace(buttonIconRegex, `<button aria-label="Action"$1>$2$3</button>`);
+      modified = modified.replace(buttonIconRegex, `<$1 aria-label="Action"$2>$3$4</$1>`);
       appliedFixes.push({
         file: rel,
         ruleId: "A11Y-UI-001",
-        description: 'Added accessible aria-label="Action" to icon-only <button>',
+        description: 'Added accessible aria-label="Action" to icon-only button',
       });
     }
 

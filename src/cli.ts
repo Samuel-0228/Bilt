@@ -387,8 +387,8 @@ program
   )
   .option(
     "--max-iterations <n>",
-    "Maximum allowed loop iterations before escalating (default 5)",
-    "5",
+    "Maximum allowed loop iterations before escalating (default 15)",
+    "15",
   )
   .action(
     async (
@@ -719,6 +719,67 @@ baselineCmd
     }
   });
 
+// ─── bilt loop ───────────────────────────────────────────────────────────────
+
+const loopCmd = program
+  .command("loop")
+  .description("Manage agent supervision loop state and budget");
+
+loopCmd
+  .command("reset")
+  .description("Reset the runaway loop counter and iteration history")
+  .argument("[dir]", "Project directory", ".")
+  .option("--json", "Output results as JSON")
+  .action(async (dir: string, opts: { json?: boolean }) => {
+    try {
+      const { resetLoopState } = await import("./core/loop/state.js");
+      const rootDir = (await import("node:path")).resolve(dir);
+      await resetLoopState(rootDir);
+      if (opts.json) {
+        console.log(
+          JSON.stringify(
+            { success: true, message: "Loop state reset successfully." },
+            null,
+            2,
+          ),
+        );
+      } else {
+        console.log(
+          `  ${colors.mintClear.apply(glyphs.passed)} Loop state reset successfully.`,
+        );
+      }
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
+loopCmd
+  .command("status")
+  .description("Inspect current loop iteration count and history")
+  .argument("[dir]", "Project directory", ".")
+  .option("--json", "Output results as JSON")
+  .action(async (dir: string, opts: { json?: boolean }) => {
+    try {
+      const { readLoopState } = await import("./core/loop/state.js");
+      const rootDir = (await import("node:path")).resolve(dir);
+      const state = await readLoopState(rootDir);
+      if (opts.json) {
+        console.log(JSON.stringify(state, null, 2));
+      } else {
+        console.log(
+          `  Loop Iteration: ${colors.vitalTeal.bold(String(state.currentIteration))}`,
+        );
+        console.log(
+          `  History Runs: ${colors.slateDim.dim(String(state.history.length))}`,
+        );
+      }
+    } catch (error) {
+      printError(error);
+      process.exitCode = 2;
+    }
+  });
+
 // ─── bilt verify ─────────────────────────────────────────────────────────────
 
 program
@@ -740,8 +801,8 @@ program
   .option("--snippets", "Include sanitized code snippets in untrusted_snippet")
   .option(
     "--max-iterations <n>",
-    "Maximum allowed loop iterations before escalating (default 5)",
-    "5",
+    "Maximum allowed loop iterations before escalating (default 15)",
+    "15",
   )
   .action(
     async (
