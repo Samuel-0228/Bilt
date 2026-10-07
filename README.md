@@ -1,6 +1,6 @@
 # Bilt
 
-[![npm version](https://img.shields.io/badge/npm-v1.0.5-blue.svg)](https://www.npmjs.com/package/bilt-toolkit)
+[![npm version](https://img.shields.io/badge/npm-v1.1.5-blue.svg)](https://www.npmjs.com/package/bilt-toolkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
 [![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/Samuel-0228/bilt)
@@ -173,33 +173,59 @@ When executing health checks or initialization, Bilt outputs an intuitive diagno
 
 ## CLI Command Reference
 
-| `bilt check [dir]`           | Comprehensive production-readiness verification for AI-built software. Categorizes issues across security and design.      | `--format <human\|agent\|json>`, `--changed`, `--base <ref>`, `--categories <list>`           |
-| `bilt design-check [dir]`    | Detects generic AI/template-driven website design patterns and checks production UX states. Includes `--fix` safe repair. | `--format <human\|agent\|json>`, `--fix`, `--changed`, `--base <ref>`                          |
-| `bilt design-brief [dir]`    | Developer questionnaire establishing product-specific design intent to guide AI coding agents.                            | `[subcommand: show\|edit]`, `--format <human\|agent>`, `--non-interactive`                    |
-| `bilt scan [dir]`            | Audits working tree and Git history for leaked secrets, framework misconfigurations, and environment mismatches. Supports agent and SARIF output formats. | `--changed`, `--base <ref>`, `--format <agent\|sarif\|json\|text>`, `--full-history`, `--json` |
-| `bilt verify [dir]`          | Git diff-scoped verification with configuration tamper detection and iteration budgeting for agents & CI.                                                 | `--base <ref>`, `--format <agent\|sarif\|text>`, `--max-iterations <N>`                        |
-| `bilt baseline create [dir]` | Captures pre-existing repository debt into `.bilt/baseline.json` so agents focus solely on new issues.                                                    | None                                                                                           |
-| `bilt mcp`                   | Starts the Model Context Protocol (MCP) stdio server for native AI tool calling (Claude Code, Cursor).                                                    | None                                                                                           |
-| `bilt prompt`                | Outputs modular system prompt security guidelines for coding agents.                                                                                      | `--agent <claude\|cursor\|default>`                                                            |
-| `bilt init`                  | Onboards repository. Supports `--agent` for zero-friction agent setup.                                                                                    | `--agent [name]`, `--dry-run`, `--force`, `--verbose`                                          |
-| `bilt api-scan [dir]`        | Executes specialized API security checks, inspecting endpoint safety, header hygiene, and key leaks.                                                      | `--json`, `--verbose`, `--dry-run`                                                             |
-| `bilt fix [dir]`             | Safely remediates flagged findings. Supports interactive mode, safe autopilot mode, or preview dry-runs.                                                  | `--safe`, `--dry-run`, `--verbose`, `--quiet`                                                  |
-| `bilt undo [dir]`            | Reverts the latest changes made by `bilt fix`. Displays snapshot diffs before restoring original files.                                                   | `--list`                                                                                       |
-| `bilt watch [dir]`           | Launches real-time background file monitor to detect secrets and environment drifts instantly on save.                                                    | `--quiet`, `--debounce <ms>`, `--poll`                                                         |
-| `bilt live [dir]`            | Alias for `bilt watch`. Continuous real-time security monitoring.                                                                                         | `--quiet`, `--debounce <ms>`                                                                   |
-| `bilt doctor [dir]`          | Generates comprehensive repository health analysis with severity grading and actionable remediation advice.                                               | `--card`, `--debug`                                                                            |
-| `bilt report [dir]`          | Exports project health and security findings to Markdown or JSON format for CI/CD integration.                                                            | `--format <markdown\|json>`, `--output <path>`                                                 |
-| `bilt plugin <action>`       | Manages custom scanning rules and extension plugins (`list`, `create`, `install`).                                                                        | `--dir <path>`                                                                                 |
-| `bilt welcome`               | Interactive onboarding wizard introducing Bilt concepts and command quick-starts.                                                                         | None                                                                                           |
-| `bilt onboarding`            | Alias for `bilt welcome`. Interactive wizard.                                                                                                             | None                                                                                           |
-| `bilt ai <subcommand>`       | Manages optional local or cloud AI provider integration (`setup`, `status`, `switch`, `model`).                                                           | `setup`, `status`, `switch`, `model`, `provider`, `remove`, `test`                             |
-| `bilt ask <question>`        | Queries contextual AI assistant about specific scan findings and remediation guidance.                                                                    | `--debug`                                                                                      |
+Bilt commands are organized into distinct functional layers:
+
+### 1. Verification & Production Readiness
+| Command | Description | Key Options |
+| :--- | :--- | :--- |
+| `bilt check [dir]` | Comprehensive pre-production readiness verification. Categorizes findings across security, architecture, and design. | `--format <human\|agent\|json>`, `--changed`, `--base <ref>`, `--categories <list>` |
+| `bilt verify [dir]` | Git diff-scoped CI/PR verification with tamper detection and iteration budgeting for agents. | `--base <ref>`, `--format <agent\|sarif\|text>`, `--max-iterations <N>` |
+| `bilt scan [dir]` | Audits working tree and Git history for leaked secrets, framework misconfigurations, and environment divergence. | `--changed`, `--base <ref>`, `--format <agent\|sarif\|json\|text>`, `--full-history`, `--json` |
+| `bilt api-scan [dir]` | Static API security checks, inspecting endpoint safety, method allowlists, and header hygiene. | `--json`, `--verbose`, `--dry-run` |
+
+### 2. Autonomous Remediation & Debt Management
+| Command | Description | Key Options |
+| :--- | :--- | :--- |
+| `bilt fix [dir]` | Safely remediates flagged findings. Supports interactive mode, safe autopilot mode, or preview dry-runs. | `--safe`, `--dry-run`, `--verbose`, `--quiet` |
+| `bilt undo [dir]` | Instant snapshot rollback: reverts the latest changes made by `bilt fix`. | `--list` |
+| `bilt baseline create [dir]` | Captures pre-existing repository debt into `.bilt/baseline.json` so agents focus solely on new diffs. | `--json` |
+| `bilt accept-risk <id>` | Explicitly accepts operational risk for a specific finding with a documented rationale and owner. | `--reason "<explanation>"`, `--owner "<team>"`, `--expires <date>` |
+
+### 3. Design Quality & Direction
+| Command | Description | Key Options |
+| :--- | :--- | :--- |
+| `bilt design-check [dir]` | Detects generic AI/template website patterns and checks accessibility/UX states. Includes `--fix` safe repair. | `--format <human\|agent\|json>`, `--fix`, `--changed`, `--base <ref>` |
+| `bilt design-brief [dir]` | Captures authentic human design intent (purpose, visual direction, colors, feeling) to guide AI coding agents. | `show`, `edit`, `set`, `--format <human\|agent>`, `--non-interactive` |
+| `bilt explain <topic>` | Interactive guidance, architectural patterns, and code snippets for flagged categories or rules. | `<category\|ruleId>` |
+
+### 4. AI Agent Supervision & Control Plane
+| Command | Description | Key Options |
+| :--- | :--- | :--- |
+| `bilt loop <subcommand> [dir]` | Manages agent supervision loop state and prevents infinite looping/thrashing (`reset`, `status`). | `reset`, `status`, `--json` |
+| `bilt prompt` | Outputs modular system prompt security guidelines for coding agents (Claude Code, Cursor, Codex). | `--agent <claude\|cursor\|default>` |
+| `bilt mcp` | Starts the Model Context Protocol (MCP) stdio server for native AI tool calling in agent IDEs. | None |
+
+### 5. Continuous Monitoring & Diagnostics
+| Command | Description | Key Options |
+| :--- | :--- | :--- |
+| `bilt watch [dir]` *(alias: `live`)* | Background daemon monitoring file events in real time on save. | `--quiet`, `--debounce <ms>`, `--poll` |
+| `bilt doctor [dir]` | Comprehensive repository health analysis with severity grading and shareable health card. | `--card`, `--owasp`, `--debug` |
+| `bilt report [dir]` | Exports project health and security findings to Markdown or JSON for CI/CD artifacts. | `--format <markdown\|json>`, `--output <path>` |
+
+### 6. Setup, Extensions & AI Assistant
+| Command | Description | Key Options |
+| :--- | :--- | :--- |
+| `bilt init [dir]` | Zero-friction onboarding: scans repo, applies safe `.gitignore` and `.env.example`, and configures `AGENTS.md`. | `--agent [name]`, `--dry-run`, `--force` |
+| `bilt plugin <action>` | Manages custom scanning rules and extension plugins (`list`, `create`, `install`). | `--dir <path>` |
+| `bilt welcome` *(alias: `onboarding`)* | Interactive terminal onboarding wizard introducing Bilt concepts. | None |
+| `bilt ai <subcommand>` | Manages optional local/cloud AI provider keys and audits redaction (`setup`, `status`, `switch`, `model`). | `setup`, `status`, `switch`, `model`, `provider`, `remove`, `test` |
+| `bilt ask <question>` | Queries contextual AI assistant about scan findings with automatic secret redaction. | `--debug` |
 
 ---
 
 ## Core Command Breakdown
 
-### 1. `scan` — Static Security & Environment Audit
+### `scan` — Static Security & Environment Audit
 
 Scans source files, config files, and git commit history for hardcoded tokens, secret keys, entropy spikes, and environment variable divergence.
 
@@ -214,7 +240,7 @@ bilt scan ./src
 bilt scan --json
 ```
 
-### 2. `api-scan` — Dedicated API Security Diagnostics
+### `api-scan` — Dedicated API Security Diagnostics
 
 Analyzes REST/GraphQL endpoints, API route handlers, authentication header checks, and client-exposed public keys.
 
@@ -222,15 +248,7 @@ Analyzes REST/GraphQL endpoints, API route handlers, authentication header check
 bilt api-scan
 ```
 
-### 3. `init` — Automated Project Onboarding
-
-Sets up recommended security defaults, ignores, and health baselines for new or unconfigured repositories.
-
-```bash
-bilt init
-```
-
-### 4. `fix` — Non-Destructive Remediation
+### `fix` — Non-Destructive Remediation
 
 Applies fixes interactively or in safe mode. Always previews changes using `--dry-run` first to review prospective edits without mutating disk files.
 
@@ -245,7 +263,7 @@ bilt fix
 bilt fix --safe
 ```
 
-### 5. `undo` — Instant Rollback & Snapshot Recovery
+### `undo` — Instant Rollback & Snapshot Recovery
 
 Reverts modifications performed by `bilt fix` using stored local snapshots.
 
@@ -257,7 +275,19 @@ bilt undo
 bilt undo --list
 ```
 
-### 6. `design-check` — Anti-Vibecoding & Production UX Detection
+### `baseline` — Legacy Debt Isolation
+
+Snapshots existing repository debt into `.bilt/baseline.json` so developers and AI coding agents focus strictly on introduced diffs (`introduced_by_change: true`).
+
+```bash
+# Capture current findings as a baseline
+bilt baseline create
+
+# Output JSON result
+bilt baseline create --json
+```
+
+### `design-check` — Anti-Vibecoding & Production UX Detection
 
 > **Bilt can detect when an interface is heavily dependent on recognizable AI-generated design patterns.**
 
@@ -333,7 +363,7 @@ If an autonomous coding agent makes repeated changes across consecutive iteratio
 
 ---
 
-### 7. `design-brief` — Developer Design Direction & Intent
+### `design-brief` — Developer Design Direction & Intent
 
 > **Allow developers to provide concise, intentional design direction before AI agents build or redesign user interfaces.**
 
@@ -364,9 +394,26 @@ bilt design-brief --non-interactive
 
 ---
 
-### 8. `watch` / `live` — Real-Time Daemon
+### `loop` — Agent Supervision & Loop State
 
-Monitors file creation, edits, and deletions in real time. Notifies developer immediately when a secret token is saved.
+Inspects or resets the runaway agent loop supervisor and iteration counter.
+
+```bash
+# Inspect current iteration count, history, and escalation status
+bilt loop status
+
+# Machine-readable JSON output
+bilt loop status --json
+
+# Reset runaway loop counter
+bilt loop reset
+```
+
+---
+
+### `watch` / `live` — Real-Time Background Daemon
+
+Monitors file creation, edits, and deletions in real time. Notifies developers immediately when a secret token or environment drift is detected on save.
 
 ```bash
 # Start watcher daemon
@@ -376,7 +423,19 @@ bilt watch
 bilt live
 ```
 
-### 7. `report` — CI/CD Export & Documentation Generator
+### `doctor` — Broad Health & Score Diagnostics
+
+Evaluates codebase maturity, secret leaks, missing `.env.example` definitions, and framework-specific security pitfalls.
+
+```bash
+# Holistic health report
+bilt doctor
+
+# Generate markdown health card
+bilt doctor --card
+```
+
+### `report` — CI/CD Export & Documentation Generator
 
 Exports structured security findings into Markdown or JSON reports.
 
@@ -391,15 +450,19 @@ bilt report --format markdown
 bilt report --format json
 ```
 
-### 8. `doctor` — Broad Health & Score Diagnostics
+### `init` — Automated Project Onboarding
 
-Evaluates codebase maturity, secret leaks, missing `.env.example` definitions, and framework-specific security pitfalls.
+Sets up recommended security defaults, ignores, and health baselines for new or unconfigured repositories.
 
 ```bash
-bilt doctor
+# Initialize Bilt guardrails, .gitignore, and .env.example
+bilt init
+
+# Configure agent guidelines for specific assistants (Claude, Cursor, default)
+bilt init --agent claude
 ```
 
-### 9. `plugin` — Custom Rule Extensions
+### `plugin` — Custom Rule Extensions
 
 List available plugins or scaffold custom security rules for project-specific protocols.
 
@@ -411,7 +474,7 @@ bilt plugin list
 bilt plugin create custom-security-rule
 ```
 
-### 10. `welcome` / `onboarding` — Interactive Assistant
+### `welcome` / `onboarding` — Interactive Assistant
 
 Guided terminal interface for new developers joining a codebase.
 
@@ -419,7 +482,7 @@ Guided terminal interface for new developers joining a codebase.
 bilt welcome
 ```
 
-### 11. `ai` & `ask` — Contextual AI Assistance
+### `ai` & `ask` — Contextual AI Assistance
 
 Inspect findings and request step-by-step remediation advice without exposing raw credentials.
 
