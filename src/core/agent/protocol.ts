@@ -267,6 +267,34 @@ function computeNextAction(
   }
 
   if (reviewFindings.length > 0) {
+    const designFindings = reviewFindings.filter((f) => f.category === 'design-quality');
+    const otherReviewFindings = reviewFindings.filter((f) => f.category !== 'design-quality');
+
+    if (designFindings.length > 0) {
+      const targetFiles = Array.from(
+        new Set(
+          designFindings.flatMap((f) =>
+            f.locations && f.locations.length > 0
+              ? f.locations.map((l) => l.file)
+              : f.file ? [f.file] : [],
+          ),
+        ),
+      );
+      const filesStr = targetFiles.length > 0 ? ` in ${targetFiles.slice(0, 3).join(', ')}` : '';
+      return {
+        type: 'fix',
+        findingIds: designFindings.map((f) => f.id ?? f.fingerprint),
+        instruction:
+          `MANDATORY DESIGN & UI REFACTOR: ${designFindings.length} design quality pattern(s) detected${filesStr}. ` +
+          `First, run "npx bilt design-check --fix" to automatically repair mechanical issues (focus rings, gradient text, blur orbs, corner radii). ` +
+          `Next, inspect the flagged files and refactor generic AI templates (eliminate stacked cards, radial blur orbs, and fake indicators) into authentic, domain-specific UI with real data density. ` +
+          (otherReviewFindings.length > 0
+            ? `${otherReviewFindings.length} guided architectural finding(s) require human review. `
+            : '') +
+          `Re-verify by running "npx bilt check --format agent".`,
+      };
+    }
+
     return {
       type: 'review',
       findingIds: reviewFindings.map((f) => f.id ?? f.fingerprint),
@@ -301,8 +329,6 @@ function normalizeFinding(f: BiltCheckFinding): BiltCheckFinding & {
   id: string;
   lifecycleStatus: import('../readiness/finding.js').FindingLifecycleStatus;
 } {
-  const agentAction = normalizeAgentAction(f.agentAction, f.file);
-
   let locations: FindingLocation[] = f.locations ?? [];
   if (locations.length === 0 && f.file) {
     locations = [
@@ -312,6 +338,34 @@ function normalizeFinding(f: BiltCheckFinding): BiltCheckFinding & {
         endLine: f.endLine ?? f.line,
       },
     ];
+  }
+
+  const filesToInspect =
+    locations.length > 0
+      ? [...new Set(locations.map((l) => l.file))]
+      : f.file ? [f.file] : [];
+
+  let agentAction: AgentActionContract;
+  if (typeof f.agentAction === 'string') {
+    agentAction = {
+      objective: f.agentAction,
+      allowedChanges: ['Remediate the specific finding described above'],
+      forbiddenChanges: [
+        'Weakening security configuration',
+        'Disabling or removing Bilt rules',
+        'Adding suppressions without explicit reason and owner',
+      ],
+      filesToInspect,
+      verificationCommand: 'npx bilt check --format agent',
+    };
+  } else {
+    agentAction = {
+      ...f.agentAction,
+      filesToInspect:
+        f.agentAction.filesToInspect && f.agentAction.filesToInspect.length > 0
+          ? f.agentAction.filesToInspect
+          : filesToInspect,
+    };
   }
 
   return {

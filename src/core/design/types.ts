@@ -23,6 +23,7 @@ export interface DesignFinding {
   file?: string;
   line?: number;
   endLine?: number;
+  locations?: Array<{ file: string; line?: number; endLine?: number }>;
   fixable?: boolean;
 }
 
@@ -172,6 +173,7 @@ export interface CopySnapshot {
   emojiCount: number;
   loremIpsumCount: number;
   featureMatrixCardOnlyCount: number;
+  matchLocations?: Array<{ file: string; line: number; phrase: string; patternType?: string }>;
 }
 
 export interface UXStateSnapshot {
@@ -286,6 +288,7 @@ export interface DesignRuleCheckResult {
   file?: string;
   line?: number;
   endLine?: number;
+  locations?: Array<{ file: string; line?: number; endLine?: number }>;
   fixable?: boolean;
 }
 

@@ -29,5 +29,12 @@ describe("Readiness Check & Design Quality Integration", () => {
       (f) => f.category === "design-quality",
     );
     expect(blockingDesignFindings).toHaveLength(0);
+
+    // Verify design findings have locations populated
+    for (const f of designFindings) {
+      expect(f.locations).toBeDefined();
+      expect(f.locations!.length).toBeGreaterThan(0);
+      expect(f.locations![0].file).toBe("app/page.tsx");
+    }
   });
 });

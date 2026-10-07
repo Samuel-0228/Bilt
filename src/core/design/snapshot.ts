@@ -139,6 +139,7 @@ export async function buildDesignSnapshot(
 
   let genericSaaSCount = 0;
   const genericPhrasesFound: string[] = [];
+  const copyMatchLocations: Array<{ file: string; line: number; phrase: string; patternType?: string }> = [];
   let adjectiveStackCount = 0;
   let itIsNotXItIsYCount = 0;
   let fakeTestimonialCount = 0;
@@ -336,6 +337,59 @@ export async function buildDesignSnapshot(
 
     lines.forEach((lineText, idx) => {
       const lineNum = idx + 1;
+
+      // Copy match tracking for precise file and line attribution
+      for (const pattern of GENERIC_SAAS_PATTERNS) {
+        const match = lineText.match(pattern);
+        if (match) {
+          copyMatchLocations.push({
+            file: relPath,
+            line: lineNum,
+            phrase: match[0],
+            patternType: "slogan",
+          });
+        }
+      }
+      if (ADJECTIVE_STACK_REGEX.test(lineText)) {
+        copyMatchLocations.push({
+          file: relPath,
+          line: lineNum,
+          phrase: "adjective stack",
+          patternType: "adjective-stack",
+        });
+      }
+      if (IT_IS_NOT_X_REGEX.test(lineText)) {
+        copyMatchLocations.push({
+          file: relPath,
+          line: lineNum,
+          phrase: "formulaic comparison",
+          patternType: "formulaic-claim",
+        });
+      }
+      if (FAKE_TESTIMONIAL_NAME_REGEX.test(lineText)) {
+        copyMatchLocations.push({
+          file: relPath,
+          line: lineNum,
+          phrase: "fake customer testimonial",
+          patternType: "testimonial",
+        });
+      }
+      if (FAKE_COMPANY_REGEX.test(lineText)) {
+        copyMatchLocations.push({
+          file: relPath,
+          line: lineNum,
+          phrase: "placeholder company name",
+          patternType: "company",
+        });
+      }
+      if (/lorem ipsum/i.test(lineText)) {
+        copyMatchLocations.push({
+          file: relPath,
+          line: lineNum,
+          phrase: "Lorem ipsum",
+          patternType: "lorem-ipsum",
+        });
+      }
 
       // Hero heading sizes
       if (
@@ -652,10 +706,25 @@ export async function buildDesignSnapshot(
       if (cardTags >= 3) cardNestingDepth = cardTags;
     }
 
+    let componentStartLine = 1;
+    if (isHero) {
+      const heroIdx = lines.findIndex((l) => /<section[^>]*hero|<header/i.test(l));
+      if (heroIdx >= 0) componentStartLine = heroIdx + 1;
+    } else if (isTerminalMockup) {
+      const termIdx = lines.findIndex((l) => /terminal|rounded-full.*bg-red-500/i.test(l));
+      if (termIdx >= 0) componentStartLine = termIdx + 1;
+    } else if (isBento) {
+      const bentoIdx = lines.findIndex((l) => /col-span-2/i.test(l));
+      if (bentoIdx >= 0) componentStartLine = bentoIdx + 1;
+    } else if (isTestimonial) {
+      const testIdx = lines.findIndex((l) => /testimonial/i.test(l));
+      if (testIdx >= 0) componentStartLine = testIdx + 1;
+    }
+
     components.push({
       name: path.basename(filePath, path.extname(filePath)),
       file: relPath,
-      line: 1,
+      line: componentStartLine,
       tag: "component",
       isCard: content.includes("rounded-") && (content.includes("border") || content.includes("shadow")),
       isButton: content.includes("<button"),
@@ -766,6 +835,7 @@ export async function buildDesignSnapshot(
     emojiCount,
     loremIpsumCount,
     featureMatrixCardOnlyCount,
+    matchLocations: copyMatchLocations,
   };
 
   const uxStates: UXStateSnapshot = {

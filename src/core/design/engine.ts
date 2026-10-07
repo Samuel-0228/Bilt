@@ -33,6 +33,188 @@ export function generateDesignFingerprint(
   return hash.digest("hex");
 }
 
+export interface ResolvedLocation {
+  primaryFile?: string;
+  primaryLine?: number;
+  locations: Array<{ file: string; line?: number; endLine?: number }>;
+}
+
+export function resolveFindingLocations(
+  ruleId: string,
+  res: import("./types.js").DesignRuleCheckResult,
+  snapshot: import("./types.js").DesignSnapshot,
+): ResolvedLocation {
+  const locMap = new Map<string, number>();
+
+  const addLoc = (file?: string, line?: number) => {
+    if (!file) return;
+    if (!locMap.has(file)) {
+      locMap.set(file, line ?? 1);
+    } else if (line && line > 1 && locMap.get(file) === 1) {
+      locMap.set(file, line);
+    }
+  };
+
+  // If rule explicitly provided file/line/locations, record them
+  if (res.file) {
+    addLoc(res.file, res.line);
+  }
+  if (res.locations) {
+    for (const l of res.locations) {
+      addLoc(l.file, l.line);
+    }
+  }
+
+  // Combinations & Landing page composition
+  if (
+    ruleId === "GENERIC-SAAS-COMBINATION-001" ||
+    ruleId === "VIBECODED-LANDING-PAGE-001" ||
+    ruleId === "DECORATION-OVERLOAD-001"
+  ) {
+    const marketingRoute = snapshot.routes.find((r) => r.type === "marketing");
+    if (marketingRoute) addLoc(marketingRoute.file);
+
+    for (const c of snapshot.components) {
+      if (
+        c.isHero ||
+        c.isTerminalMockup ||
+        c.isBentoGrid ||
+        c.isThreeColumnSection ||
+        c.isCard ||
+        c.iconNames.some((i) => /Sparkle|Wand/i.test(i))
+      ) {
+        addLoc(c.file, c.line);
+      }
+    }
+    for (const s of snapshot.styles) {
+      if (s.radialOrbCount > 0 || s.gradientTextCount > 0 || s.decorativeBlobCount > 0) {
+        addLoc(s.file);
+      }
+    }
+  }
+
+  // Gradients and visual styling
+  if (
+    ruleId === "DESIGN-VISUAL-001" ||
+    ruleId === "DESIGN-VISUAL-002" ||
+    ruleId === "DESIGN-VISUAL-003"
+  ) {
+    for (const s of snapshot.styles) {
+      if (
+        s.gradientTextCount > 0 ||
+        s.gradientButtonCount > 0 ||
+        s.gradientBorderCount > 0 ||
+        s.purpleBlueGradientCount > 0 ||
+        s.radialOrbCount > 0 ||
+        s.glassmorphismCount > 0
+      ) {
+        addLoc(s.file);
+      }
+    }
+  }
+
+  // Extreme corner radii
+  if (ruleId === "DESIGN-VISUAL-004") {
+    for (const s of snapshot.styles) {
+      if (s.extremeRadiusCount > 0) {
+        addLoc(s.file);
+      }
+    }
+  }
+
+  // Sparkle / wand icons
+  if (ruleId === "DESIGN-VISUAL-005") {
+    for (const c of snapshot.components) {
+      if (c.iconNames.some((name) => /Sparkle|Wand|Brain/i.test(name))) {
+        addLoc(c.file, c.line);
+      }
+    }
+  }
+
+  // Dot grids and textures
+  if (ruleId === "DESIGN-VISUAL-006") {
+    for (const s of snapshot.styles) {
+      if (s.dotGridCount > 0 || s.noiseTextureCount > 0) {
+        addLoc(s.file);
+      }
+    }
+  }
+
+  // Excessive hover animations & interactions
+  if (ruleId === "DESIGN-INTERACTION-001") {
+    for (const s of snapshot.styles) {
+      addLoc(s.file);
+    }
+  }
+  if (ruleId === "DESIGN-AUTHENTICITY-004") {
+    for (const c of snapshot.components) {
+      if (/animate-ping|viewing right now|online right now/i.test(c.rawText)) {
+        addLoc(c.file, c.line);
+      }
+    }
+  }
+
+  // Copy quality, slogans, testimonials, companies
+  if (ruleId.startsWith("CONTENT-QUALITY") || ruleId.startsWith("DESIGN-AUTHENTICITY")) {
+    if (snapshot.copy.matchLocations) {
+      for (const m of snapshot.copy.matchLocations) {
+        addLoc(m.file, m.line);
+      }
+    }
+    for (const c of snapshot.components) {
+      if (c.isTestimonial || /CEO at|Acme Corp|TechCorp|Supercharge/i.test(c.rawText)) {
+        addLoc(c.file, c.line);
+      }
+    }
+  }
+
+  // Accessibility
+  if (ruleId === "A11Y-UI-001") {
+    for (const c of snapshot.components) {
+      if (c.hasAriaLabel === false || c.hasIcon) {
+        addLoc(c.file, c.line);
+      }
+    }
+  }
+  if (ruleId === "A11Y-UI-002") {
+    for (const s of snapshot.styles) {
+      if (s.outlineNoneWithoutFocusVisibleCount > 0) {
+        addLoc(s.file);
+      }
+    }
+  }
+  if (ruleId === "A11Y-UI-003") {
+    for (const a of snapshot.assets) {
+      if (a.images.some((img) => img.alt === undefined)) {
+        addLoc(a.file);
+      }
+    }
+  }
+
+  // Fallback: if still empty, pick first route or first component
+  if (locMap.size === 0) {
+    const firstRoute = snapshot.routes[0];
+    const firstComponent = snapshot.components[0];
+    if (firstRoute) {
+      addLoc(firstRoute.file);
+    } else if (firstComponent) {
+      addLoc(firstComponent.file, firstComponent.line);
+    }
+  }
+
+  const locations = Array.from(locMap.entries()).map(([file, line]) => ({
+    file,
+    line,
+  }));
+
+  const primary = locations[0];
+  return {
+    primaryFile: primary?.file,
+    primaryLine: primary?.line,
+    locations,
+  };
+}
+
 export async function runDesignCheck(
   rootDir: string = ".",
   options: DesignCheckOptions = {},
@@ -77,13 +259,17 @@ export async function runDesignCheck(
   for (const rule of DESIGN_RULES) {
     const startRule = performance.now();
     const results = rule.check(snapshot);
-    timingMs[rule.id] = Number((performance.now() - startRule).toFixed(2));
     for (const res of results) {
       if (res.matches) {
+        const resolved = resolveFindingLocations(rule.id, res, snapshot);
+        const targetFile = res.file ?? resolved.primaryFile;
+        const targetLine = res.line ?? resolved.primaryLine;
+        const targetLocations = res.locations ?? resolved.locations;
+
         const fp = generateDesignFingerprint(
           rule.id,
-          res.file,
-          res.line,
+          targetFile,
+          targetLine,
           res.evidence.join(";"),
         );
 
@@ -98,7 +284,7 @@ export async function runDesignCheck(
             severity: rule.severity,
             title: rule.title,
             reason,
-            file: res.file,
+            file: targetFile,
           });
         } else {
           rawFindings.push({
@@ -111,9 +297,10 @@ export async function runDesignCheck(
             recommendation: rule.recommendation,
             agentAction: rule.agentAction,
             fingerprint: fp,
-            file: res.file,
-            line: res.line,
-            endLine: res.endLine,
+            file: targetFile,
+            line: targetLine,
+            endLine: res.endLine ?? targetLine,
+            locations: targetLocations,
             fixable: res.fixable,
           });
         }

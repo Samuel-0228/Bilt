@@ -54,9 +54,10 @@ npx bilt scan --format agent --changed
 
 ## 3. Strict Rules for Coding Agents
 
-1. **Only fix what you introduced**: Focus exclusively on findings where `"introduced_by_change": true`. Do not rewrite pre-existing repository debt unless explicitly requested.
-2. **Never weaken security configs**: Do not modify `.biltrc.json`, tamper with security rules, or add blanket `.gitignore` patterns to bypass checks. Bilt's tamper detector will fail the build with a hard `fail`.
-3. **Respect loop escalation**: If Bilt returns exit code `4` (`status: "escalate"`), do not loop or retry. Stop and ask the human maintainer for guidance.
+1. **Only fix what you introduced (Backend / Infrastructure)**: For security and architectural checks, focus on findings where `"introduced_by_change": true`.
+2. **UI Transformation Mandate**: Design quality, UI genericity, accessibility, and UX completeness findings are **NEVER** pre-existing debt that can be ignored or baselined away. When tasked with improving or making a project production-ready, you MUST actively inspect the UI files flagged by Bilt, run `npx bilt design-check --fix`, refactor template tropes into authentic domain UI, and achieve a passing design check.
+3. **Never weaken security configs**: Do not modify `.biltrc.json`, tamper with security rules, or add blanket `.gitignore` patterns to bypass checks. Bilt's tamper detector will fail the build with a hard `fail`.
+4. **Respect loop escalation**: If Bilt returns exit code `4` (`status: "escalate"`), do not loop or retry. Stop and ask the human maintainer for guidance.
 
 ---
 
@@ -72,14 +73,15 @@ When Bilt reports findings, you MUST execute the following remediation loop:
    npx bilt design-check --fix
    npx bilt fix --safe
    ```
-   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, and `.env` drift.
+   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, gradient text on headings, radial blur orbs, extreme radii, and `.env` drift.
 
 2. **Handle Pre-Existing Codebase Debt (Baselining)**:
-   If you were asked to onboard Bilt to an existing codebase and findings belong to pre-existing architecture (e.g. database backup strategy, Sentry monitoring, PII policies):
-   ```bash
-   npx bilt baseline create
-   ```
-   This captures existing debt into `.bilt/baseline.json` so you and future agents focus solely on diffs introduced by current tasks (`introduced_by_change: true`).
+   - For backend architectural debt (database backup strategy, external Sentry monitoring, PII policies):
+     ```bash
+     npx bilt baseline create
+     ```
+     This captures pre-existing infrastructure debt into `.bilt/baseline.json`.
+   - **CRITICAL UI WARNING**: **DO NOT USE BASELINE TO SILENCE UI OR DESIGN DEFECTS**. UI genericity and design flaws MUST be actively refactored into authentic, domain-specific UI with real data density.
 
 3. **Follow the Design Brief for UI Changes**:
    If design quality issues are flagged (`design-genericity`, uniform card grids, typography):

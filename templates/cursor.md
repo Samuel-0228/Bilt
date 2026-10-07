@@ -4,9 +4,10 @@
 > **Command**: `npx bilt` (or `bilt` if globally installed)
 
 1. Before suggesting commits or completing agent tasks, run `npx bilt verify --base origin/main --format agent` (or `npx bilt scan --format agent --changed`).
-2. Resolve only findings with `"introduced_by_change": true`.
-3. Do not modify Bilt ignore patterns or lower rule severities.
-4. If output status is `escalate`, cease modifications and ask the user for clarification.
+2. Resolve findings with `"introduced_by_change": true`.
+3. **UI Transformation Mandate**: Design quality, UI genericity, accessibility, and UX completeness findings are **NEVER** pre-existing debt that can be ignored or baselined away. You MUST actively resolve design findings in all components flagged by Bilt.
+4. Do not modify Bilt ignore patterns or lower rule severities.
+5. If output status is `escalate`, cease modifications and ask the user for clarification.
 
 ---
 
@@ -22,14 +23,11 @@ When Bilt reports findings, you MUST execute the following remediation loop:
    npx bilt design-check --fix
    npx bilt fix --safe
    ```
-   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, and `.env` drift.
+   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, gradient text on headings, radial blur orbs, extreme radii, and `.env` drift.
 
 2. **Handle Pre-Existing Codebase Debt (Baselining)**:
-   If you were asked to onboard Bilt to an existing codebase and findings belong to pre-existing architecture (e.g. database backup strategy, Sentry monitoring, PII policies):
-   ```bash
-   npx bilt baseline create
-   ```
-   This captures existing debt into `.bilt/baseline.json` so you and future agents focus solely on diffs introduced by current tasks (`introduced_by_change: true`).
+   - For backend architectural debt: `npx bilt baseline create`.
+   - **DO NOT USE BASELINE TO SILENCE UI OR DESIGN DEFECTS**. UI template tropes must be actively refactored into authentic domain UI.
 
 3. **Follow the Design Brief for UI Changes**:
    If design quality issues are flagged (`design-genericity`, uniform card grids, typography):

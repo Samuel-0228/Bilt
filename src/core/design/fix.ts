@@ -85,6 +85,70 @@ export async function applyDesignSafeFixes(rootDir: string): Promise<FixApplyRes
       });
     }
 
+    // 5. Replace generic low-contrast gradient text with solid high-contrast typography
+    const gradientTextRegex =
+      /\b(?:bg-gradient-to-[a-z]+(?:\s+from-[a-z0-9/\[\]_-]+)?(?:\s+via-[a-z0-9/\[\]_-]+)?(?:\s+to-[a-z0-9/\[\]_-]+)?\s+bg-clip-text\s+text-transparent|bg-clip-text\s+text-transparent\s+bg-gradient-to-[a-z]+(?:\s+from-[a-z0-9/\[\]_-]+)?(?:\s+via-[a-z0-9/\[\]_-]+)?(?:\s+to-[a-z0-9/\[\]_-]+)?)\b/g;
+    if (gradientTextRegex.test(modified)) {
+      modified = modified.replace(gradientTextRegex, "text-foreground font-semibold");
+      appliedFixes.push({
+        file: rel,
+        ruleId: "DESIGN-VISUAL-001",
+        description: "Replaced generic low-contrast gradient text with solid high-contrast typography",
+      });
+    }
+
+    // 6. Neutralize non-functional decorative radial blur orbs and glowing background blobs
+    const blurOrbTagRegex =
+      /<div\s+className="[^"]*(?:(?:radial-gradient|rounded-full|from-purple|bg-purple)[^"]*blur-(?:2xl|3xl)|blur-(?:2xl|3xl)[^"]*(?:radial-gradient|rounded-full|from-purple|bg-purple))[^"]*"[^>]*\/>/gi;
+    if (blurOrbTagRegex.test(modified)) {
+      modified = modified.replace(
+        blurOrbTagRegex,
+        "{/* Decorative background blur removed by Bilt for visual clarity */}",
+      );
+      appliedFixes.push({
+        file: rel,
+        ruleId: "DECORATION-OVERLOAD-001",
+        description: "Removed non-functional decorative background blur orb",
+      });
+    }
+
+    // 7. Normalize extreme container radii from rounded-3xl to crisp rounded-xl
+    if (/\brounded-3xl\b|\brounded-\[3[0-9]px\]\b|\brounded-\[4[0-9]px\]\b/.test(modified)) {
+      modified = modified.replace(
+        /\brounded-3xl\b|\brounded-\[3[0-9]px\]\b|\brounded-\[4[0-9]px\]\b/g,
+        "rounded-xl",
+      );
+      appliedFixes.push({
+        file: rel,
+        ruleId: "DESIGN-VISUAL-004",
+        description: "Calibrated extreme container corner radius from rounded-3xl to rounded-xl",
+      });
+    }
+
+    // 8. Normalize excessive hover scale transforms causing layout jitter
+    if (/\bhover:scale-(?:105|110|102)\b/.test(modified)) {
+      modified = modified.replace(
+        /\bhover:scale-(?:105|110|102)\b/g,
+        "transition-colors hover:border-zinc-700",
+      );
+      appliedFixes.push({
+        file: rel,
+        ruleId: "DESIGN-INTERACTION-001",
+        description: "Replaced layout-displacing hover:scale-105 with subtle border transition",
+      });
+    }
+
+    // 9. Replace simulated fake live counter with authentic operational status
+    const fakeViewerRegex = /[0-9]+\s+(?:people|users)\s+(?:viewing|online)\s+right\s+now/gi;
+    if (fakeViewerRegex.test(modified)) {
+      modified = modified.replace(fakeViewerRegex, "All systems operational");
+      appliedFixes.push({
+        file: rel,
+        ruleId: "DESIGN-AUTHENTICITY-004",
+        description: "Replaced hardcoded fake visitor activity count with authentic operational status",
+      });
+    }
+
     // If changes were made, write back
     if (modified !== content) {
       await fs.writeFile(filePath, modified, "utf-8");

@@ -16,12 +16,20 @@ describe("Bilt CLI Design-Check Integration", () => {
       "agent",
     ], { reject: false });
 
-    // Status needs-improvement returns exit code 1
     expect([1, 4]).toContain(exitCode);
     const parsed = JSON.parse(stdout);
     expect(parsed.schemaVersion).toBe("1");
     expect(parsed.summary.patternsDetected).toBeGreaterThan(0);
     expect(Array.isArray(parsed.findings)).toBe(true);
+    expect(parsed.nextAction).toBeDefined();
+    if (exitCode === 1) {
+      expect(parsed.nextAction.type).toBe("fix");
+    } else {
+      expect(parsed.nextAction.type).toBe("escalate");
+    }
+    expect(parsed.findings[0].locations).toBeDefined();
+    expect(parsed.findings[0].locations.length).toBeGreaterThan(0);
+    expect(parsed.findings[0].locations[0].file).toBe("app/page.tsx");
   });
 
   it("executes bilt design-check --format human against intentional fixture", async () => {

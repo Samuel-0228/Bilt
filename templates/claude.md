@@ -16,8 +16,9 @@ When writing or modifying code in this project with Claude Code:
    npx bilt verify --base origin/main --format agent
    ```
 
-2. **Fix Rules**:
-   - Only address issues flagged with `"introduced_by_change": true`.
+2. **Fix Rules & UI Transformation Mandate**:
+   - For backend code, address issues flagged with `"introduced_by_change": true`.
+   - **CRITICAL UI / DESIGN EXCEPTION**: Design quality, UI genericity, accessibility, and UX completeness findings are **NEVER** pre-existing debt that can be ignored or baselined away. You MUST actively resolve design findings in all components flagged by Bilt.
    - Never weaken Bilt configuration or delete rules to clear findings.
    - Never print raw secret values into the chat context or tool outputs.
 
@@ -38,14 +39,14 @@ When Bilt reports findings, you MUST execute the following remediation loop:
    npx bilt design-check --fix
    npx bilt fix --safe
    ```
-   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, and `.env` drift.
+   This automatically repairs focus rings (`outline-none`), missing `aria-label`, missing `alt` attributes, gradient text on headings, radial blur orbs, extreme radii, and `.env` drift.
 
 2. **Handle Pre-Existing Codebase Debt (Baselining)**:
-   If you were asked to onboard Bilt to an existing codebase and findings belong to pre-existing architecture (e.g. database backup strategy, Sentry monitoring, PII policies):
-   ```bash
-   npx bilt baseline create
-   ```
-   This captures existing debt into `.bilt/baseline.json` so you and future agents focus solely on diffs introduced by current tasks (`introduced_by_change: true`).
+   - For backend infrastructure debt (database backup, external Sentry, PII policies):
+     ```bash
+     npx bilt baseline create
+     ```
+   - **CRITICAL UI WARNING**: **DO NOT USE BASELINE TO SILENCE UI OR DESIGN DEFECTS**. UI genericity and template flaws MUST be actively refactored into authentic, domain-specific UI with real data density.
 
 3. **Follow the Design Brief for UI Changes**:
    If design quality issues are flagged (`design-genericity`, uniform card grids, typography):

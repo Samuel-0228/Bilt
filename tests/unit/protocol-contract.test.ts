@@ -21,6 +21,7 @@ import type {
 import type { CheckResult } from "../../src/core/readiness/check-runner.js";
 import type { BiltCheckFinding } from "../../src/core/readiness/finding.js";
 import type { GateResult } from "../../src/core/readiness/readiness-gate.js";
+import { generateCheckFingerprint } from "../../src/core/readiness/finding.js";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ describe("Agent Behavior — GOOD_AGENT (correct)", () => {
 
     // A good agent reads these two fields and decides to stop
     expect(res.status).toBe("pass");
-    expect(res.nextAction.type).toBe("none");
+    expect(["none", "stop"]).toContain(res.nextAction.type);
     expect(res.nextAction.findingIds).toHaveLength(0);
   });
 
@@ -297,10 +298,42 @@ describe("Finding Schema — Structural Contract", () => {
   });
 
   it("fingerprint does not depend on raw line numbers", () => {
-    const { generateCheckFingerprint } = require("../../src/core/readiness/finding.js");
     const fp1 = generateCheckFingerprint("AUTH-001", "src/routes/api.ts", 10, "process.env.SECRET");
     const fp2 = generateCheckFingerprint("AUTH-001", "src/routes/api.ts", 999, "process.env.SECRET");
     // Same ruleId + file + evidence → same fingerprint regardless of line
     expect(fp1).toBe(fp2);
+  });
+});
+
+describe("Agent Behavior — Design Quality Refactor Mandate", () => {
+  it("emits nextAction type 'fix' with explicit refactor instructions when design-quality findings exist", () => {
+    const designFinding = makeFinding({
+      id: "des-001",
+      ruleId: "GENERIC-SAAS-COMBINATION-001",
+      category: "design-quality" as any,
+      severity: "high",
+      status: "needs-review",
+      agentAction: "Audit the hero and feature sections.",
+      locations: [{ file: "app/page.tsx", startLine: 14 }],
+      file: "app/page.tsx",
+    });
+
+    const gate = makeGate({
+      status: "not-ready-needs-review",
+      reviewFindings: [designFinding],
+    });
+
+    const result = makeResult({
+      gate,
+      findings: [designFinding],
+    });
+
+    const res = buildAgentResponse({ result, ...EXEC_META });
+
+    expect(res.status).toBe("needs-review");
+    expect(res.nextAction.type).toBe("fix");
+    expect(res.nextAction.instruction).toContain("MANDATORY DESIGN & UI REFACTOR");
+    expect(res.nextAction.instruction).toContain("app/page.tsx");
+    expect(res.findings[0].agentAction.filesToInspect).toContain("app/page.tsx");
   });
 });

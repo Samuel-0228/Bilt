@@ -38,6 +38,12 @@ export const designQualityChecker: CategoryChecker = {
         file: df.file,
         line: df.line,
         endLine: df.endLine,
+        locations:
+          df.locations && df.locations.length > 0
+            ? df.locations.map((l) => ({ file: l.file, startLine: l.line, endLine: l.endLine }))
+            : df.file
+              ? [{ file: df.file, startLine: df.line, endLine: df.endLine }]
+              : [],
         fingerprint: df.fingerprint,
       });
     }
