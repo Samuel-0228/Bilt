@@ -186,7 +186,7 @@ program
 program
   .command("design-brief")
   .description("Manage the project design brief")
-  .argument("[subcommand]", "Subcommand: show | edit | set | clear")
+  .argument("[subcommand]", "Subcommand: show | edit | set | clear | questionnaire | questions")
   .argument("[dir]", "Project directory", ".")
   .option("--format <format>", "Output format: human, agent", "human")
   .option("--non-interactive", "Skip questionnaire; print machine-readable status")
@@ -214,7 +214,7 @@ program
       }
     ) => {
       try {
-        const known = ["show", "edit", "set", "clear"];
+        const known = ["show", "edit", "set", "clear", "questionnaire", "questions"];
         const isKnown = subcommand && known.includes(subcommand.toLowerCase());
         const actualSubcommand = isKnown ? subcommand.toLowerCase() : undefined;
         const targetDir = isKnown ? (dir || ".") : (subcommand || ".");

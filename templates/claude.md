@@ -89,26 +89,28 @@ Do not remove or weaken Bilt rules simply to obtain a passing result.
 
 ---
 
-## DESIGN BRIEF & HUMAN-INTENT BOUNDARIES
+## DESIGN BRIEF & MANDATORY HUMAN-INTENT CHECKPOINT
 
 Bilt uses a Design Brief (`.bilt/design-brief.json`) to capture authentic human design intent before UI implementation.
 
 1. **Explicit Human-in-the-Loop Checkpoint**: The design brief represents authentic human intent. **NEVER** guess, infer from files, or autonomously synthesize fake design choices to create `.bilt/design-brief.json`.
-2. **When `.bilt/design-brief.json` is not configured (`configured: false`)**:
+2. **MANDATORY CHECKPOINT WHEN UNCONFIGURED (`configured: false`)**:
    - Query: `npx bilt design-brief --format agent`
-   - If the user asked you to use, set up, or follow a design brief: **PAUSE execution immediately** and ask the developer these 4 questions in chat:
+   - Whenever design quality findings are detected, UI refactoring is needed, or preparing a website for production:
+     **YOU MUST PAUSE EXECUTION IMMEDIATELY AND ASK THE DEVELOPER THESE 4 DESIGN INTENT QUESTIONS IN CHAT**:
      1. **Purpose & Audience**: What is the main purpose of this product, and who is it for?
      2. **Visual Direction**: What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', or Custom)
      3. **Brand Colors**: Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')
      4. **Desired Feeling**: When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')
+   - **DO NOT SKIP THIS INTERVIEW**. You cannot produce authentic domain UI without knowing the actual domain, user persona, and aesthetic goals. Never guess or fabricate answers.
    - After the developer responds, record their authentic answers using:
      ```bash
      npx bilt design-brief set --purpose "..." --visual "..." --colors "..." --feeling "..."
      ```
      *(or write `.bilt/design-brief.json` directly)*.
-   - If the user did NOT request a design brief: design creativity remains agent-controlled. Proceed using your best judgment while verifying with `npx bilt design-check`.
 3. **When `.bilt/design-brief.json` is configured (`configured: true`)**:
    - Query: `npx bilt design-brief --format agent` to read the developer's authentic constraints.
    - Respect creative freedom where fields are marked "Surprise me" (`creative-freedom`).
+   - Refactor generic AI templates into authentic domain UI matching the brief.
    - Run `npx bilt design-check` after UI changes.
 

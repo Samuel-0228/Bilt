@@ -60,4 +60,41 @@ describe("Design Brief CLI", () => {
     expect(outputHuman).toContain("Purpose:      test");
     expect(outputHuman).toContain("Visual:       minimal");
   });
+
+  it("outputs structured questionnaire in agent mode", () => {
+    const cmd = `node ${path.resolve("bin/bilt.js")} design-brief questionnaire --format agent ${tmpDir}`;
+    const output = execSync(cmd).toString();
+    const result = JSON.parse(output);
+
+    expect(result.schemaVersion).toBe("1");
+    expect(Array.isArray(result.questions)).toBe(true);
+    expect(result.questions).toHaveLength(4);
+    expect(result.questions[0].id).toBe("purpose");
+    expect(result.questions[1].id).toBe("visual");
+    expect(result.questions[2].id).toBe("colors");
+    expect(result.questions[3].id).toBe("feeling");
+    expect(result.agentInstruction).toContain("npx bilt design-brief set");
+  });
+
+  it("prints human-readable questionnaire in human mode", () => {
+    const cmd = `node ${path.resolve("bin/bilt.js")} design-brief questionnaire ${tmpDir}`;
+    const output = execSync(cmd).toString();
+
+    expect(output).toContain("BILT DESIGN INTENT QUESTIONNAIRE");
+    expect(output).toContain("Purpose & Audience");
+    expect(output).toContain("Visual Direction");
+    expect(output).toContain("Brand Colors");
+    expect(output).toContain("Desired Feeling");
+    expect(output).toContain("npx bilt design-brief set");
+  });
+
+  it("does not contain agent-controlled escape hatch in agent instructions", () => {
+    const cmd = `node ${path.resolve("bin/bilt.js")} design-brief --format agent --non-interactive ${tmpDir}`;
+    const output = execSync(cmd).toString();
+    const result = JSON.parse(output);
+
+    expect(result.agentInstructions).not.toContain("agent-controlled");
+    expect(result.agentInstructions).toContain("MANDATORY CHECKPOINT BEFORE UI WORK");
+    expect(result.agentInstructions).toContain("DO NOT SKIP OR BYPASS THIS INTERVIEW");
+  });
 });

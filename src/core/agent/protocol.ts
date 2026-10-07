@@ -5,6 +5,8 @@
 // Schema version "1" — stable. Increment only for breaking changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import path from 'node:path';
+import fs from 'node:fs';
 import type { CheckResult } from '../readiness/check-runner.js';
 import type { BiltCheckFinding, FindingLocation, AgentActionContract } from '../readiness/finding.js';
 import { normalizeAgentAction } from '../readiness/finding.js';
@@ -127,6 +129,8 @@ export interface BuildAgentResponseOptions {
   previousFingerprints?: string[];
   /** If provided, loop escalation is baked into the response. */
   escalation?: { reason: EscalationReason; detail: string };
+  /** Explicit override for whether design brief is configured. */
+  hasDesignBrief?: boolean;
 }
 
 export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentResponse {
@@ -138,6 +142,23 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
   const findings = result.findings.map(normalizeFinding);
   const blockingFindings = result.gate.blockingFindings.map(normalizeFinding);
   const reviewFindings = result.gate.reviewFindings.map(normalizeFinding);
+
+  // ── Design Brief Detection ────────────────────────────────────────────────────
+  let hasDesignBrief = opts.hasDesignBrief;
+  if (hasDesignBrief === undefined && projectRoot) {
+    try {
+      const briefPath = path.join(projectRoot, ".bilt", "design-brief.json");
+      if (fs.existsSync(briefPath)) {
+        const raw = fs.readFileSync(briefPath, "utf-8");
+        const parsed = JSON.parse(raw);
+        hasDesignBrief = Boolean(parsed && typeof parsed === "object");
+      } else {
+        hasDesignBrief = false;
+      }
+    } catch {
+      hasDesignBrief = false;
+    }
+  }
 
   // ── Summary ──────────────────────────────────────────────────────────────────
   const summary: AgentSummary = {
@@ -162,7 +183,13 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
   }
 
   // ── nextAction ────────────────────────────────────────────────────────────────
-  const nextAction = computeNextAction(status, blockingFindings, reviewFindings, escalation);
+  const nextAction = computeNextAction(
+    status,
+    blockingFindings,
+    reviewFindings,
+    escalation,
+    hasDesignBrief ?? false,
+  );
 
   // ── Progress ──────────────────────────────────────────────────────────────────
   let progress: AgentProgress | undefined;
@@ -220,6 +247,7 @@ function computeNextAction(
   blockingFindings: BiltCheckFinding[],
   reviewFindings: BiltCheckFinding[],
   escalation?: { reason: EscalationReason; detail: string },
+  hasDesignBrief: boolean = false,
 ): AgentNextAction {
   if (status === 'escalate' || escalation) {
     return {
@@ -281,13 +309,26 @@ function computeNextAction(
         ),
       );
       const filesStr = targetFiles.length > 0 ? ` in ${targetFiles.slice(0, 3).join(', ')}` : '';
+
+      const designRefactorBody = !hasDesignBrief
+        ? `First, run "npx bilt design-check --fix" to automatically repair mechanical issues (focus rings, gradient text, blur orbs, corner radii). ` +
+          `Next: MANDATORY DESIGN INTENT CHECKPOINT — No design brief is configured (.bilt/design-brief.json). ` +
+          `Before rewriting UI, you MUST PAUSE and ask the developer these 4 Design Intent questions in chat:\n` +
+          `1. Purpose & Audience: What is the main purpose of this product, and who is it for?\n` +
+          `2. Visual Direction: What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', or Custom)\n` +
+          `3. Brand Colors: Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n` +
+          `4. Desired Feeling: When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')\n` +
+          `After the developer answers, save their answers via "npx bilt design-brief set --purpose '...' --visual '...' --colors '...' --feeling '...'". ` +
+          `Then inspect the flagged files and refactor generic AI templates into authentic, domain-specific UI with real data density. `
+        : `First, run "npx bilt design-check --fix" to automatically repair mechanical issues (focus rings, gradient text, blur orbs, corner radii). ` +
+          `Next, follow the configured design brief in .bilt/design-brief.json: inspect the flagged files and refactor generic AI templates (eliminate stacked cards, radial blur orbs, and fake indicators) into authentic, domain-specific UI with real data density. `;
+
       return {
         type: 'fix',
         findingIds: designFindings.map((f) => f.id ?? f.fingerprint),
         instruction:
           `MANDATORY DESIGN & UI REFACTOR: ${designFindings.length} design quality pattern(s) detected${filesStr}. ` +
-          `First, run "npx bilt design-check --fix" to automatically repair mechanical issues (focus rings, gradient text, blur orbs, corner radii). ` +
-          `Next, inspect the flagged files and refactor generic AI templates (eliminate stacked cards, radial blur orbs, and fake indicators) into authentic, domain-specific UI with real data density. ` +
+          designRefactorBody +
           (otherReviewFindings.length > 0
             ? `${otherReviewFindings.length} guided architectural finding(s) require human review. `
             : '') +

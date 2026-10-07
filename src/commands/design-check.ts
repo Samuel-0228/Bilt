@@ -23,7 +23,7 @@ export async function executeDesignCheck(
   }
 
   if (format === "agent" || format === "json") {
-    const jsonOutput = formatAgentDesignOutput(result);
+    const jsonOutput = formatAgentDesignOutput(result, { projectRoot: targetDir });
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     const humanOutput = formatHumanDesignOutput(result);

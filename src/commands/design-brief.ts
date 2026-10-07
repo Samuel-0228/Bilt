@@ -47,6 +47,71 @@ export async function executeDesignBrief(
     return 0;
   }
 
+  // ─── Subcommand: questionnaire / questions ─────────────────────────────────
+  if (normalizedSubcommand === "questionnaire" || normalizedSubcommand === "questions") {
+    const questionsList = [
+      {
+        id: "purpose",
+        number: 1,
+        title: "Purpose & Audience",
+        question: "What is the main purpose of this product, and who is it for?",
+        hint: "E.g. 'A B2B SaaS dashboard for dental clinics to track patient appointments' or 'Surprise me'",
+      },
+      {
+        id: "visual",
+        number: 2,
+        title: "Visual Direction",
+        question: "What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', Custom)",
+        hint: "Choose one or more aesthetic styles",
+      },
+      {
+        id: "colors",
+        number: 3,
+        title: "Brand Colors",
+        question: "Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')",
+        hint: "Hex codes, color names, or 'Surprise me' (e.g. '#0f172a, #3b82f6')",
+      },
+      {
+        id: "feeling",
+        number: 4,
+        title: "Desired Feeling",
+        question: "When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')",
+        hint: "The emotional tone the interface should convey",
+      },
+    ];
+
+    const currentBrief = await readDesignBrief(dir);
+
+    if (isAgent) {
+      console.log(
+        JSON.stringify(
+          {
+            schemaVersion: "1",
+            configured: currentBrief !== null,
+            questions: questionsList,
+            agentInstruction:
+              "PAUSE execution and present these 4 Design Intent questions to the developer in chat. " +
+              "Once they respond, save their answers using: " +
+              "npx bilt design-brief set --purpose \"...\" --visual \"...\" --colors \"...\" --feeling \"...\"",
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.log("\n  BILT DESIGN INTENT QUESTIONNAIRE");
+      console.log("  ─────────────────────────────────");
+      console.log("  Copy and paste these 4 questions into your prompt or chat:\n");
+      for (const q of questionsList) {
+        console.log(`  ${q.number}. ${q.title}: ${q.question}`);
+        console.log(`     Hint: ${q.hint}\n`);
+      }
+      console.log("  To record answers after getting a response:");
+      console.log('  npx bilt design-brief set --purpose "..." --visual "..." --colors "..." --feeling "..."\n');
+    }
+    return 0;
+  }
+
   // ─── Subcommand: set ──────────────────────────────────────────────────────
   if (normalizedSubcommand === "set") {
     let briefToSave: DesignBrief;
@@ -173,7 +238,7 @@ export async function executeDesignBrief(
       printHumanBrief(brief);
     } else {
       console.log("No Bilt Design Brief exists.");
-      console.log("Design creativity remains agent-controlled.");
+      console.log("To configure design intent: run 'npx bilt design-brief questionnaire' or 'npx bilt design-brief set ...'");
     }
     return 0;
   }
@@ -190,7 +255,7 @@ export async function executeDesignBrief(
         console.log("To configure a design brief:");
         console.log("  • In an interactive terminal: run 'npx bilt design-brief'");
         console.log("  • In an AI coding agent: ask the developer in chat, then run 'npx bilt design-brief set ...'");
-        console.log("Design creativity remains agent-controlled.");
+        console.log("To see the questions: run 'npx bilt design-brief questionnaire'");
       }
       return 0;
     }
@@ -211,7 +276,7 @@ export async function executeDesignBrief(
       printHumanBrief(brief);
     } else {
       console.log("No Bilt Design Brief exists.");
-      console.log("Design creativity remains agent-controlled.");
+      console.log("To configure design intent: run 'npx bilt design-brief questionnaire' or 'npx bilt design-brief set ...'");
     }
   }
 
@@ -232,16 +297,17 @@ function formatAgentOutput(brief: DesignBrief | null): DesignBriefAgentOutput {
       constraints: [],
       agentInstructions:
         "No Bilt Design Brief exists (`configured: false`).\n" +
-        "CRITICAL HUMAN-INTENT BOUNDARY:\n" +
-        "1. Do NOT autonomously fabricate or guess answers to populate `.bilt/design-brief.json`.\n" +
-        "2. If the user asked you to use, set up, or follow a design brief: PAUSE execution and present the 4 questionnaire questions directly to the developer in chat:\n" +
-        "   Q1 (Purpose): What is the main purpose of this product, and who is it for?\n" +
+        "CRITICAL HUMAN-INTENT BOUNDARY & MANDATORY QUESTIONNAIRE:\n" +
+        "1. Do NOT autonomously fabricate, guess, or hallucinate answers to populate `.bilt/design-brief.json`.\n" +
+        "2. MANDATORY CHECKPOINT BEFORE UI WORK: Whenever design quality or vibecoding issues are detected, you MUST PAUSE execution and ask the developer these 4 Design Intent questions in chat:\n" +
+        "   Q1 (Purpose & Audience): What is the main purpose of this product, and who is it for?\n" +
         "   Q2 (Visual Direction): What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', Custom)\n" +
-        "   Q3 (Brand Colors): Do you have brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n" +
-        "   Q4 (Desired Feeling): What should the interface feel like? (Trustworthy, calm, energetic, technical, or 'Surprise me')\n" +
-        "   After the developer responds, record their exact answers via `npx bilt design-brief set --purpose ... --visual ... --colors ... --feeling ...` (or write `.bilt/design-brief.json`).\n" +
-        "3. If the user did NOT request a design brief, design creativity remains agent-controlled. Avoid generic AI/vibecoded patterns.\n" +
-        "4. Run `bilt design-check` before declaring UI complete. If identical findings persist across 3 runs, STOP and ask the developer.",
+        "   Q3 (Brand Colors): Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n" +
+        "   Q4 (Desired Feeling): When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')\n" +
+        "3. DO NOT SKIP OR BYPASS THIS INTERVIEW. Authentic domain UI requires human direction on product purpose and audience.\n" +
+        "4. After the developer responds, record their exact answers via `npx bilt design-brief set --purpose ... --visual ... --colors ... --feeling ...` (or write `.bilt/design-brief.json`).\n" +
+        "5. Once saved, refactor the UI to align with their brief and run `npx bilt design-check --format agent` to verify.\n" +
+        "6. If identical findings persist across 3 runs, STOP and ask the developer.",
     };
   }
 

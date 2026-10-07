@@ -376,6 +376,7 @@ export async function runDesignCheck(
     fixedCount,
     rawSnapshot: options.debug ? snapshot : undefined,
     timingMs: options.debug ? timingMs : undefined,
+    hasDesignBrief: brief !== null,
   };
 }
 

@@ -336,4 +336,62 @@ describe("Agent Behavior — Design Quality Refactor Mandate", () => {
     expect(res.nextAction.instruction).toContain("app/page.tsx");
     expect(res.findings[0].agentAction.filesToInspect).toContain("app/page.tsx");
   });
+
+  it("injects 4 Design Intent questions into nextAction.instruction when no brief is configured", () => {
+    const designFinding = makeFinding({
+      id: "des-002",
+      ruleId: "GENERIC-SAAS-COMBINATION-001",
+      category: "design-quality" as any,
+      severity: "high",
+      status: "needs-review",
+      locations: [{ file: "components/hero.tsx", startLine: 10 }],
+      file: "components/hero.tsx",
+    });
+
+    const gate = makeGate({
+      status: "not-ready-needs-review",
+      reviewFindings: [designFinding],
+    });
+
+    const result = makeResult({
+      gate,
+      findings: [designFinding],
+    });
+
+    const res = buildAgentResponse({ result, ...EXEC_META, hasDesignBrief: false });
+
+    expect(res.nextAction.instruction).toContain("MANDATORY DESIGN INTENT CHECKPOINT");
+    expect(res.nextAction.instruction).toContain("Purpose & Audience");
+    expect(res.nextAction.instruction).toContain("Visual Direction");
+    expect(res.nextAction.instruction).toContain("Brand Colors");
+    expect(res.nextAction.instruction).toContain("Desired Feeling");
+    expect(res.nextAction.instruction).toContain("npx bilt design-brief set");
+  });
+
+  it("instructs agent to follow configured design brief when hasDesignBrief is true", () => {
+    const designFinding = makeFinding({
+      id: "des-003",
+      ruleId: "GENERIC-SAAS-COMBINATION-001",
+      category: "design-quality" as any,
+      severity: "high",
+      status: "needs-review",
+      locations: [{ file: "components/hero.tsx", startLine: 10 }],
+      file: "components/hero.tsx",
+    });
+
+    const gate = makeGate({
+      status: "not-ready-needs-review",
+      reviewFindings: [designFinding],
+    });
+
+    const result = makeResult({
+      gate,
+      findings: [designFinding],
+    });
+
+    const res = buildAgentResponse({ result, ...EXEC_META, hasDesignBrief: true });
+
+    expect(res.nextAction.instruction).not.toContain("MANDATORY DESIGN INTENT CHECKPOINT");
+    expect(res.nextAction.instruction).toContain("follow the configured design brief in .bilt/design-brief.json");
+  });
 });

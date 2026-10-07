@@ -340,4 +340,5 @@ export interface DesignCheckResult {
   fixedCount?: number;
   rawSnapshot?: DesignSnapshot;
   timingMs?: Record<string, number>;
+  hasDesignBrief?: boolean;
 }
