@@ -5,26 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.6] - 2026-10-04
+## [1.1.5] - 2026-10-07
 
-### Added & Enhanced — Agent Protocol & Control Plane Architecture
+### Added & Enhanced — Agent Protocol, Supervision Layer & Telemetry Hardening
 
+- **Component Tag Casing in Design Auto-Fixer (`src/core/design/fix.ts`)**: Preserves `<Button>` casing on accessible button fixes, avoiding JSX element downgrades to native HTML `<button>` tags.
+- **Protected Ecosystem Dependencies & Expanded Scanning (`src/core/scan/dependencies.ts`)**: Added common web ecosystem libraries (`zod`, `react-hook-form`, `swr`, `date-fns`, `clsx`, `tailwind-merge`, `lucide-react`) to the protected allowlist and increased the scan limit to 2,000 files with support for dynamic imports and re-exports.
+- **Loop Supervision & Auto-Reset (`src/core/loop/state.ts`)**: Auto-resets loop state when all findings are resolved, increased default iteration budget to 15, and added automatic reset on `bilt init` and `bilt baseline create`.
+- **New `bilt loop` Command (`src/cli.ts`)**: Added `bilt loop reset` and `bilt loop status` for inspection and management of agent supervision state.
 - **Strict Agent Response Protocol (`src/core/agent/protocol.ts`)**: Built canonical builder for schema version `"1"` returning `status`, `summary`, `findings`, `nextAction` (`type`, `findingIds`, `instruction`), `execution` (`command`, `projectRoot`, `durationMs`), and `progress` (`previous`, `current`, `resolved`, `introduced`, `regressed`, `net`).
-- **Machine-Actionable Finding Contract (`src/core/readiness/finding.ts`)**: Upgraded `BiltCheckFinding` with content-based `id`, structured `agentAction` contract (`objective`, `allowedChanges`, `forbiddenChanges`, `filesToInspect`, `verificationCommand`), `locations[]`, and `lifecycleStatus` ('open', 'in-progress', 'verifying', 'resolved', 'suppressed').
+- **Machine-Actionable Finding Contract (`src/core/readiness/finding.ts`)**: Upgraded `BiltCheckFinding` with content-based `id`, structured `agentAction` contract (`objective`, `allowedChanges`, `forbiddenChanges`, `filesToInspect`, `verificationCommand`), `locations[]`, and `lifecycleStatus`.
 - **Line-Number-Independent Fingerprints**: `generateCheckFingerprint()` now computes content-normalized SHA256 hashes without raw line numbers so fingerprints survive refactoring and code movement.
-- **Agent Contract Test Suite (`tests/agent/protocol-contract.test.ts`)**: Added unit and behavioral contract tests for `GOOD_AGENT`, `PASSIVE_AGENT`, `LOOPING_AGENT`, progress tracking, and fingerprint stability guarantees.
-- **Agent Protocol Reference Documentation (`docs/agent-protocol.md`)**: Comprehensive documentation covering authority models, schema specifications, decision loops, exit code contracts, and remediation rules.
-- **Loop Escalation Integration**: Integrated loop progress detection into `bilt check --format agent`, returning exit code `4` (`status: "escalate"`) on runaway agent iterations or state thrashing.
-
-## [1.1.5] - 2026-10-03
-
-### Added & Enhanced - Anti-Passive Auditor Trap Architecture
-
 - **Action Plan in Readiness Check**: Enhanced `bilt check` human output with an explicit, high-visibility `ACTION PLAN FOR DEVELOPERS & AI CODING AGENTS` detailing runnable commands (`bilt design-check --fix`, `bilt fix --safe`, `bilt baseline create`, `bilt design-brief --format agent`, `bilt explain <rule>`).
-- **Machine-Readable Agent Directive**: Enhanced `bilt check --format agent` JSON output with top-level `agentInstruction` and structured `actionPlan` arrays containing executable bash commands and remediation reasons.
-- **Autonomous Agent Remediation Protocol**: Codified the mandatory `AUTONOMOUS REMEDIATION PROTOCOL (DO NOT MERELY REPORT AND HALT)` across `AGENTS.md`, `templates/default.md`, `templates/claude.md`, `templates/cursor.md`, and `init-agent.ts`.
-- **Integrated Agent Onboarding in `init`**: `bilt init` now automatically scaffolds `AGENTS.md` and agent hooks alongside `.gitignore` and `.env.example`, unifying repository hygiene and agent governance into a single command.
-- **Reporter Next Steps**: Updated `bilt init` completion output to highlight `check`, `baseline`, and `design-check --fix`.
+- **Autonomous Remediation Protocol**: Codified the mandatory `AUTONOMOUS REMEDIATION PROTOCOL (DO NOT MERELY REPORT AND HALT)` across `AGENTS.md` and templates.
 
 ## [1.1.2] - 2026-09-28
 
