@@ -85,7 +85,12 @@ jobs:
         run: |
           node scripts/package-registry.js github
           npm pack
-          npm publish
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "@samuel-0228/bilt-toolkit@$PKG_VERSION" --registry=https://npm.pkg.github.com > /dev/null 2>&1; then
+            echo "Notice: @samuel-0228/bilt-toolkit@$PKG_VERSION is already published to GitHub Packages. Skipping."
+          else
+            npm publish
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -98,7 +103,12 @@ jobs:
         if: env.NPM_TOKEN != ''
         run: |
           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
-          npm publish --access public
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "bilt-toolkit@$PKG_VERSION" --registry=https://registry.npmjs.org > /dev/null 2>&1; then
+            echo "Notice: bilt-toolkit@$PKG_VERSION is already published to npm. Skipping."
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -107,7 +117,12 @@ jobs:
         if: env.NPM_TOKEN != ''
         run: |
           node scripts/package-registry.js npm-scoped
-          npm publish --@samuel-0228:registry=https://registry.npmjs.org --access public
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "@samuel-0228/bilt-toolkit@$PKG_VERSION" --registry=https://registry.npmjs.org > /dev/null 2>&1; then
+            echo "Notice: @samuel-0228/bilt-toolkit@$PKG_VERSION is already published to scoped npm. Skipping."
+          else
+            npm publish --@samuel-0228:registry=https://registry.npmjs.org --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

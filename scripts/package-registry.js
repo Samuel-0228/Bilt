@@ -42,6 +42,7 @@ function configureGitHub() {
 }
 
 function configureNpm() {
+  backupPackageJson();
   const pkg = readPackageJson();
   pkg.name = NPM_PACKAGE_NAME;
   pkg.publishConfig = {
@@ -82,12 +83,13 @@ function restorePackageJson() {
     console.log("[package-registry] Restored original package.json from backup.");
   } else {
     const pkg = readPackageJson();
-    pkg.name = GITHUB_PACKAGE_NAME;
+    pkg.name = NPM_PACKAGE_NAME;
     pkg.publishConfig = {
-      registry: GITHUB_REGISTRY,
+      registry: NPM_REGISTRY,
+      access: "public",
     };
     writePackageJson(pkg);
-    console.log("[package-registry] Reset package.json to default GitHub Packages configuration.");
+    console.log("[package-registry] Reset package.json to default npm configuration.");
   }
 }
 
