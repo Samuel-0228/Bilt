@@ -2,14 +2,21 @@
 // Single source of truth for the machine-readable JSON contract that AI agents
 // consume. Every `--format agent` response passes through here.
 //
+// Protocol Answers 3 Mandatory Questions for Coding Agents:
+// 1. What is wrong?        → status, summary, findings (with objective, allowed/forbidden changes)
+// 2. What should I do next?→ nextAction (type, findingIds, instruction)
+// 3. Am I allowed to continue? → allowedToContinue (boolean gate)
+//
 // Schema version "1" — stable. Increment only for breaking changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import path from 'node:path';
 import fs from 'node:fs';
 import type { CheckResult } from '../readiness/check-runner.js';
-import type { BiltCheckFinding, FindingLocation, AgentActionContract } from '../readiness/finding.js';
+import type { BiltCheckFinding, FindingLocation, AgentActionContract, CheckSeverity } from '../readiness/finding.js';
 import { normalizeAgentAction } from '../readiness/finding.js';
+import type { ReadinessCategory } from '../readiness/taxonomy.js';
+import type { AgentSession, SessionStatus } from './session.js';
 import { DISCLAIMER } from '../readiness/disclaimer.js';
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -54,11 +61,11 @@ export interface AgentProgress {
   previous: number;
   /** Number of open findings in this run. */
   current: number;
-  /** Findings resolved since the last run (fingerprints). */
+  /** Findings resolved since the last run (fingerprints or IDs). */
   resolved: string[];
-  /** New findings introduced since the last run (fingerprints). */
+  /** New findings introduced since the last run (fingerprints or IDs). */
   introduced: string[];
-  /** Findings that were resolved then re-appeared (fingerprints). */
+  /** Findings that were resolved then re-appeared (regressions). */
   regressed: string[];
   /** Net change: negative means improvement, positive means regression. */
   net: number;
@@ -78,15 +85,48 @@ export interface AgentEscalation {
   detail: string;
 }
 
+export interface AgentSessionInfo {
+  id: string;
+  iteration: number;
+  status: SessionStatus;
+  previousFindings: number;
+  currentFindings: number;
+  resolvedFindings: string[];
+  introducedFindings: string[];
+  regressions: string[];
+  unchangedFindings: string[];
+  escalationState: {
+    escalated: boolean;
+    reason?: EscalationReason;
+    detail?: string;
+  };
+}
+
+export interface AgentFinding extends BiltCheckFinding {
+  id: string;
+  ruleId: string;
+  category: ReadinessCategory;
+  severity: CheckSeverity;
+  title: string;
+  objective: string;
+  filesToInspect: string[];
+  allowedChanges: string[];
+  forbiddenChanges: string[];
+  verification: string;
+  locations: FindingLocation[];
+  agentAction: AgentActionContract;
+}
+
 /**
  * The canonical Bilt Agent Response (schema version "1").
  *
  * EVERY `--format agent` command returns this structure.
  * Agents MUST:
- *   1. Read `status` — it is the authoritative gate signal.
- *   2. Read `nextAction.type` — it is the authoritative instruction.
+ *   1. Read `status` and `allowedToContinue` — authoritative gate signals.
+ *   2. Read `nextAction.type` and `nextAction.instruction` — authoritative instructions.
  *   3. Act on `nextAction.findingIds` — these are the findings requiring action.
- *   4. NEVER self-assess resolution. Re-run `verificationCommand` in each finding.
+ *   4. Follow `objective`, `allowedChanges`, and `forbiddenChanges` on each finding.
+ *   5. NEVER self-assess resolution. Re-run `verification` command in each finding.
  */
 export interface AgentResponse {
   /** Schema version. Increment only for breaking changes. */
@@ -102,19 +142,29 @@ export interface AgentResponse {
    * - "error"        → Bilt internal error. Review `escalation.detail`.
    */
   status: AgentStatus;
+  /**
+   * Authoritative permission signal: Am I allowed to continue working or declare complete?
+   * true  → All checks pass. Agent may proceed or declare complete.
+   * false → Agent MUST NOT proceed without fixing or escalating.
+   */
+  allowedToContinue: boolean;
   summary: AgentSummary;
-  findings: BiltCheckFinding[];
+  findings: AgentFinding[];
   /**
    * Deterministic next action for the agent.
    * Agents MUST NOT decide what to do next independently of this field.
    */
   nextAction: AgentNextAction;
-  /** Metadata about this scan execution. */
-  execution: AgentExecutionMeta;
-  /** Progress delta since last run (if loop state is available). */
+  /**
+   * Active supervision session state tracking progression across iterations.
+   */
+  session?: AgentSessionInfo;
+  /** Progress delta since last run. */
   progress?: AgentProgress;
   /** Only present when status === "escalate". */
   escalation?: AgentEscalation;
+  /** Metadata about this scan execution. */
+  execution: AgentExecutionMeta;
   disclaimer: string;
 }
 
@@ -125,21 +175,32 @@ export interface BuildAgentResponseOptions {
   toolVersion: string;
   command: string;
   projectRoot: string;
+  /** Active session state if running under supervisor. */
+  session?: AgentSession;
   /** Fingerprints from the previous run — used to compute progress delta. */
   previousFingerprints?: string[];
   /** If provided, loop escalation is baked into the response. */
   escalation?: { reason: EscalationReason; detail: string };
   /** Explicit override for whether design brief is configured. */
   hasDesignBrief?: boolean;
+  /** Explicit list of regressed fingerprints. */
+  regressedFingerprints?: string[];
 }
 
 export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentResponse {
-  const { result, toolVersion, command, projectRoot, previousFingerprints, escalation } = opts;
+  const { result, toolVersion, command, projectRoot } = opts;
+  const session = opts.session;
+  let escalation = opts.escalation;
+
+  if (!escalation && session?.escalationState?.escalated) {
+    escalation = {
+      reason: session.escalationState.reason || 'unknown',
+      detail: session.escalationState.detail || 'Supervision loop escalation triggered.',
+    };
+  }
 
   // ── Normalize findings ────────────────────────────────────────────────────────
-  // Ensure every finding in the response has a structured agentAction object and
-  // a locations[] array, regardless of how the checker constructed the finding.
-  const findings = result.findings.map(normalizeFinding);
+  const findings: AgentFinding[] = result.findings.map(normalizeFinding);
   const blockingFindings = result.gate.blockingFindings.map(normalizeFinding);
   const reviewFindings = result.gate.reviewFindings.map(normalizeFinding);
 
@@ -182,6 +243,12 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
     status = 'needs-review';
   }
 
+  const allowedToContinue = status === 'pass';
+
+  // ── Regressions ──────────────────────────────────────────────────────────────
+  const regressedFps = opts.regressedFingerprints || session?.regressions || [];
+  const regressedFindings = findings.filter((f) => regressedFps.includes(f.fingerprint));
+
   // ── nextAction ────────────────────────────────────────────────────────────────
   const nextAction = computeNextAction(
     status,
@@ -189,28 +256,56 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
     reviewFindings,
     escalation,
     hasDesignBrief ?? false,
+    regressedFindings,
   );
 
-  // ── Progress ──────────────────────────────────────────────────────────────────
+  // ── Progress & Session ────────────────────────────────────────────────────────
   let progress: AgentProgress | undefined;
-  if (previousFingerprints !== undefined) {
+  const previousFpList = opts.previousFingerprints || session?.previousFingerprints;
+
+  if (session) {
+    progress = {
+      previous: session.previousFingerprints ? session.previousFingerprints.length : 0,
+      current: findings.length,
+      resolved: session.resolvedFingerprints || [],
+      introduced: session.introducedFingerprints || [],
+      regressed: session.regressions || [],
+      net: findings.length - (session.previousFingerprints ? session.previousFingerprints.length : 0),
+    };
+  } else if (previousFpList !== undefined) {
     const currentFps = findings.map((f) => f.fingerprint);
-    const prevSet = new Set(previousFingerprints);
+    const prevSet = new Set(previousFpList);
     const currSet = new Set(currentFps);
 
-    const resolved = previousFingerprints.filter((fp) => !currSet.has(fp));
+    const resolved = previousFpList.filter((fp) => !currSet.has(fp));
     const introduced = currentFps.filter((fp) => !prevSet.has(fp));
-    // Regressed = was resolved in prev→curr transition but re-appeared (not applicable
-    // in a two-snapshot diff; kept for symmetry with the full Change Ledger)
-    const regressed: string[] = [];
+    const regressed = opts.regressedFingerprints || [];
 
     progress = {
-      previous: previousFingerprints.length,
+      previous: previousFpList.length,
       current: currentFps.length,
       resolved,
       introduced,
       regressed,
-      net: currentFps.length - previousFingerprints.length,
+      net: currentFps.length - previousFpList.length,
+    };
+  }
+
+  let sessionInfo: AgentSessionInfo | undefined;
+  if (session) {
+    sessionInfo = {
+      id: session.id,
+      iteration: session.iteration,
+      status: session.status,
+      previousFindings: session.previousFingerprints ? session.previousFingerprints.length : 0,
+      currentFindings: findings.length,
+      resolvedFindings: session.resolvedFingerprints || [],
+      introducedFindings: session.introducedFingerprints || [],
+      regressions: session.regressions || [],
+      unchangedFindings: session.unchangedFingerprints || [],
+      escalationState: session.escalationState || {
+        escalated: false,
+      },
     };
   }
 
@@ -225,6 +320,7 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
     schemaVersion: '1',
     toolVersion,
     status,
+    allowedToContinue,
     summary,
     findings,
     nextAction,
@@ -232,6 +328,7 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
     disclaimer: DISCLAIMER,
   };
 
+  if (sessionInfo) response.session = sessionInfo;
   if (progress) response.progress = progress;
   if (escalation) {
     response.escalation = escalation;
@@ -244,17 +341,18 @@ export function buildAgentResponse(opts: BuildAgentResponseOptions): AgentRespon
 
 function computeNextAction(
   status: AgentStatus,
-  blockingFindings: BiltCheckFinding[],
-  reviewFindings: BiltCheckFinding[],
+  blockingFindings: AgentFinding[],
+  reviewFindings: AgentFinding[],
   escalation?: { reason: EscalationReason; detail: string },
   hasDesignBrief: boolean = false,
+  regressedFindings: AgentFinding[] = [],
 ): AgentNextAction {
   if (status === 'escalate' || escalation) {
     return {
       type: 'escalate',
       findingIds: [],
       instruction:
-        'HALT automated retries. A loop or tamper condition was detected. ' +
+        'HALT automated retries. A loop, regression impasse, or tamper condition was detected. ' +
         'Stop and explain the situation to the human maintainer immediately.',
     };
   }
@@ -264,7 +362,19 @@ function computeNextAction(
       type: 'stop',
       findingIds: [],
       instruction:
-        'STOP. All checks pass. Zero introduced violations. STOP making changes solely to satisfy Bilt. You may commit or open a pull request.',
+        'STOP. All checks pass. Zero introduced violations. Allowed to continue. You may commit or finalize the task.',
+    };
+  }
+
+  // If regression detected, prioritize alerting agent to fix regression
+  if (regressedFindings.length > 0) {
+    const regressedIds = regressedFindings.map((f) => f.id || f.fingerprint);
+    return {
+      type: 'fix',
+      findingIds: regressedIds,
+      instruction:
+        `REGRESSION DETECTED: ${regressedFindings.length} finding(s) previously resolved have re-appeared (${regressedIds.slice(0, 3).join(', ')}). ` +
+        `You MUST fix this regression before proceeding. Follow agentAction.objective and allowedChanges. Verification: run "npx bilt check --format agent".`,
     };
   }
 
@@ -275,22 +385,22 @@ function computeNextAction(
     if (fixable.length > 0) {
       return {
         type: 'fix',
-        findingIds: blockingFindings.map((f) => f.id ?? f.fingerprint),
+        findingIds: blockingFindings.map((f) => f.id || f.fingerprint),
         instruction:
           `${fixable.length} finding(s) are auto-fixable. Run "npx bilt fix --safe" then ` +
           `"npx bilt design-check --fix", then re-run "npx bilt check --format agent" to verify. ` +
           (manual.length > 0
-            ? `${manual.length} finding(s) require manual remediation — inspect agentAction.objective on each.`
+            ? `${manual.length} finding(s) require manual remediation — inspect objective on each.`
             : ''),
       };
     }
 
     return {
       type: 'fix',
-      findingIds: blockingFindings.map((f) => f.id ?? f.fingerprint),
+      findingIds: blockingFindings.map((f) => f.id || f.fingerprint),
       instruction:
         `${blockingFindings.length} blocking finding(s) require manual remediation. ` +
-        'Follow agentAction.objective for each finding. After changes, run "npx bilt check --format agent" to verify.',
+        'Follow objective, allowedChanges, and forbiddenChanges for each finding. After changes, run "npx bilt check --format agent" to verify.',
     };
   }
 
@@ -325,7 +435,7 @@ function computeNextAction(
 
       return {
         type: 'fix',
-        findingIds: designFindings.map((f) => f.id ?? f.fingerprint),
+        findingIds: designFindings.map((f) => f.id || f.fingerprint),
         instruction:
           `MANDATORY DESIGN & UI REFACTOR: ${designFindings.length} design quality pattern(s) detected${filesStr}. ` +
           designRefactorBody +
@@ -338,14 +448,13 @@ function computeNextAction(
 
     return {
       type: 'review',
-      findingIds: reviewFindings.map((f) => f.id ?? f.fingerprint),
+      findingIds: reviewFindings.map((f) => f.id || f.fingerprint),
       instruction:
         `${reviewFindings.length} finding(s) require human review. ` +
         'Present findings to the developer. Do NOT auto-fix or suppress without explicit approval.',
     };
   }
 
-  // Should not normally reach here, but if status is not-ready with no findings:
   return {
     type: 'verify',
     findingIds: [],
@@ -356,20 +465,13 @@ function computeNextAction(
 // ── Finding normalization ─────────────────────────────────────────────────────
 
 /**
- * Ensure a BiltCheckFinding has:
- * - A structured AgentActionContract (not a plain string)
- * - A populated `locations[]` array (reconstructed from legacy flat fields if needed)
- * - A populated `id` field (fallback to fingerprint prefix)
- * - A populated `lifecycleStatus` field (defaults to 'open')
- *
- * This runs at output time so checkers don't need to be rewritten immediately.
+ * Ensure an AgentFinding has:
+ * - Direct top-level objective, filesToInspect, allowedChanges, forbiddenChanges, verification
+ * - A structured agentAction object
+ * - A populated locations[] array
+ * - A clean id string
  */
-function normalizeFinding(f: BiltCheckFinding): BiltCheckFinding & {
-  agentAction: AgentActionContract;
-  locations: FindingLocation[];
-  id: string;
-  lifecycleStatus: import('../readiness/finding.js').FindingLifecycleStatus;
-} {
+function normalizeFinding(f: BiltCheckFinding): AgentFinding {
   let locations: FindingLocation[] = f.locations ?? [];
   if (locations.length === 0 && f.file) {
     locations = [
@@ -390,11 +492,14 @@ function normalizeFinding(f: BiltCheckFinding): BiltCheckFinding & {
   if (typeof f.agentAction === 'string') {
     agentAction = {
       objective: f.agentAction,
-      allowedChanges: ['Remediate the specific finding described above'],
+      allowedChanges: [
+        (f as any).suggestion || 'Remediate the specific finding described in the objective',
+        'Update configuration or code to use secure patterns',
+      ],
       forbiddenChanges: [
-        'Weakening security configuration',
-        'Disabling or removing Bilt rules',
-        'Adding suppressions without explicit reason and owner',
+        'Do not weaken security configuration',
+        'Do not disable or remove Bilt rules or detectors',
+        'Do not add suppressions without explicit approval and owner',
       ],
       filesToInspect,
       verificationCommand: 'npx bilt check --format agent',
@@ -406,14 +511,25 @@ function normalizeFinding(f: BiltCheckFinding): BiltCheckFinding & {
         f.agentAction.filesToInspect && f.agentAction.filesToInspect.length > 0
           ? f.agentAction.filesToInspect
           : filesToInspect,
+      verificationCommand: f.agentAction.verificationCommand || 'npx bilt check --format agent',
     };
   }
 
+  const objective = f.objective || agentAction.objective;
+  const allowedChanges = f.allowedChanges || agentAction.allowedChanges;
+  const forbiddenChanges = f.forbiddenChanges || agentAction.forbiddenChanges;
+  const verification = f.verification || agentAction.verificationCommand || 'npx bilt check --format agent';
+
   return {
     ...f,
-    id: f.id ?? f.fingerprint.slice(0, 8),
-    lifecycleStatus: f.lifecycleStatus ?? 'open',
+    id: f.id || f.ruleId || f.fingerprint.slice(0, 8),
+    lifecycleStatus: f.lifecycleStatus || 'open',
     agentAction,
     locations,
+    objective,
+    filesToInspect: agentAction.filesToInspect,
+    allowedChanges,
+    forbiddenChanges,
+    verification,
   };
 }

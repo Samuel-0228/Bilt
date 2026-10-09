@@ -3,11 +3,17 @@
 > **Installation**: `npm install -D bilt-toolkit`
 > **Command**: `npx bilt` (or `bilt` if globally installed)
 
-1. Before suggesting commits or completing agent tasks, run `npx bilt verify --base origin/main --format agent` (or `npx bilt scan --format agent --changed`).
-2. Resolve findings with `"introduced_by_change": true`.
-3. **UI Transformation Mandate**: Design quality, UI genericity, accessibility, and UX completeness findings are **NEVER** pre-existing debt that can be ignored or baselined away. You MUST actively resolve design findings in all components flagged by Bilt.
-4. Do not modify Bilt ignore patterns or lower rule severities.
-5. If output status is `escalate`, cease modifications and ask the user for clarification.
+Follow these 10 mandatory operating principles:
+1. Use Bilt during implementation: run `npx bilt check --changed --format agent` (or `npx bilt scan --format agent --changed`).
+2. Verify before considering task complete: run `npx bilt check --base origin/main --format agent` before opening PRs.
+3. Treat structured output as authoritative: check `status` and `allowedToContinue`. Follow `nextAction`.
+4. Fix blocking/high findings: resolve findings in `nextAction.findingIds` (including `"introduced_by_change": true`).
+5. Follow exact remediation constraints: obey `objective`, `allowedChanges`, and `forbiddenChanges`.
+6. Strict non-evasion invariant: do not modify Bilt ignore patterns or lower rule severities.
+7. Re-run Bilt after changes: execute `verification` command to confirm fixes.
+8. Watch for regressions: if a previously resolved issue re-appears in `session.regressions`, fix it immediately.
+9. Stop when Bilt reports escalate: if status is `escalate` (exit code 4), cease modifications and ask the user for guidance.
+10. Ask the developer when human decision is needed: if `status` is `needs-review`, consult the developer.
 
 ---
 

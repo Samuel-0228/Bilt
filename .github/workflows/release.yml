@@ -4,9 +4,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
-  contents: write # Required to create a GitHub Release
+  contents: write # Required to create GitHub Release and upload assets
+  packages: write # Required to publish to GitHub Packages (npm.pkg.github.com)
 
 jobs:
   publish:
@@ -22,14 +24,14 @@ jobs:
         with:
           node-version: 'lts/*'
           cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
 
-      - name: Check for npm token
+      - name: Check for publishing credentials
         run: |
+          echo "GITHUB_TOKEN is automatically provided for GitHub Packages publication."
           if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "Error: NPM_TOKEN secret is missing or empty."
-            echo "Please add a granular access token with publish permissions as a repository secret named 'NPM_TOKEN'."
-            exit 1
+            echo "Notice: NPM_TOKEN secret is not set. Publishing to public npm registry will be skipped."
+          else
+            echo "NPM_TOKEN secret is detected. Public npm registry will also be published."
           fi
 
       - name: Install dependencies
@@ -48,6 +50,7 @@ jobs:
         run: npm run build
 
       - name: Verify package version matches git tag
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
           PKG_VERSION=$(node -p "require('./package.json').version")
@@ -71,18 +74,67 @@ jobs:
           fi
           echo "All required files exist."
 
-      - name: Verify package with npm pack
-        run: npm pack --dry-run
+      - name: Configure GitHub Packages authentication
+        run: |
+          echo "@samuel-0228:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to npm
-        run: npm publish
+      - name: Publish to GitHub Packages (@samuel-0228/bilt-toolkit)
+        run: |
+          node scripts/package-registry.js github
+          npm pack
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pack for npm registry (bilt-toolkit)
+        run: |
+          node scripts/package-registry.js npm
+          npm pack
+
+      - name: Publish to public npm (bilt-toolkit)
+        if: env.NPM_TOKEN != ''
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
+      - name: Publish to public npm (@samuel-0228/bilt-toolkit)
+        if: env.NPM_TOKEN != ''
+        run: |
+          node scripts/package-registry.js npm-scoped
+          npm publish --@samuel-0228:registry=https://registry.npmjs.org --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Restore original package.json
+        if: always()
+        run: node scripts/package-registry.js restore
+
+      - name: Create or update GitHub Release with tarball assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "Release ${{ github.ref_name }}" \
-            --generate-notes
+          RELEASE_TAG="${{ github.ref_name }}"
+          if [ -z "$RELEASE_TAG" ] || [ "${{ github.ref_type }}" != "tag" ]; then
+            RELEASE_TAG="v$(node -p "require('./package.json').version")"
+          fi
+          echo "Target release tag: $RELEASE_TAG"
+          echo "Release tarball assets to attach:"
+          ls -la *.tgz
+
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists. Uploading tarball assets..."
+            gh release upload "$RELEASE_TAG" *.tgz --clobber
+          else
+            echo "Creating GitHub Release $RELEASE_TAG with release notes and tarball assets..."
+            gh release create "$RELEASE_TAG" \
+              *.tgz \
+              --title "Release $RELEASE_TAG" \
+              --generate-notes
+          fi

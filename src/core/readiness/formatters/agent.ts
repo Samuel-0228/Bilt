@@ -34,6 +34,9 @@ export function formatAgentCheckOutput(
   command = "bilt check --format agent",
   projectRoot = process.cwd(),
   previousFingerprints?: string[],
+  session?: import("../../agent/session.js").AgentSession,
+  escalation?: { reason: import("../../agent/protocol.js").EscalationReason; detail: string },
+  regressedFingerprints?: string[],
 ): AgentResponse {
   return buildAgentResponse({
     result,
@@ -41,5 +44,8 @@ export function formatAgentCheckOutput(
     command,
     projectRoot,
     previousFingerprints,
+    session,
+    escalation,
+    regressedFingerprints,
   });
 }

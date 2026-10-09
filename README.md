@@ -122,12 +122,17 @@ npm install -D bilt-toolkit
 
 # Option 2: Install globally to run the 'bilt' command anywhere
 npm install -g bilt-toolkit
+
+# Option 3: Install from GitHub Packages
+# (Requires @samuel-0228:registry=https://npm.pkg.github.com in .npmrc)
+npm install -D @samuel-0228/bilt-toolkit
 ```
 
 > [!IMPORTANT]
 > **Package Name vs. CLI Binary Command:**
-> - The package name on npm is **`bilt-toolkit`** (`npm i bilt-toolkit`).
-> - Once installed, the CLI binary command you execute in your terminal is **`bilt`** (or **`npx bilt`** if installed locally in `node_modules`).
+> - On npm, the package is **`bilt-toolkit`** (`npm i bilt-toolkit`).
+> - On GitHub Packages, the package is scoped as **`@samuel-0228/bilt-toolkit`**.
+> - Regardless of registry, the executable binary in your terminal is **`bilt`** (or **`npx bilt`**).
 
 ### First Steps
 

@@ -3,38 +3,43 @@
 > **Installation**: `npm install -D bilt-toolkit`
 > **Command**: `npx bilt` (or `bilt` if globally installed)
 
-You are operating in a repository equipped with Bilt deterministic security gating.
-Follow these mandatory principles when modifying code:
+You are operating in a repository equipped with Bilt deterministic engineering supervision.
+Bilt is an active verification layer inside your development loop. Treat Bilt's structured machine-readable output as authoritative project feedback.
 
-1. **Invoke the Check**:
-   Before completing your task or generating a commit, run:
+Follow these 10 mandatory operating principles:
 
+1. **Use Bilt during implementation**: Run Bilt checks incrementally while developing:
    ```bash
-   npx bilt scan --format agent --changed
+   npx bilt check --changed --format agent
+   ```
+   Or against target branch / PR base:
+   ```bash
+   npx bilt check --base origin/main --format agent
+   # or: npx bilt scan --format agent --changed
    ```
 
-   Or in a CI/PR environment:
+2. **Verify before considering task complete**: Never declare your task complete without running Bilt checks.
 
-   ```bash
-   npx bilt verify --base origin/main --format agent
-   ```
+3. **Treat structured output as authoritative**:
+   - Inspect `status` and `allowedToContinue`. If `allowedToContinue` is `false`, you are NOT done.
+   - Read `nextAction`: follow `nextAction.type` and `nextAction.instruction`.
 
-2. **Scope of Remediation & UI Transformation Mandate**:
-   - For backend infrastructure debt, fix findings introduced by your changes (`introduced_by_change: true`).
-   - **CRITICAL UI / DESIGN EXCEPTION**: Design quality, UI genericity, accessibility, and UX completeness findings are **NEVER** pre-existing debt that can be ignored or baselined away. When building, refactoring, or preparing a project for production, you MUST actively resolve design findings in all flagged components.
-   - Do not claim a task is complete while recognizable AI template tropes (decorative gradients, radial blur blobs, extreme corner radii, fake indicators, stacked uniform cards) remain in the codebase.
+4. **Fix blocking/high findings**: Address all findings referenced in `nextAction.findingIds`.
 
-3. **Strict Non-Evasion Invariant**:
-   - **NEVER** edit `.biltrc`, `bilt.config.*`, or security configuration to weaken rules, lower severities, or disable engines to pass checks.
-   - **NEVER** add blanket ignores (e.g. `*` or `src/**`) or unexplained inline suppressions (`// bilt-ignore` without a legitimate business reason).
-   - Any config weakening will trigger an immediate high-severity `tamper` failure.
+5. **Follow exact remediation constraints**: Follow `objective`, `allowedChanges`, and `forbiddenChanges` on each finding.
 
-4. **Secret Confidentiality**:
-   - **NEVER** print, log, or echo raw detected secrets, tokens, or private keys. Always use environment variable references.
+6. **Strict non-evasion invariant**:
+   - NEVER edit `.biltrc`, `bilt.config.*`, or security configuration to weaken rules, lower severities, or disable engines to pass checks.
+   - NEVER add blanket ignores (e.g. `*` or `src/**`) or unexplained inline suppressions (`// bilt-ignore`). Tampering triggers immediate escalation.
+   - NEVER print or echo raw secret values. Always use environment variable references.
 
-5. **Loop Termination & Escalation**:
-   - If the check returns `status: escalate` (exit code 4), **STOP immediately**.
-   - Do not retry or add workarounds. Explain the impasse and ask the human maintainer for guidance.
+7. **Re-run Bilt after changes**: Execute each finding's `verification` command (or `npx bilt check --format agent`) after editing code. Only Bilt verifies resolution.
+
+8. **Watch for regressions**: Inspect `session.regressions`. If a previously resolved finding re-appears, prioritize fixing it immediately.
+
+9. **Stop when Bilt reports escalate**: If Bilt returns `status: "escalate"` (exit code 4), STOP immediately. Explain the impasse to the human developer. Do not retry random edits.
+
+10. **Ask the developer when human decision is needed**: When `status` is `needs-review` or `nextAction.type` is `review`, present the findings to the developer and wait for guidance.
 
 ---
 

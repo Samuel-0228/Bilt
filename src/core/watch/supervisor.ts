@@ -1,7 +1,9 @@
 // ─── Bilt Agent Supervisor State Machine ──────────────────────────────────────
 // Main supervisory controller for `bilt watch` / `bilt watch --format agent`.
 // Tracks project state transitions:
-// IDLE -> OBSERVING -> CHANGE DETECTED -> ANALYZING -> VERIFYING -> PROGRESS/REGRESSION -> PASS/ESCALATE
+// START SESSION -> BASELINE -> DETECT CHANGES -> RUN RELEVANT CHECKS ->
+// COMPARE WITH PREVIOUS STATE -> REPORT PROGRESS -> DETECT REGRESSION/NO-PROGRESS/TAMPERING ->
+// ALLOW CONTINUE / ESCALATE
 // ─────────────────────────────────────────────────────────────────────────────
 
 import path from "node:path";
@@ -9,9 +11,14 @@ import type { CheckResult } from "../readiness/check-runner.js";
 import { runChecks } from "../readiness/check-runner.js";
 import { formatAgentCheckOutput } from "../readiness/formatters/agent.js";
 import type { AgentResponse, EscalationReason } from "../agent/protocol.js";
-import { getOrStartSession, updateSessionState, type AgentSession } from "../agent/session.js";
-import { recordChangeIteration, type ChangeRecord } from "../loop/ledger.js";
-import { checkLoopProgress } from "../loop/state.js";
+import {
+  getOrStartSession,
+  recordSessionIteration,
+  type AgentSession,
+  type SessionIterationResult,
+} from "../agent/session.js";
+import type { ReadinessCategory } from "../readiness/taxonomy.js";
+import { detectTampering } from "../trust/tamper.js";
 import { VERSION } from "../../version.js";
 
 export type SupervisorState =
@@ -31,7 +38,8 @@ export interface SupervisorStatusPayload {
   session: AgentSession;
   lastChangedFiles: string[];
   response: AgentResponse;
-  ledgerRecord?: ChangeRecord;
+  allowedToContinue: boolean;
+  delta?: SessionIterationResult["delta"];
 }
 
 export class BiltSupervisor {
@@ -44,6 +52,10 @@ export class BiltSupervisor {
     this.rootDir = path.resolve(rootDir);
   }
 
+  /**
+   * START SESSION & BASELINE:
+   * Initialize session, execute initial baseline scan, and enter OBSERVING state.
+   */
   public async initialize(): Promise<AgentSession> {
     this.session = await getOrStartSession(this.rootDir);
     this.state = "OBSERVING";
@@ -55,16 +67,103 @@ export class BiltSupervisor {
   }
 
   /**
-   * Handle modified files event, execute verification pass, update change ledger,
-   * check loop thrashing/regressions, and return structured AgentResponse payload.
+   * Determine targeted check categories based on changed file patterns
+   * to avoid unnecessarily scanning unaffected systems.
+   */
+  private determineRelevantCategories(
+    changedFiles: string[],
+  ): ReadinessCategory[] | undefined {
+    if (changedFiles.length === 0) return undefined;
+
+    const categories = new Set<ReadinessCategory>();
+
+    for (const file of changedFiles) {
+      const lower = file.toLowerCase();
+      const ext = path.extname(lower);
+
+      if (
+        lower.includes(".env") ||
+        lower.includes(".gitignore") ||
+        lower.includes("secret") ||
+        lower.includes("key")
+      ) {
+        categories.add("secrets-and-env");
+      }
+
+      if (
+        lower.includes("package.json") ||
+        lower.includes("pnpm-lock") ||
+        lower.includes("package-lock") ||
+        lower.includes("yarn.lock")
+      ) {
+        categories.add("dependencies");
+      }
+
+      if (
+        [".tsx", ".jsx", ".html", ".css", ".scss", ".vue", ".svelte"].includes(ext) ||
+        lower.includes("/ui/") ||
+        lower.includes("/components/")
+      ) {
+        categories.add("design-quality");
+      }
+
+      if ([".ts", ".js", ".mjs", ".cjs", ".py", ".go"].includes(ext)) {
+        if (
+          lower.includes("auth") ||
+          lower.includes("login") ||
+          lower.includes("jwt") ||
+          lower.includes("session")
+        ) {
+          categories.add("auth");
+          categories.add("authorization");
+        }
+        if (
+          lower.includes("route") ||
+          lower.includes("api") ||
+          lower.includes("controller") ||
+          lower.includes("endpoint") ||
+          lower.includes("server")
+        ) {
+          categories.add("auth");
+          categories.add("authorization");
+          categories.add("input-validation");
+          categories.add("api-abuse-and-cost");
+        }
+        if (
+          lower.includes("db") ||
+          lower.includes("schema") ||
+          lower.includes("migration") ||
+          lower.includes("model")
+        ) {
+          categories.add("database");
+        }
+        if (
+          lower.includes("log") ||
+          lower.includes("error") ||
+          lower.includes("sentry")
+        ) {
+          categories.add("error-handling-logs");
+        }
+      }
+    }
+
+    if (categories.size > 0 && categories.size <= 5) {
+      return Array.from(categories);
+    }
+    return undefined;
+  }
+
+  /**
+   * Handle modified files event, execute scoped verification pass, update session state,
+   * detect regressions & anti-tamper, and stream structured AgentResponse.
    */
   public async handleFileChanges(
     changedFiles: string[],
     isAgentFormat = false,
   ): Promise<SupervisorStatusPayload> {
     if (this.isProcessing) {
-      // Coalesce overlapping change events
-      return this.buildPayload([], await runChecks({ dir: this.rootDir }), "OBSERVING");
+      const fallbackCheck = await runChecks({ dir: this.rootDir });
+      return this.buildPayload([], fallbackCheck, "OBSERVING");
     }
 
     this.isProcessing = true;
@@ -72,83 +171,76 @@ export class BiltSupervisor {
 
     try {
       this.state = "ANALYZING";
-      const checkResult = await runChecks({ dir: this.rootDir });
+
+      // 1. Anti-tamper inspection on modified files
+      const tamperFindings = await detectTampering(this.rootDir, "HEAD~1").catch(() => []);
+      const criticalTamper = tamperFindings.find((t) => t.severity === "critical");
+
+      // 2. Scoped execution of relevant checks
+      const relevantCategories = this.determineRelevantCategories(changedFiles);
+      const checkResult = await runChecks({
+        dir: this.rootDir,
+        categories: relevantCategories,
+      });
 
       this.state = "VERIFYING";
       const currentFps = checkResult.findings.map((f) => f.fingerprint);
 
-      // Loop / Thrashing check
-      const loopCheck = await checkLoopProgress(this.rootDir, currentFps).catch(() => null);
-
-      let escalationReason:
-        | { reason: import("../agent/protocol.js").EscalationReason; detail: string }
-        | undefined;
-
-      if (loopCheck?.shouldEscalate) {
-        escalationReason = {
-          reason: "no-progress",
-          detail: loopCheck.escalationReason || "Supervision loop escalation triggered.",
-        };
-      }
-
-      // Record in Change Ledger
-      const prevFps = this.session.previousFingerprints || [];
-      const ledgerRecord = await recordChangeIteration(
-        this.rootDir,
-        this.session.id,
-        this.session.iteration + 1,
-        prevFps,
-        currentFps,
+      // 3. Compare with previous state & track session progression
+      const sessionResult = await recordSessionIteration(this.rootDir, currentFps, {
         changedFiles,
-      );
+        tamperDetected: Boolean(criticalTamper),
+        tamperDetail: criticalTamper?.message,
+        isCleanPass: checkResult.gate.status === "production-ready" && !criticalTamper,
+      });
 
-      // Update Supervisor State
-      if (escalationReason) {
+      this.session = sessionResult.session;
+
+      // 4. Determine supervisor state
+      if (sessionResult.escalation) {
         this.state = "ESCALATE";
-      } else if (checkResult.gate.status === "production-ready") {
+      } else if (checkResult.gate.status === "production-ready" && !criticalTamper) {
         this.state = "PASS";
-      } else if (ledgerRecord.state === "regressed") {
+      } else if (sessionResult.delta.regressions.length > 0) {
         this.state = "REGRESSION";
-      } else if (ledgerRecord.state === "progress") {
+      } else if (sessionResult.delta.resolved.length > sessionResult.delta.introduced.length) {
         this.state = "PROGRESS";
       } else {
         this.state = "FINDINGS_GENERATED";
       }
 
-      // Update session state
-      const sessionStatus =
-        this.state === "PASS"
-          ? "passed"
-          : this.state === "ESCALATE"
-            ? "escalated"
-            : "active";
-
-      this.session = await updateSessionState(this.rootDir, currentFps, sessionStatus);
-
-      // Build AgentResponse
+      // 5. Construct canonical AgentResponse
       const response = formatAgentCheckOutput(
         checkResult,
         VERSION,
         "bilt watch --format agent",
         this.rootDir,
-        prevFps,
+        this.session.previousFingerprints,
+        this.session,
+        sessionResult.escalation,
+        sessionResult.delta.regressions,
       );
 
-      if (escalationReason) {
-        response.status = "escalate";
-        response.escalation = escalationReason;
+      if (criticalTamper && response.status !== "escalate") {
+        response.status = "fail";
+        response.allowedToContinue = false;
         response.nextAction = {
-          type: "escalate",
-          findingIds: [],
-          instruction:
-            "HALT automated retries. Bilt supervisor detected a loop or regression. Stop and explain the situation to the human developer.",
+          type: "fix",
+          findingIds: ["TAMPER-CONFIG"],
+          instruction: `CRITICAL: Anti-tamper violation detected: ${criticalTamper.message}. Revert configuration tampering immediately.`,
         };
       }
 
-      const payload = this.buildPayload(changedFiles, checkResult, this.state, response, ledgerRecord);
+      const payload = this.buildPayload(
+        changedFiles,
+        checkResult,
+        this.state,
+        response,
+        sessionResult.delta,
+      );
 
       if (isAgentFormat) {
-        console.log(JSON.stringify(payload, null, 2));
+        console.log(JSON.stringify(payload.response, null, 2));
       }
 
       return payload;
@@ -165,7 +257,7 @@ export class BiltSupervisor {
     result: CheckResult,
     state: SupervisorState,
     response?: AgentResponse,
-    ledgerRecord?: ChangeRecord,
+    delta?: SessionIterationResult["delta"],
   ): SupervisorStatusPayload {
     const finalResponse =
       response ||
@@ -174,6 +266,8 @@ export class BiltSupervisor {
         VERSION,
         "bilt watch --format agent",
         this.rootDir,
+        this.session?.previousFingerprints,
+        this.session,
       );
 
     return {
@@ -181,7 +275,8 @@ export class BiltSupervisor {
       session: this.session,
       lastChangedFiles: changedFiles,
       response: finalResponse,
-      ledgerRecord,
+      allowedToContinue: finalResponse.allowedToContinue,
+      delta,
     };
   }
 }

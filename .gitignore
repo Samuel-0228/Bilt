@@ -16,3 +16,4 @@ bilt-report.*
 bilt-health-card.png
 .tmp_home/
 *.tgz
+package.json.bak

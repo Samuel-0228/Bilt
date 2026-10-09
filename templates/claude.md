@@ -3,27 +3,31 @@
 > **Installation**: `npm install -D bilt-toolkit`
 > **Command**: `npx bilt` (or `bilt` if globally installed)
 
-When writing or modifying code in this project with Claude Code:
+When writing or modifying code in this project with Claude Code, treat Bilt as an active verification and engineering supervision layer.
 
-1. **Automatic Verification**:
-   Run the following verification step before finishing any coding turn:
+Follow these 10 mandatory operating principles:
 
+1. **Use Bilt during implementation**: Run checks incrementally during development:
    ```bash
-   npx bilt scan --format agent --changed
+   npx bilt check --changed --format agent
+   # or: npx bilt scan --format agent --changed
    ```
-   Or against a PR base branch:
+   Or against PR base:
    ```bash
-   npx bilt verify --base origin/main --format agent
+   npx bilt check --base origin/main --format agent
+   # or: npx bilt verify --base origin/main --format agent
    ```
-
-2. **Fix Rules & UI Transformation Mandate**:
-   - For backend code, address issues flagged with `"introduced_by_change": true`.
-   - **CRITICAL UI / DESIGN EXCEPTION**: Design quality, UI genericity, accessibility, and UX completeness findings are **NEVER** pre-existing debt that can be ignored or baselined away. You MUST actively resolve design findings in all components flagged by Bilt.
-   - Never weaken Bilt configuration or delete rules to clear findings.
-   - Never print raw secret values into the chat context or tool outputs.
-
-3. **Termination Guarantee**:
-   - If Bilt returns exit code 4 or `status: "escalate"`, immediately stop and prompt the user for human review.
+2. **Verify before considering task complete**: Never declare your task complete without running Bilt checks.
+3. **Treat structured output as authoritative**:
+   - Inspect `status` and `allowedToContinue`. If `allowedToContinue` is `false`, you are NOT done.
+   - Read `nextAction`: follow `nextAction.type` and `nextAction.instruction`.
+4. **Fix blocking/high findings**: Address all findings referenced in `nextAction.findingIds`.
+5. **Follow exact remediation constraints**: Follow `objective`, `allowedChanges`, and `forbiddenChanges` on each finding.
+6. **Strict non-evasion invariant**: Never edit `.biltrc` or weaken security configuration. Never add blanket ignores or fake findings.
+7. **Re-run Bilt after changes**: Run each finding's `verification` command (or `npx bilt check --format agent`).
+8. **Watch for regressions**: Inspect `session.regressions`. If a previously resolved finding re-appears, fix it immediately.
+9. **Stop when Bilt reports escalate**: If Bilt returns exit code 4 or `status: "escalate"`, immediately stop and prompt the user for guidance.
+10. **Ask the developer when human decision is needed**: When `status` is `needs-review` or `nextAction.type` is `review`, present findings to the user and wait for approval.
 
 ---
 

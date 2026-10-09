@@ -103,6 +103,13 @@ export interface BiltCheckFinding {
   fingerprint: string;
   introduced_by_change?: boolean;
 
+  // ── Top-level agent contract fields (canonical machine-readable interface) ───
+  objective?: string;
+  filesToInspect?: string[];
+  allowedChanges?: string[];
+  forbiddenChanges?: string[];
+  verification?: string;
+
   // ── Legacy flat fields — checkers still populate these ──────────────────────
   file?: string;
   line?: number;
@@ -171,6 +178,8 @@ export function findingToCheckFinding(finding: Finding, category: ReadinessCateg
     finding.untrusted_snippet,
   );
 
+  const normalizedAction = normalizeAgentAction(finding.agent_action, finding.file);
+
   return {
     id,
     ruleId: finding.rule_id,
@@ -184,7 +193,12 @@ export function findingToCheckFinding(finding: Finding, category: ReadinessCateg
     title: finding.title,
     whyItMatters: finding.explanation,
     technicalDetail: finding.explanation,
-    agentAction: normalizeAgentAction(finding.agent_action, finding.file),
+    agentAction: normalizedAction,
+    objective: normalizedAction.objective,
+    filesToInspect: normalizedAction.filesToInspect,
+    allowedChanges: normalizedAction.allowedChanges,
+    forbiddenChanges: normalizedAction.forbiddenChanges,
+    verification: normalizedAction.verificationCommand || 'npx bilt check --format agent',
     fixable: finding.fixable,
     locations: [location],
     fingerprint,

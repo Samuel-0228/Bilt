@@ -1,10 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 import { execa } from "execa";
 import path from "node:path";
+import fs from "node:fs/promises";
 
 const CLI_PATH = path.resolve(__dirname, "../../dist/cli.js");
 
 describe("bilt check CLI Integration", () => {
+  afterAll(async () => {
+    await Promise.allSettled([
+      fs.rm(path.resolve(__dirname, "../fixtures/clean-project/.bilt"), { recursive: true, force: true }),
+      fs.rm(path.resolve(__dirname, "../fixtures/vulnerable-readiness-app/.bilt"), { recursive: true, force: true }),
+    ]);
+  });
   it("should show help for bilt check", async () => {
     const { stdout } = await execa("node", [CLI_PATH, "check", "--help"]);
     expect(stdout).toContain("Comprehensive production-readiness verification");

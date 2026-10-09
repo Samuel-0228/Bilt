@@ -1,0 +1,9 @@
+# .npmrc.example — Configuration for GitHub Packages
+#
+# To install @samuel-0228/bilt-toolkit from GitHub Packages:
+# 1. Copy this file to .npmrc in your project root or ~/.npmrc in your home directory.
+# 2. Ensure your GITHUB_TOKEN environment variable is set (with 'read:packages' scope),
+#    or replace ${GITHUB_TOKEN} with your GitHub Personal Access Token (PAT).
+
+@samuel-0228:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
