@@ -19,9 +19,10 @@
   },
   "scripts": {
     "prepublishOnly": "npm run test:all && npm run build",
+    "pretest": "npm run build",
     "prepare": "npm run build",
     "dev": "tsx src/cli.ts",
-    "build": "npm run clean && tsc && node scripts/copy-assets.js",
+    "build": "tsc && node scripts/copy-assets.js",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",

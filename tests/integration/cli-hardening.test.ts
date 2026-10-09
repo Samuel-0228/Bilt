@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -11,6 +11,14 @@ const CLI_PATH = path.resolve(__dirname, "../../dist/cli.js");
 
 describe("CLI Hardening & Safety Integration Tests", () => {
   let tmpDir: string;
+
+  beforeAll(async () => {
+    const rootDir = path.resolve(__dirname, "../../");
+    const exists = await fs.stat(CLI_PATH).then(() => true).catch(() => false);
+    if (!exists) {
+      await execa("npm", ["run", "build"], { cwd: rootDir });
+    }
+  }, 60000);
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bilt-hardening-test-"));

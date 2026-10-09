@@ -30,14 +30,14 @@ jobs:
       - name: Run typecheck
         run: npx tsc --noEmit
 
+      - name: Build the project
+        run: npm run build
+
       - name: Run all tests
         run: npm run test:all
 
       - name: Run integration tests
         run: npm run test:integration
-
-      - name: Build the project
-        run: npm run build
 
       - name: Ensure CLI starts successfully
         run: node dist/cli.js --help

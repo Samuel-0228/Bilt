@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execa } from "execa";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -6,6 +6,14 @@ import fs from "node:fs/promises";
 const CLI_PATH = path.resolve(__dirname, "../../dist/cli.js");
 
 describe("bilt check CLI Integration", () => {
+  beforeAll(async () => {
+    const rootDir = path.resolve(__dirname, "../../");
+    const exists = await fs.stat(CLI_PATH).then(() => true).catch(() => false);
+    if (!exists) {
+      await execa("npm", ["run", "build"], { cwd: rootDir });
+    }
+  }, 60000);
+
   afterAll(async () => {
     await Promise.allSettled([
       fs.rm(path.resolve(__dirname, "../fixtures/clean-project/.bilt"), { recursive: true, force: true }),

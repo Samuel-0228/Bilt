@@ -17,7 +17,10 @@ describe("CLI Binary Integration Tests", () => {
   beforeAll(async () => {
     // Ensure project is built before running CLI binary tests
     const rootDir = path.resolve(__dirname, "../../");
-    await execa("npm", ["run", "build"], { cwd: rootDir });
+    const exists = await fs.stat(cliPath).then(() => true).catch(() => false);
+    if (!exists) {
+      await execa("npm", ["run", "build"], { cwd: rootDir });
+    }
   }, 60000);
 
   beforeEach(async () => {
