@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-10-09
+
+### Added & Enhanced — Pre-Implementation Design Brief Gate & Dual-Registry Release Pipeline
+
+- **Dual-Registry Release Architecture**: Automated publishing workflow for GitHub Packages (`@samuel-0228/bilt-toolkit`), public npm (`bilt-toolkit`), and attached `.tgz` release assets on GitHub Releases.
+- **Pre-Implementation Gate for UI / Frontend Work**: Added Section 2A to `AGENTS.md` and agent instruction templates. AI coding agents are strictly gated from generating or modifying UI code before querying `npx bilt design-brief --format agent`.
+- **Anti-Deferral Directives for Design Intent**: Prohibits agents from deferring the 4 Design Intent questions to end-of-session summaries. When unconfigured, Bilt mandates an immediate mid-session pause to capture user intent (or "Surprise me" creative freedom) before UI files are created.
+- **Strict Blocking Status on Missing Design Brief**: Clarified `needs_review` status in agent protocols so unconfigured design briefs are treated as strictly blocking rather than advisory wrap-up metadata.
+- **CI & Test Pipeline Race Condition Fix**: Added `pretest` build hook, CI build ordering before test execution, and file stat guards in CLI integration tests to eliminate `ERR_MODULE_NOT_FOUND` during parallel test runs.
+
 ## [1.1.5] - 2026-10-07
 
 ### Added & Enhanced — Agent Protocol, Supervision Layer & Telemetry Hardening
