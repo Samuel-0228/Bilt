@@ -47,8 +47,37 @@ npx bilt scan --format agent --changed
 | :--- | :---: | :--- |
 | **`pass`** | `0` | All clear. Zero introduced security violations. Proceed to commit or submit PR. |
 | **`fail`** | `1` | Hard security failure. Review the `"findings"` array, locate `"agent_action"`, apply the suggested fix, and re-run verification. |
-| **`needs_review`** | `2` | Heuristic / medium-precision finding requiring human judgment. Non-blocking for automated PRs unless team policy specifies otherwise. |
+| **`needs_review`** | `2` | **Requires Human Input**. For UI/Design or missing Design Brief, this is **STRICTLY BLOCKING**: you MUST pause mid-session and ask the developer in chat before touching or completing UI. NEVER defer to an end-of-session summary. |
 | **`escalate`** | `4` | Runaway loop detected (consecutive attempts yielded identical findings with no progress). **Halt automated retries immediately** and explain the situation to the human maintainer. |
+
+---
+
+## 2A. Mandatory Pre-Implementation Gate for UI / Frontend Work
+
+**CRITICAL TIMING RULE**: Coding agents must **NEVER** write, scaffold, or generate UI code before obtaining the human developer's design intent. Do NOT design the UI first and report questions at the end of the session.
+
+Whenever a task involves creating, modifying, or refactoring UI components, pages, views, layouts, or styling:
+
+1. **Check Design Brief FIRST (before touching any UI files)**:
+   ```bash
+   npx bilt design-brief --format agent
+   ```
+2. **If unconfigured (`configured: false`)**:
+   - **DO NOT WRITE A SINGLE LINE OF UI CODE.**
+   - **PAUSE EXECUTION IMMEDIATELY MID-SESSION.**
+   - Prompt the developer in chat with the 4 Design Intent questions:
+     1. **Purpose & Audience**: What is the main purpose of this product, and who is it for?
+     2. **Visual Direction**: What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', or Custom)
+     3. **Brand Colors**: Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')
+     4. **Desired Feeling**: When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')
+   - **Wait for the developer's response.**
+   - Save their answers:
+     ```bash
+     npx bilt design-brief set --purpose "..." --visual "..." --colors "..." --feeling "..."
+     ```
+3. **Use the context to design authentic UI**:
+   - Only AFTER the brief is saved, proceed to implement the UI using the developer's authentic constraints or creative freedom choice.
+   - Do NOT treat design intent questions as an end-of-session summary. They are a **pre-condition** for designing the UI.
 
 ---
 
@@ -148,4 +177,7 @@ Bilt uses a Design Brief (`.bilt/design-brief.json`) to capture authentic human 
    - Respect creative freedom where fields are marked "Surprise me" (`creative-freedom`).
    - Refactor generic AI templates into authentic domain UI matching the brief.
    - Run `npx bilt design-check` after UI changes.
+4. **DO NOT DEFER QUESTIONS TO THE END OF THE SESSION**:
+   - A critical failure mode of AI coding agents is implementing generic UI first, and then dumping the 4 questions in an end-of-session 'Needs Review' summary.
+   - This defeats the entire purpose of the Design Brief. You must ask the questions BEFORE creating or altering UI files so you have the necessary context to design the UI.
 

@@ -423,13 +423,13 @@ function computeNextAction(
       const designRefactorBody = !hasDesignBrief
         ? `First, run "npx bilt design-check --fix" to automatically repair mechanical issues (focus rings, gradient text, blur orbs, corner radii). ` +
           `Next: MANDATORY DESIGN INTENT CHECKPOINT — No design brief is configured (.bilt/design-brief.json). ` +
-          `Before rewriting UI, you MUST PAUSE and ask the developer these 4 Design Intent questions in chat:\n` +
+          `CRITICAL: DO NOT DEFER THIS TO AN END-OF-SESSION SUMMARY. Before writing or rewriting UI, you MUST PAUSE IMMEDIATELY and ask the developer these 4 Design Intent questions in chat so you can use their context to design the UI:\n` +
           `1. Purpose & Audience: What is the main purpose of this product, and who is it for?\n` +
           `2. Visual Direction: What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', or Custom)\n` +
           `3. Brand Colors: Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n` +
           `4. Desired Feeling: When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')\n` +
           `After the developer answers, save their answers via "npx bilt design-brief set --purpose '...' --visual '...' --colors '...' --feeling '...'". ` +
-          `Then inspect the flagged files and refactor generic AI templates into authentic, domain-specific UI with real data density. `
+          `Then use their context to inspect the flagged files and refactor generic AI templates into authentic, domain-specific UI with real data density. `
         : `First, run "npx bilt design-check --fix" to automatically repair mechanical issues (focus rings, gradient text, blur orbs, corner radii). ` +
           `Next, follow the configured design brief in .bilt/design-brief.json: inspect the flagged files and refactor generic AI templates (eliminate stacked cards, radial blur orbs, and fake indicators) into authentic, domain-specific UI with real data density. `;
 

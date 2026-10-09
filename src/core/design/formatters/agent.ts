@@ -39,7 +39,8 @@ export function formatAgentDesignOutput(
   }
 
   const designRefactorBody = !hasBrief
-    ? `MANDATORY DESIGN INTENT CHECKPOINT: No design brief is configured (.bilt/design-brief.json). Before rewriting UI, PAUSE and ask the developer these 4 Design Intent questions in chat:\n` +
+    ? `MANDATORY DESIGN INTENT CHECKPOINT: No design brief is configured (.bilt/design-brief.json). ` +
+      `DO NOT DEFER THIS TO AN END-OF-SESSION SUMMARY. Before writing or rewriting UI files, PAUSE IMMEDIATELY and ask the developer these 4 Design Intent questions in chat so you have the context to design the UI:\n` +
       `1. Purpose & Audience: What is the main purpose of this product, and who is it for?\n` +
       `2. Visual Direction: What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', or Custom)\n` +
       `3. Brand Colors: Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n` +

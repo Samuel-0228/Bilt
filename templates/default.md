@@ -39,7 +39,7 @@ Follow these 10 mandatory operating principles:
 
 9. **Stop when Bilt reports escalate**: If Bilt returns `status: "escalate"` (exit code 4), STOP immediately. Explain the impasse to the human developer. Do not retry random edits.
 
-10. **Ask the developer when human decision is needed**: When `status` is `needs-review` or `nextAction.type` is `review`, present the findings to the developer and wait for guidance.
+10. **Ask the developer when human decision is needed**: When `status` is `needs-review` or `nextAction.type` is `review`, present the findings to the developer and wait for guidance. For missing Design Brief or UI/Design work, this is **STRICTLY BLOCKING**: you MUST pause mid-session and ask the developer before touching UI. NEVER defer questions to an end-of-session summary.
 
 ---
 
@@ -111,10 +111,11 @@ Do not remove or weaken Bilt rules simply to obtain a passing result.
 Bilt uses a Design Brief (`.bilt/design-brief.json`) to capture authentic human design intent before UI implementation.
 
 1. **Explicit Human-in-the-Loop Checkpoint**: The design brief represents authentic human intent. **NEVER** guess, infer from files, or autonomously synthesize fake design choices to create `.bilt/design-brief.json`.
-2. **MANDATORY CHECKPOINT WHEN UNCONFIGURED (`configured: false`)**:
+2. **MANDATORY PRE-IMPLEMENTATION GATE (BEFORE WRITING ANY UI)**:
+   - **CRITICAL TIMING**: NEVER write or scaffold UI code before obtaining design intent. Do NOT design the UI first and report questions at the end of the session.
    - Query: `npx bilt design-brief --format agent`
-   - Whenever design quality findings are detected, UI refactoring is needed, or preparing a website for production:
-     **YOU MUST PAUSE EXECUTION IMMEDIATELY AND ASK THE DEVELOPER THESE 4 DESIGN INTENT QUESTIONS IN CHAT**:
+   - Whenever a task involves creating, modifying, or refactoring UI, or when design quality findings are detected:
+     **YOU MUST PAUSE EXECUTION IMMEDIATELY MID-SESSION AND ASK THE DEVELOPER THESE 4 DESIGN INTENT QUESTIONS IN CHAT**:
      1. **Purpose & Audience**: What is the main purpose of this product, and who is it for?
      2. **Visual Direction**: What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', or Custom)
      3. **Brand Colors**: Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')
@@ -127,7 +128,11 @@ Bilt uses a Design Brief (`.bilt/design-brief.json`) to capture authentic human 
      *(or write `.bilt/design-brief.json` directly)*.
 3. **When `.bilt/design-brief.json` is configured (`configured: true`)**:
    - Query: `npx bilt design-brief --format agent` to read the developer's authentic constraints.
+   - Use their answers as the active context to design authentic UI.
    - Respect creative freedom where fields are marked "Surprise me" (`creative-freedom`).
    - Refactor generic AI templates into authentic domain UI matching the brief.
    - Run `npx bilt design-check` after UI changes.
+4. **DO NOT DEFER QUESTIONS TO THE END OF THE SESSION**:
+   - A critical failure mode of AI coding agents is implementing generic UI first, and then dumping the 4 questions in an end-of-session 'Needs Review' summary.
+   - This defeats the entire purpose of the Design Brief. You must ask the questions BEFORE creating or altering UI files so you have the necessary context to design the UI.
 

@@ -90,7 +90,9 @@ export async function executeDesignBrief(
             configured: currentBrief !== null,
             questions: questionsList,
             agentInstruction:
-              "PAUSE execution and present these 4 Design Intent questions to the developer in chat. " +
+              "STOP EXECUTION IMMEDIATELY. DO NOT WRITE ANY UI CODE YET. " +
+              "Prompt the developer with these 4 Design Intent questions in chat now so you can use their context to design the UI. " +
+              "Do NOT defer this to an end-of-session summary. " +
               "Once they respond, save their answers using: " +
               "npx bilt design-brief set --purpose \"...\" --visual \"...\" --colors \"...\" --feeling \"...\"",
           },
@@ -299,14 +301,14 @@ function formatAgentOutput(brief: DesignBrief | null): DesignBriefAgentOutput {
         "No Bilt Design Brief exists (`configured: false`).\n" +
         "CRITICAL HUMAN-INTENT BOUNDARY & MANDATORY QUESTIONNAIRE:\n" +
         "1. Do NOT autonomously fabricate, guess, or hallucinate answers to populate `.bilt/design-brief.json`.\n" +
-        "2. MANDATORY CHECKPOINT BEFORE UI WORK: Whenever design quality or vibecoding issues are detected, you MUST PAUSE execution and ask the developer these 4 Design Intent questions in chat:\n" +
+        "2. MANDATORY CHECKPOINT BEFORE UI WORK (PRE-IMPLEMENTATION GATE): Before writing, modifying, or generating ANY UI code, or whenever design quality issues are detected, you MUST PAUSE execution immediately mid-session and ask the developer these 4 Design Intent questions in chat so you have the context to design the UI. DO NOT generate UI first and dump questions at the end of the session:\n" +
         "   Q1 (Purpose & Audience): What is the main purpose of this product, and who is it for?\n" +
         "   Q2 (Visual Direction): What visual direction do you prefer? (Minimal, Bold, Technical, Playful, Luxury, Brutalist, 'Surprise me', Custom)\n" +
         "   Q3 (Brand Colors): Do you have specific brand colors or visual references? (Hex codes, color names, or 'Surprise me')\n" +
         "   Q4 (Desired Feeling): When someone opens this, what should they feel? (Trustworthy, calm, energetic, technical, or 'Surprise me')\n" +
         "3. DO NOT SKIP OR BYPASS THIS INTERVIEW. Authentic domain UI requires human direction on product purpose and audience.\n" +
         "4. After the developer responds, record their exact answers via `npx bilt design-brief set --purpose ... --visual ... --colors ... --feeling ...` (or write `.bilt/design-brief.json`).\n" +
-        "5. Once saved, refactor the UI to align with their brief and run `npx bilt design-check --format agent` to verify.\n" +
+        "5. Once saved, use their answers to implement/refactor the UI to align with their brief and run `npx bilt design-check --format agent` to verify.\n" +
         "6. If identical findings persist across 3 runs, STOP and ask the developer.",
     };
   }
