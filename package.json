@@ -79,7 +79,7 @@
     "enquirer": "^2.4.1",
     "execa": "^9.6.1",
     "fast-glob": "^3.3.3",
-    "simple-git": "^3.27.0",
+    "simple-git": "^4.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
