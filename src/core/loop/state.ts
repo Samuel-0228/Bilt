@@ -1,5 +1,6 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
+import { validateLoopState } from "../security/validation.js";
 
 export interface IterationRecord {
   iteration: number;
@@ -39,11 +40,11 @@ export async function readLoopState(rootDir: string): Promise<LoopState> {
 
   try {
     const raw = await fs.readFile(agentPath, "utf-8");
-    return JSON.parse(raw) as LoopState;
+    return validateLoopState(JSON.parse(raw));
   } catch {
     try {
       const raw = await fs.readFile(loopPath, "utf-8");
-      return JSON.parse(raw) as LoopState;
+      return validateLoopState(JSON.parse(raw));
     } catch {
       return {
         currentIteration: 0,

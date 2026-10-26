@@ -444,19 +444,24 @@ bilt doctor --card
 
 The repository's [`.env.example`](./.env.example) contains safe local defaults and variable names only. Copy it to `.env` for development; never commit `.env` or replace placeholders with credentials in tracked files.
 
-| Variable | Required | Scope | Visibility |
-|---|---|---|---|
-| `PORT` | No | Local development | Public |
-| `NODE_ENV` | No | Development/test/runtime | Public |
-| `BILT_DEBUG` | No | Development diagnostics | Public |
-| `BILT_LOG_LEVEL` | No | Development diagnostics | Public |
-| `BILT_HOME` | No | Local development | Public path |
-| `BILT_SESSION_ID` | No | Agent/session harness | Session metadata |
-| `BILT_AGENT_NAME` | No | Agent/session harness | Agent metadata |
-| `NO_COLOR` | No | Local terminal | Public |
-| `BILT_*_API_KEY` | No | AI provider integrations | **Secret; use the OS keyring or environment only** |
+| Variable | Required | Scope | Visibility | Classification |
+|---|---|---|---|---|
+| `PORT` | No | development-only | public/non-secret | Optional local server port |
+| `NODE_ENV` | No | development-only | public/non-secret | Runtime mode (`development`, `test`, `production`) |
+| `BILT_DEBUG` | No | development-only | public/non-secret | Verbose internal debug diagnostics toggle |
+| `BILT_LOG_LEVEL` | No | development-only | public/non-secret | Diagnostic log level (`debug`, `info`, `warn`, `error`) |
+| `BILT_HOME` | No | internal/session state | public/non-secret | Custom config directory (defaults to `~/.bilt`) |
+| `BILT_SESSION_ID` | No | internal/session state | public/non-secret | Automated agent session tracking |
+| `BILT_AGENT_NAME` | No | internal/session state | public/non-secret | Client agent identifier |
+| `NO_COLOR` | No | development-only | public/non-secret | Disables ANSI colors and sounds |
+| `CI` | No | CI-only | public/non-secret | Continuous integration mode indicator |
+| `BILT_*_API_KEY` | No | optional (AI queries) | **secret** | Provider API key (`bilt ask`). Use OS keyring |
+| `AWS_ACCESS_KEY_ID` | No | optional (testing) | public/non-secret | Companion key for AWS offline verifier |
+| `AWS_SECRET_ACCESS_KEY` | No | optional (testing) | **secret** | Companion secret for AWS offline verifier |
+| `DATABASE_URL` | No | audited application | **secret** | Target application database connection string |
+| `JWT_SECRET` | No | audited application | **secret** | Target application JWT signing secret |
 
-The `BILT_*_API_KEY` variables are read only for the corresponding configured AI provider and are intentionally omitted from `.env.example`. They must never be written to reports, logs, snapshots, JSON output, Markdown output, or agent prompts. The agent/session variables identify a local supervisory process and are not credentials.
+All `BILT_*_API_KEY` and credential variables are optional secrets. They must never be written to reports, logs, snapshots, JSON output, Markdown output, or agent prompts. Bilt runs zero-config by default without requiring any `.env` file.
 
 ### `report` — CI/CD Export & Documentation Generator
 

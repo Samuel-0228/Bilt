@@ -10,7 +10,22 @@ import { formatSarifOutput } from "../../core/output/formatters/sarif.js";
 import { statusToExitCode } from "../../core/output/types.js";
 import { checkLoopProgress } from "../../core/loop/state.js";
 import { VERSION } from "../../version.js";
+import { redactKnownSecrets } from "../../core/safety/sanitizer.js";
 import type { ScanResult, ScanFinding, ScanOptions } from "../../types/index.js";
+
+function sanitizeResultForOutput(res: ScanResult): ScanResult {
+  return {
+    ...res,
+    findings: res.findings.map((f) => {
+      const copy: ScanFinding = { ...f };
+      delete (copy as { secret?: string }).secret;
+      copy.message = redactKnownSecrets(copy.message);
+      if (copy.suggestion) copy.suggestion = redactKnownSecrets(copy.suggestion);
+      if (copy.preview) copy.preview = redactKnownSecrets(copy.preview);
+      return copy;
+    }),
+  };
+}
 
 export interface ReportScanOptions {
   result: ScanResult;
@@ -74,7 +89,7 @@ export async function reportScanResult(opts: ReportScanOptions): Promise<void> {
   }
 
   if (isJson || options.format === "json") {
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(sanitizeResultForOutput(result), null, 2));
     const criticalCount = findings.filter(
       (f) => f.severity === "critical",
     ).length;

@@ -8,6 +8,7 @@ import { getAIConfig } from "./config.js";
 import { redactForAI } from "./redact.js";
 import { executeAICompletion } from "./runtime.js";
 import { canFixFinding } from "../fix/can-fix.js";
+import { stripControlAndAnsiCharacters } from "../safety/sanitizer.js";
 
 /**
  * Static local 6-part AI Explanation for a finding (0 network calls, 100% reliable local baseline).
@@ -202,14 +203,19 @@ export async function generateAIExplanationWithFallback(finding: ScanFinding): P
     const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return staticFallback;
 
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<AIExplanation>;
-    if (parsed.whatIsIt && parsed.whyIsItAProblem && parsed.howToFix) {
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (
+      parsed &&
+      typeof parsed.whatIsIt === "string" &&
+      typeof parsed.whyIsItAProblem === "string" &&
+      typeof parsed.howToFix === "string"
+    ) {
       return {
-        whatIsIt: parsed.whatIsIt,
-        whyIsItAProblem: parsed.whyIsItAProblem,
-        howSerious: parsed.howSerious || staticFallback.howSerious,
-        canItBeExploited: parsed.canItBeExploited || staticFallback.canItBeExploited,
-        howToFix: parsed.howToFix,
+        whatIsIt: stripControlAndAnsiCharacters(parsed.whatIsIt),
+        whyIsItAProblem: stripControlAndAnsiCharacters(parsed.whyIsItAProblem),
+        howSerious: typeof parsed.howSerious === "string" ? stripControlAndAnsiCharacters(parsed.howSerious) : staticFallback.howSerious,
+        canItBeExploited: typeof parsed.canItBeExploited === "string" ? stripControlAndAnsiCharacters(parsed.canItBeExploited) : staticFallback.canItBeExploited,
+        howToFix: stripControlAndAnsiCharacters(parsed.howToFix),
         canBiltFix: typeof parsed.canBiltFix === "boolean" ? parsed.canBiltFix : staticFallback.canBiltFix,
       };
     }

@@ -5,6 +5,7 @@ import { loadPlugins } from "../../../plugins/loader.js";
 import { createPluginContext } from "../../../plugins/interface.js";
 import { applyOverridesAndFilter } from "../filter.js";
 import { logger } from "../../../core/logging/logger.js";
+import { validatePluginResult } from "../../../core/security/validation.js";
 import type { ScanStepContext } from "./context.js";
 
 export async function runPluginsStep(
@@ -18,7 +19,8 @@ export async function runPluginsStep(
       for (const plugin of plugins) {
         try {
           const result = await plugin.check(pluginContext);
-          stepFindings.push(...result.findings);
+          const validated = validatePluginResult(result);
+          stepFindings.push(...validated.findings);
         } catch (pluginErr) {
           logger.warn("Plugin check execution failed", {
             plugin: plugin.name,

@@ -75,10 +75,17 @@ const COMMON_SECRET_PATTERNS = [
   /SG\.[a-zA-Z0-9_\-\.]{50,}/g,
   /re_[a-zA-Z0-9]{24,}/g,
   /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g,
-  /(?:postgres(?:ql)?|mongodb(?:\+srv)?|mysql):\/\/[^\s:]+:([^\s@]+)@[^\s\/]+/gi,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
   /bearer\s+[a-zA-Z0-9_\-\.]{25,}/gi,
 ];
+
+// Sensitive key-value assignment patterns (e.g. JWT_SECRET=..., AWS_SECRET_ACCESS_KEY=...)
+const SENSITIVE_ASSIGNMENT_PATTERN =
+  /((?:AWS_SECRET_ACCESS_KEY|JWT_SECRET|TOKEN_SECRET|SUPABASE_SERVICE_ROLE_KEY|SERVICE_ROLE_KEY|DB_PASSWORD))\s*([:=])\s*(["']?)([^"'\s\r\n]{8,})\3/gi;
+
+// Database connection URLs containing passwords
+const DATABASE_URL_PASSWORD_PATTERN =
+  /((?:postgres(?:ql)?|mongodb(?:\+srv)?|mysql|redis):\/\/[^:\s]+:)([^@\s]+)(@[^\s\/]+)/gi;
 
 /**
  * Universally scrub any detected secret values from arbitrary strings (messages, previews).
@@ -87,6 +94,18 @@ export function redactKnownSecrets(text: string): string {
   if (!text) return "";
 
   let result = text;
+
+  // 1. Redact database passwords in connection URLs
+  result = result.replace(DATABASE_URL_PASSWORD_PATTERN, (_match, prefix, password, suffix) => {
+    return `${prefix}${redactSecret(password)}${suffix}`;
+  });
+
+  // 2. Redact sensitive key assignments
+  result = result.replace(SENSITIVE_ASSIGNMENT_PATTERN, (_match, key, sep, quote, secret) => {
+    return `${key}${sep}${quote}${redactSecret(secret)}${quote}`;
+  });
+
+  // 3. Redact common secret tokens and private keys
   for (const pattern of COMMON_SECRET_PATTERNS) {
     result = result.replace(pattern, (match) => {
       if (match.startsWith("-----BEGIN")) {

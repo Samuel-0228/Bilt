@@ -1,6 +1,7 @@
 import { cosmiconfig } from "cosmiconfig";
 import type { BiltConfig } from "../types/index.js";
 import { logger } from "../core/logging/logger.js";
+import { validateBiltConfig } from "../core/security/validation.js";
 
 // ─── Default Configuration (Zero-Config) ────────────────────────────────────
 
@@ -67,7 +68,7 @@ export async function loadConfig(searchFrom?: string): Promise<BiltConfig> {
       return { ...DEFAULT_CONFIG };
     }
 
-    const userConfig = result.config as Partial<BiltConfig>;
+    const userConfig = validateBiltConfig(result.config);
 
     return {
       ignore: userConfig.ignore
