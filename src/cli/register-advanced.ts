@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { executeWatch } from "../commands/watch.js";
 import { colors, glyphs, banner, pulseBar, sectionHeader, divider, spinnerFrames } from "../ui/theme.js";
-import { handleCommandError } from "./common.js";
+import { printError } from "./common.js";
 
 export function registerAdvancedCommands(program: Command): void {
   // ─── bilt watch ──────────────────────────────────────────────────────────────
@@ -41,7 +41,8 @@ export function registerAdvancedCommands(program: Command): void {
             live: opts.live,
           });
         } catch (error) {
-          process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "watch" });
+          printError(error);
+          process.exitCode = 2;
         }
       },
     );
@@ -72,7 +73,8 @@ export function registerAdvancedCommands(program: Command): void {
           const { executeReport } = await import("../commands/report.js");
           await executeReport(dir, opts);
         } catch (error) {
-          process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "watch" });
+          printError(error);
+          process.exitCode = 2;
         }
       },
     );
@@ -94,7 +96,8 @@ export function registerAdvancedCommands(program: Command): void {
           const { executePlugin } = await import("../commands/plugin.js");
           await executePlugin(action, name, opts);
         } catch (error) {
-          process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "watch" });
+          printError(error);
+          process.exitCode = 2;
         }
       },
     );
@@ -116,7 +119,8 @@ export function registerAdvancedCommands(program: Command): void {
         const { executeBaselineCreate } = await import("../commands/baseline.js");
         await executeBaselineCreate(dir, opts);
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "baseline" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -149,7 +153,8 @@ export function registerAdvancedCommands(program: Command): void {
           );
         }
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "baseline" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -174,7 +179,8 @@ export function registerAdvancedCommands(program: Command): void {
           );
         }
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "baseline" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -222,7 +228,8 @@ export function registerAdvancedCommands(program: Command): void {
               : undefined,
           });
         } catch (error) {
-          process.exitCode = handleCommandError(error, { defaultExitCode: 3, command: "verify" });
+          printError(error);
+          process.exitCode = 3;
         }
       },
     );
@@ -238,7 +245,8 @@ export function registerAdvancedCommands(program: Command): void {
         const { startMcpServer } = await import("../mcp/server.js");
         startMcpServer();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 3, command: "mcp" });
+        printError(error);
+        process.exitCode = 3;
       }
     });
 
@@ -256,7 +264,8 @@ export function registerAdvancedCommands(program: Command): void {
         const { executePrompt } = await import("../commands/prompt.js");
         await executePrompt({ agent: opts.agent });
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "baseline" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 

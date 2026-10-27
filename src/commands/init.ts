@@ -13,7 +13,6 @@ import { reportInitComplete } from "../ui/reporter.js";
 import { SECRET_RULES } from "../core/rules/secret-rules.js";
 import { loadConfig } from "../config/config.js";
 import { resetLoopState } from "../core/loop/state.js";
-import { logger } from "../core/logging/logger.js";
 
 export interface InitOptions {
   agent?: string;
@@ -71,11 +70,8 @@ export async function executeInit(
       "Pre-init snapshot",
       rootDir,
     );
-  } catch (snapErr) {
-    logger.warn("Pre-init snapshot creation failed", {
-      error: snapErr instanceof Error ? snapErr.message : String(snapErr),
-      projectRoot: rootDir,
-    });
+  } catch {
+    // Snapshot creation failed — proceed anyway
   }
 
   // ── Auto-fix: .gitignore entries ────────────────────────────────────
@@ -106,11 +102,8 @@ export async function executeInit(
       await fs.writeFile(gitignorePath, newContent, "utf-8");
       fixesApplied++;
       console.log(colors.mintClear.apply("  " + glyphs.fixed + " Added .env patterns to .gitignore"));
-    } catch (gitErr) {
-      logger.warn("Failed to update .gitignore", {
-        error: gitErr instanceof Error ? gitErr.message : String(gitErr),
-        projectRoot: rootDir,
-      });
+    } catch {
+      // Failed to update .gitignore — non-critical
     }
   }
 
@@ -132,11 +125,8 @@ export async function executeInit(
       );
       fixesApplied++;
       console.log(colors.mintClear.apply("  " + glyphs.fixed + " Generated .env.example"));
-    } catch (exampleErr) {
-      logger.warn("Failed to generate .env.example", {
-        error: exampleErr instanceof Error ? exampleErr.message : String(exampleErr),
-        projectRoot: rootDir,
-      });
+    } catch {
+      // Failed to generate .env.example — non-critical
     }
   }
 
@@ -171,11 +161,8 @@ export async function executeInit(
             "  " + glyphs.fixed + " Configured agent guidelines (AGENTS.md)",
           ),
         );
-      } catch (agentErr) {
-        logger.warn("Failed to initialize agent guidelines", {
-          error: agentErr instanceof Error ? agentErr.message : String(agentErr),
-          projectRoot: rootDir,
-        });
+      } catch {
+        // Failed to init agent doc — non-critical
       }
     }
   }

@@ -345,5 +345,4 @@ export interface WatchOptions {
   live?: boolean;
   format?: "human" | "agent" | "json";
   agent?: boolean;
-  signal?: AbortSignal;
 }

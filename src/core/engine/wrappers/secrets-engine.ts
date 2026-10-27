@@ -1,7 +1,6 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import fg from "fast-glob";
-import { safeReadProjectFile } from "../../safety/fs-guard.js";
 import type { Engine, EngineContext } from "../types.js";
 import type { ScanFinding } from "../../../types/index.js";
 import { SECRET_RULES } from "../../rules/secret-rules.js";
@@ -66,11 +65,13 @@ export class SecretsEngine implements Engine {
       const isEnvFile = basename.startsWith(".env");
       if (!isEnvFile && !textExtensions.has(ext) && ext !== "") continue;
 
+      const fullPath = path.join(rootDir, file);
       try {
-        const readResult = await safeReadProjectFile(file, rootDir);
-        if (readResult.content === null) continue;
+        const stat = await fs.stat(fullPath);
+        if (stat.size > 1_048_576) continue;
 
-        const secretFindings = scanFileForSecrets(readResult.content, file, SECRET_RULES, {
+        const content = await fs.readFile(fullPath, "utf-8");
+        const secretFindings = scanFileForSecrets(content, file, SECRET_RULES, {
           entropyThreshold: config.entropyThreshold,
           includeTests: context.options?.includeTests,
         });
@@ -115,9 +116,6 @@ export class SecretsEngine implements Engine {
           } else {
             finding.verificationState = "unverified";
           }
-        }
-        if (!(context.options as { retainSecrets?: boolean } | undefined)?.retainSecrets) {
-          delete finding.secret;
         }
       }
     }

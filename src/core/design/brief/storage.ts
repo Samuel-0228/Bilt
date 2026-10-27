@@ -1,7 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DesignBrief } from "./types.js";
-import { validateDesignBrief } from "../../security/validation.js";
 
 function getBriefPath(rootDir: string): string {
   return path.join(rootDir, ".bilt", "design-brief.json");
@@ -11,7 +10,7 @@ export async function readDesignBrief(rootDir: string): Promise<DesignBrief | nu
   try {
     const briefPath = getBriefPath(rootDir);
     const content = await fs.readFile(briefPath, "utf-8");
-    return validateDesignBrief(JSON.parse(content));
+    return JSON.parse(content) as DesignBrief;
   } catch {
     return null; // Fail-soft on missing or malformed JSON
   }

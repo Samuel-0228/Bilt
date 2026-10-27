@@ -10,7 +10,7 @@ import {
   executeAIProvider,
 } from "../commands/ai.js";
 import { executeAsk } from "../commands/ask.js";
-import { handleCommandError } from "./common.js";
+import { printError } from "./common.js";
 
 export function registerAiCommands(program: Command): void {
   // ─── bilt ai ─────────────────────────────────────────────────────────────────
@@ -27,7 +27,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAISetup();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -40,7 +41,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAIStatus();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -51,7 +53,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAISwitch();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -66,7 +69,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAIModel(model);
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -81,7 +85,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAIProvider(provider);
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -92,7 +97,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAIRemove();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -103,7 +109,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAITest();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -115,7 +122,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAILastRequest();
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 
@@ -132,7 +140,8 @@ export function registerAiCommands(program: Command): void {
       try {
         await executeAsk(question, dir, { debug: opts.debug });
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "ai" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 }

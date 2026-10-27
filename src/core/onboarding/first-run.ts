@@ -4,17 +4,15 @@
 import Enquirer from "enquirer";
 import { isFirstRun, markFirstRunCompleted } from "../ai/config.js";
 import { banner, sectionHeader, divider, text, colors } from "../../ui/theme.js";
-import { logger } from "../logging/logger.js";
+import { executeScan } from "../../commands/scan.js";
+import { executeAISetup } from "../../commands/ai.js";
 
 const enquirer = new Enquirer();
-
-export type OnboardingActionDispatcher = (action: "scan" | "ai") => Promise<void>;
 
 export interface OnboardingOptions {
   bypassInteractive?: boolean;
   plain?: boolean;
   json?: boolean;
-  actionDispatcher?: OnboardingActionDispatcher;
 }
 
 /**
@@ -31,23 +29,11 @@ export async function checkAndRunFirstTimeOnboarding(options: OnboardingOptions 
     process.env.CI ||
     !process.stdout.isTTY
   ) {
-    logger.debug("Bypassing first-time onboarding", {
-      reason: options.bypassInteractive
-        ? "bypassInteractive"
-        : options.plain
-        ? "plain"
-        : options.json
-        ? "json"
-        : !process.stdout.isTTY
-        ? "non-tty"
-        : "ci",
-    });
     markFirstRunCompleted();
     return false;
   }
 
-  logger.info("Triggering first-time interactive onboarding");
-  await runOnboardingWizard(options.actionDispatcher);
+  await runOnboardingWizard();
   markFirstRunCompleted();
   return true;
 }
@@ -55,7 +41,7 @@ export async function checkAndRunFirstTimeOnboarding(options: OnboardingOptions 
 /**
  * Display interactive welcome banner and quick-start menu
  */
-export async function runOnboardingWizard(actionDispatcher?: OnboardingActionDispatcher): Promise<void> {
+export async function runOnboardingWizard(): Promise<void> {
   console.log("");
   console.log(banner());
   console.log(sectionHeader("Welcome to Bilt — Zero-Configuration Project Health Toolkit!"));
@@ -84,22 +70,12 @@ export async function runOnboardingWizard(actionDispatcher?: OnboardingActionDis
 
     if (action === "scan") {
       console.log("");
-      if (actionDispatcher) {
-        await actionDispatcher("scan");
-      } else {
-        const { executeScan } = await import("../../commands/scan.js");
-        await executeScan(".", {});
-      }
+      await executeScan(".", {});
     } else if (action === "ai") {
       console.log("");
-      if (actionDispatcher) {
-        await actionDispatcher("ai");
-      } else {
-        const { executeAISetup } = await import("../../commands/ai.js");
-        await executeAISetup();
-      }
+      await executeAISetup();
     }
-  } catch (err) {
-    logger.debug("Onboarding prompt interrupted or dismissed", { error: err });
+  } catch {
+    // Graceful exit if prompt interrupted
   }
 }

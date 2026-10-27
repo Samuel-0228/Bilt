@@ -81,7 +81,7 @@
     "execa": "^9.6.1",
     "fast-glob": "^3.3.3",
     "simple-git": "^4.0.2",
-    "zod": "^4.6.7"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

@@ -17,7 +17,6 @@ import {
 } from "../ui/theme.js";
 import { validateProjectDirectory } from "../core/safety/index.js";
 import { VERSION } from "../version.js";
-import { logger } from "../core/logging/logger.js";
 
 export function getOWASPMapping(f: ScanFinding): { id: string; name: string } {
   if (f.owaspMapping) {
@@ -112,11 +111,8 @@ export async function executeDoctor(
       console.log(colors.slateDim.apply("  Share this card on social media:"));
       console.log(colors.vitalTeal.bold(`  Score: ${healthScore}/100 — scanned with bilt \u2192 bilt.dev`));
       console.log("");
-    } catch (sharpErr) {
+    } catch {
       // Graceful fallback to SVG if optional sharp dependency is not installed
-      logger.debug("Optional sharp package unavailable, exporting SVG health card", {
-        error: sharpErr instanceof Error ? sharpErr.message : String(sharpErr),
-      });
       try {
         const { promises: fsPromises } = await import("node:fs");
         const svgPath = path.join(rootDir, "bilt-health-card.svg");
@@ -126,10 +122,6 @@ export async function executeDoctor(
         console.log(colors.slateDim.dim("  (Install optional dependency 'sharp' to export as PNG)"));
         console.log("");
       } catch (err: any) {
-        logger.error("Failed to write SVG health card", {
-          error: err instanceof Error ? err.message : String(err),
-          projectRoot: rootDir,
-        });
         console.error(colors.pulseCoral.apply("  " + glyphs.critical + " Failed to generate card: " + err.message));
       }
     }

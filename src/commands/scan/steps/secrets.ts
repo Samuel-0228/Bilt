@@ -8,7 +8,6 @@ import { SECRET_RULES } from "../../../core/rules/secret-rules.js";
 import { scanFileForSecrets, scanGitHistory } from "../../../core/scan/secrets.js";
 import { VERIFIERS } from "../../../core/scan/verifiers/index.js";
 import { applyOverridesAndFilter } from "../filter.js";
-import { safeReadProjectFile } from "../../../core/safety/fs-guard.js";
 import type { ScanStepContext } from "./context.js";
 
 const TEXT_EXTENSIONS = new Set([
@@ -70,12 +69,14 @@ export async function runSecretsStep(
     const isEnvFile = basename.startsWith(".env");
     if (!isEnvFile && !TEXT_EXTENSIONS.has(ext) && ext !== "") continue;
 
+    const fullPath = path.join(ctx.rootDir, file);
     try {
-      const readResult = await safeReadProjectFile(file, ctx.rootDir);
-      if (readResult.content === null) continue;
+      const stat = await fs.stat(fullPath);
+      if (stat.size > 1_048_576) continue;
 
+      const content = await fs.readFile(fullPath, "utf-8");
       const secretFindings = scanFileForSecrets(
-        readResult.content,
+        content,
         file,
         SECRET_RULES,
         {

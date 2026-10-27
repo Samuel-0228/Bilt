@@ -28,8 +28,6 @@ import {
 } from "./scan/steps/index.js";
 import { enrichScanFindings, buildScanResult } from "./scan/enricher.js";
 import { reportScanResult } from "./scan/reporter.js";
-import { logger } from "../core/logging/logger.js";
-import { ScanError, isBiltError } from "../core/errors/index.js";
 
 export * from "./scan/runner.js";
 export * from "./scan/filter.js";
@@ -46,7 +44,6 @@ export async function executeScan(
 ): Promise<ScanResult> {
   const startTime = Date.now();
   const rootDir = await validateProjectDirectory(projectDir);
-  const scanTimer = logger.startTimer("scan", { projectRoot: rootDir, command: "scan" });
   const config = await loadConfig(rootDir);
   const findings: ScanFinding[] = [];
 
@@ -185,23 +182,8 @@ export async function executeScan(
       isSilent,
     });
 
-    scanTimer.done("Scan completed successfully", {
-      findingCount: findings.length,
-      scannedFiles,
-    });
-
     return result;
   } catch (error) {
-    scanTimer.fail(error, "Scan execution failed");
-    if (isBiltError(error)) {
-      throw error;
-    }
-    throw new ScanError(
-      `Scan failed: ${error instanceof Error ? error.message : String(error)}`,
-      {
-        cause: error,
-        context: { projectRoot: rootDir },
-      },
-    );
+    throw error;
   }
 }

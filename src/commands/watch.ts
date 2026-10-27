@@ -99,14 +99,7 @@ export async function executeWatch(
   );
 
   // ── Graceful shutdown ──────────────────────────────────────────────
-  let isStopped = false;
-
-  const cleanup = async (exitProcess = true): Promise<void> => {
-    if (isStopped) return;
-    isStopped = true;
-    process.removeListener("SIGINT", onSigInt);
-    process.removeListener("SIGTERM", onSigTerm);
-
+  const cleanup = async (): Promise<void> => {
     if (!isAgentFormat && !options.quiet) {
       console.log("");
       console.log(colors.slateDim.dim("  Stopping supervisor watcher…"));
@@ -116,35 +109,18 @@ export async function executeWatch(
       console.log(colors.mintClear.apply("  " + glyphs.fixed + " Watcher stopped."));
       console.log("");
     }
-    if (exitProcess) {
-      process.exit(0);
-    }
+    process.exit(0);
   };
 
-  const onSigInt = () => {
-    void cleanup(true);
-  };
-  const onSigTerm = () => {
-    void cleanup(true);
-  };
+  process.on("SIGINT", () => {
+    void cleanup();
+  });
+  process.on("SIGTERM", () => {
+    void cleanup();
+  });
 
-  process.on("SIGINT", onSigInt);
-  process.on("SIGTERM", onSigTerm);
-
-  // Keep the process running until SIGINT/SIGTERM or AbortSignal
-  await new Promise<void>((resolve) => {
-    if (options.signal) {
-      if (options.signal.aborted) {
-        void cleanup(false).then(resolve);
-        return;
-      }
-      options.signal.addEventListener(
-        "abort",
-        () => {
-          void cleanup(false).then(resolve);
-        },
-        { once: true },
-      );
-    }
+  // Keep the process running
+  await new Promise(() => {
+    // Process stays alive until SIGINT/SIGTERM
   });
 }

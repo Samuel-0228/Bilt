@@ -163,10 +163,9 @@ export async function runAnalysisPipeline(options: PipelineOptions): Promise<Pip
   } catch (err) {
     const [k, v] = phase('model', elapsed(modelStart), 'error', String(err));
     phases[k] = v;
-    pipelineLog.error('ProjectModel build failed', {
-      error: err instanceof Error ? err.message : String(err),
-      phase: 'model',
-    }, err);
+    if (options.debug) {
+      pipelineLog.error('ProjectModel build failed:', err);
+    }
     for (const name of ['relationships', 'rules', 'findings', 'baseline']) {
       phases[name] = { durationMs: 0, status: 'skipped' };
     }
@@ -206,10 +205,9 @@ export async function runAnalysisPipeline(options: PipelineOptions): Promise<Pip
   } catch (err) {
     const [k, v] = phase('rules', elapsed(rulesStart), 'error', String(err));
     phases[k] = v;
-    pipelineLog.error('Rule evaluation failed', {
-      error: err instanceof Error ? err.message : String(err),
-      phase: 'rules',
-    }, err);
+    if (options.debug) {
+      pipelineLog.error('Rule evaluation failed:', err);
+    }
   }
 
   // ── Phase 6: Findings ─────────────────────────────────────────────────────

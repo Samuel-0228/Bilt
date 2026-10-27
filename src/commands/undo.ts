@@ -11,8 +11,6 @@ import {
 import { requireSimpleConfirmation } from "../core/fix/confirm.js";
 import { reportUndoComplete } from "../ui/reporter.js";
 import { formatDiff } from "../ui/format.js";
-import { logger } from "../core/logging/logger.js";
-import { RemediationError } from "../core/errors/index.js";
 import { promises as fs } from "node:fs";
 
 /**
@@ -133,20 +131,7 @@ export async function executeUndo(
   }
 
   // ── Restore ─────────────────────────────────────────────────────────
-  logger.info("Restoring snapshot files", {
-    snapshotId: snapshot.id,
-    projectRoot: rootDir,
-    fileCount: snapshot.files.length,
-  });
-
-  const restored = await restoreSnapshot(snapshot.id, rootDir);
-  if (!restored) {
-    throw new RemediationError(`Failed to restore snapshot ${snapshot.id}`, {
-      snapshotId: snapshot.id,
-      code: "ERR_REMEDIATION_RESTORE",
-      context: { projectRoot: rootDir },
-    });
-  }
+  await restoreSnapshot(snapshot.id, rootDir);
 
   await reportUndoComplete(snapshot);
 }

@@ -65,11 +65,8 @@ export async function createPreFixSnapshot(
       `Pre-fix snapshot (${actionsCount} fixes)`,
       rootDir,
     );
-  } catch (err) {
-    logger.warn("Failed to create pre-fix snapshot", {
-      error: err instanceof Error ? err.message : String(err),
-      projectRoot: rootDir,
-    });
+  } catch {
+    // Snapshot creation failure shouldn't block fixes
   }
 }
 

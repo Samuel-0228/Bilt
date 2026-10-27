@@ -6,7 +6,6 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import type { BiltConfig, PluginManifest } from "../types/index.js";
 import { validatePlugin } from "./interface.js";
-import { logger } from "../core/logging/logger.js";
 import dockerPlugin from "./official/docker.js";
 import terraformPlugin from "./official/terraform.js";
 import prismaPlugin from "./official/prisma.js";
@@ -91,15 +90,10 @@ async function tryLoadPlugin(
     let mod: unknown;
     try {
       mod = await import(pluginPath);
-    } catch (esmErr) {
+    } catch {
       try {
         mod = require(pluginPath) as unknown;
-      } catch (cjsErr) {
-        logger.debug("Failed to import plugin via ESM and CJS", {
-          path: pluginPath,
-          esmError: esmErr instanceof Error ? esmErr.message : String(esmErr),
-          cjsError: cjsErr instanceof Error ? cjsErr.message : String(cjsErr),
-        });
+      } catch {
         return null;
       }
     }
@@ -114,10 +108,8 @@ async function tryLoadPlugin(
       return exported;
     }
 
-    logger.warn("Plugin manifest failed validation schema", { path: pluginPath });
     return null;
-  } catch (err) {
-    logger.warn("Unexpected error loading plugin", { path: pluginPath, error: err });
+  } catch {
     return null;
   }
 }

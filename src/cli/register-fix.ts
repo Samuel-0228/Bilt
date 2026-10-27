@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { executeFix } from "../commands/fix.js";
 import { executeUndo } from "../commands/undo.js";
-import { handleCommandError } from "./common.js";
+import { printError } from "./common.js";
 
 export function registerFixCommands(program: Command): void {
   // ─── bilt fix ────────────────────────────────────────────────────────────────
@@ -34,7 +34,8 @@ export function registerFixCommands(program: Command): void {
             debug: opts.debug,
           });
         } catch (error) {
-          process.exitCode = handleCommandError(error, { debug: opts.debug, defaultExitCode: 2, command: "fix" });
+          printError(error);
+          process.exitCode = 2;
         }
       },
     );
@@ -49,7 +50,8 @@ export function registerFixCommands(program: Command): void {
       try {
         await executeUndo(dir, { list: opts.list });
       } catch (error) {
-        process.exitCode = handleCommandError(error, { defaultExitCode: 2, command: "undo" });
+        printError(error);
+        process.exitCode = 2;
       }
     });
 }

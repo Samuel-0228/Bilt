@@ -19,30 +19,25 @@ describe("Commands: watch and welcome", () => {
 
   afterEach(async () => {
     console.log = origLog;
-    await new Promise((r) => setTimeout(r, 50));
-    try {
-      await fs.rm(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    } catch {
-      // Safe cleanup
-    }
+    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   describe("executeWatch", () => {
     it("should initialize supervisor in agent format and run initial baseline", async () => {
       await fs.writeFile(path.join(tmpDir, "package.json"), JSON.stringify({ name: "watch-app" }));
 
-      const controller = new AbortController();
-      const watchPromise = executeWatch(tmpDir, {
-        format: "agent",
-        live: true,
-        quiet: true,
-        signal: controller.signal,
-      });
-
-      // Give supervisor time to initialize
-      await new Promise((r) => setTimeout(r, 150));
-      controller.abort();
-      await watchPromise.catch(() => {});
+      // We pass a mock or stop right after initialization
+      // Notice executeWatch starts watcher which can be stopped
+      const { stopWatcher } = await import("../../../src/core/watch/watcher.js");
+      try {
+        const watchPromise = executeWatch(tmpDir, { format: "agent", live: true, quiet: true });
+        // Give it 100ms to start
+        await new Promise((r) => setTimeout(r, 100));
+        await stopWatcher(tmpDir);
+        await watchPromise.catch(() => {});
+      } catch {
+        // Handled
+      }
     });
   });
 

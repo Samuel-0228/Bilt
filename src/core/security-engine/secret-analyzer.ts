@@ -1,5 +1,4 @@
 import type { ASTContext, RuleConfidence } from "./types.js";
-import { redactKnownSecrets } from "../safety/sanitizer.js";
 
 export interface SecretClassification {
   isSecret: boolean;
@@ -227,7 +226,7 @@ export class SecretAnalyzer {
           results.push({
             type: item.type,
             line: i + 1,
-            snippet: redactKnownSecrets(lineText.trim()),
+            snippet: lineText.trim(),
             reason: item.reason,
             confidence: item.confidence,
           });

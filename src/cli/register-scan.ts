@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { executeScan } from "../commands/scan.js";
 import { executeApiScan } from "../commands/api-scan.js";
 import type { Severity } from "../types/index.js";
-import { handleCommandError } from "./common.js";
+import { printError } from "./common.js";
 
 export function registerScanCommands(program: Command): void {
   // ─── bilt scan ─────────────────────────────────────────────────────────────
@@ -96,7 +96,8 @@ export function registerScanCommands(program: Command): void {
             }
           }
         } catch (error) {
-          process.exitCode = handleCommandError(error, { debug: opts.debug, defaultExitCode: 2, command: "scan" });
+          printError(error, opts.debug);
+          process.exitCode = 2;
         }
       },
     );
@@ -149,7 +150,8 @@ export function registerScanCommands(program: Command): void {
             process.exitCode = 1;
           }
         } catch (error) {
-          process.exitCode = handleCommandError(error, { debug: opts.debug, defaultExitCode: 2, command: "api-scan" });
+          printError(error);
+          process.exitCode = 2;
         }
       },
     );

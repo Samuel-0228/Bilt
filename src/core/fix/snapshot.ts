@@ -9,9 +9,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { isPathContained } from "../safety/fs-guard.js";
-import { redactKnownSecrets } from "../safety/sanitizer.js";
-import { FilesystemError } from "../errors/domain.js";
 import type {
   Snapshot,
   SnapshotFile,
@@ -187,24 +184,13 @@ export async function createSnapshot(
   const filePaths: string[] = [];
 
   for (const absPath of files) {
-    const resolvedAbs = path.resolve(projectDir, absPath);
-    if (!isPathContained(resolvedAbs, projectDir)) {
-      // Disallow files outside the project root
-      continue;
-    }
-    const relativePath = path.relative(projectDir, resolvedAbs).replace(/\\/g, "/");
-    if (relativePath.startsWith("../") || path.isAbsolute(relativePath)) {
-      continue;
-    }
+    const relativePath = path.relative(projectDir, absPath).replace(/\\/g, "/");
 
     try {
-      const content = await fs.readFile(resolvedAbs, "utf-8");
+      const content = await fs.readFile(absPath, "utf-8");
 
       // Preserve directory structure inside the snapshot
-      const destPath = path.resolve(filesDir, relativePath);
-      if (!isPathContained(destPath, filesDir)) {
-        continue;
-      }
+      const destPath = path.join(filesDir, relativePath);
       await ensureDir(path.dirname(destPath));
       await fs.writeFile(destPath, content, "utf-8");
 
@@ -216,13 +202,12 @@ export async function createSnapshot(
   }
 
   const timestamp = new Date();
-  const safeDescription = redactKnownSecrets(description);
 
   // Write manifest
   const manifest: SnapshotManifest = {
     id,
     timestamp: timestamp.toISOString(),
-    description: safeDescription,
+    description,
     filePaths,
   };
 
@@ -235,7 +220,7 @@ export async function createSnapshot(
   const created: Snapshot = {
     id,
     timestamp,
-    description: safeDescription,
+    description,
     files: snapshotFiles,
   };
 
@@ -307,22 +292,9 @@ export async function getLatestSnapshot(
  * @returns `true` if the snapshot was found and restored, `false` otherwise.
  */
 export async function restoreSnapshot(
-  snapshotIdOrProjectDir: string,
-  projectDirOrSnapshotId: string,
+  snapshotId: string,
+  projectDir: string,
 ): Promise<boolean> {
-  let snapshotId = snapshotIdOrProjectDir;
-  let projectDir = projectDirOrSnapshotId;
-
-  // Support both (snapshotId, projectDir) and (projectDir, snapshotId)
-  if (snapshotId.includes("/") || snapshotId.includes("\\")) {
-    projectDir = snapshotIdOrProjectDir;
-    snapshotId = projectDirOrSnapshotId;
-  }
-
-  if (!snapshotId || !/^[a-zA-Z0-9_-]+$/.test(snapshotId)) {
-    return false;
-  }
-
   const dir = snapshotDir(projectDir, snapshotId);
   const manifest = await readManifest(dir);
 
@@ -331,13 +303,7 @@ export async function restoreSnapshot(
   const snapshot = await hydrateSnapshot(manifest, dir);
 
   for (const file of snapshot.files) {
-    const destPath = path.resolve(projectDir, file.path);
-    if (!isPathContained(destPath, projectDir)) {
-      throw new FilesystemError(`Snapshot restore path traversal attempted: ${file.path}`, {
-        code: "ERR_FS_PATH_TRAVERSAL",
-        context: { file: file.path, destPath },
-      });
-    }
+    const destPath = path.join(projectDir, file.path);
     await ensureDir(path.dirname(destPath));
     await fs.writeFile(destPath, file.content, "utf-8");
   }

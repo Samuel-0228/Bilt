@@ -107,8 +107,6 @@ function debounce<T extends (...args: never[]) => void>(
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-const activeWatchers = new Map<string, WatcherHandle>();
-
 /**
  * Start watching a project directory for file changes.
  *
@@ -228,33 +226,18 @@ export function startWatcher(
     onEvent(event);
   });
 
-  const resolvedPath = path.resolve(projectDir);
-  const handle: WatcherHandle = {
+  return {
     close: async () => {
-      activeWatchers.delete(resolvedPath);
       await watcher.close();
     },
   };
-  activeWatchers.set(resolvedPath, handle);
-
-  return handle;
 }
 
 /**
- * Stop a running watcher by handle or by project path.
+ * Stop a running watcher.
  *
- * @param watcher The watcher handle returned by `startWatcher` or project directory path.
+ * @param watcher The watcher handle returned by `startWatcher`.
  */
-export async function stopWatcher(watcher: WatcherHandle | string): Promise<void> {
-  if (typeof watcher === "string") {
-    const resolved = path.resolve(watcher);
-    const existing = activeWatchers.get(resolved);
-    if (existing) {
-      await existing.close();
-    }
-    return;
-  }
-  if (watcher && typeof watcher.close === "function") {
-    await watcher.close();
-  }
+export async function stopWatcher(watcher: WatcherHandle): Promise<void> {
+  await watcher.close();
 }

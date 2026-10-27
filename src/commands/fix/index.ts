@@ -10,8 +10,6 @@ import { validateProjectDirectory } from "../../core/safety/index.js";
 import { generateFixActions } from "./plan.js";
 import { createPreFixSnapshot, runSafeFixes } from "./apply.js";
 import { runInteractiveFixes } from "./interactive.js";
-import { logger } from "../../core/logging/logger.js";
-import { RemediationError, isBiltError } from "../../core/errors/index.js";
 
 export * from "./types.js";
 export * from "./plan.js";
@@ -33,78 +31,56 @@ export async function executeFix(
   options: FixOptions = {},
 ): Promise<void> {
   const rootDir = await validateProjectDirectory(projectDir);
-  const fixTimer = logger.startTimer("fix", { projectRoot: rootDir, command: "fix", safe: options.safe });
 
-  try {
-    // ── Run scan ────────────────────────────────────────────────────────
-    const result = await executeScan(rootDir, {
-      silent: true,
-      debug: options.debug,
-      retainSecrets: true,
-    });
+  // ── Run scan ────────────────────────────────────────────────────────
+  const result = await executeScan(rootDir, {
+    silent: true,
+    debug: options.debug,
+    retainSecrets: true,
+  });
 
-    if (result.findings.length === 0) {
-      console.log("");
-      console.log(colors.mintClear.bold("  " + glyphs.passed + " No issues found \u2014 nothing to fix"));
-      console.log("");
-      fixTimer.done("Fix command completed: zero issues found");
-      return;
-    }
-
-    // ── Generate fix actions ────────────────────────────────────────────
-    const actions = await generateFixActions(rootDir, result.findings, options);
-
-    if (actions.length === 0) {
-      console.log("");
-      console.log(
-        colors.amberFlag.apply(
-          "  " + glyphs.warning + " Issues found but no automated fixes available. Review manually.",
-        ),
-      );
-      console.log("");
-      fixTimer.done("Fix command completed: no automated actions available", {
-        findingCount: result.findings.length,
-      });
-      return;
-    }
-
-    // ── Dry-run: preview only ───────────────────────────────────────────
-    if (options.dryRun) {
-      for (const action of actions) {
-        const plan = await action.preview();
-        await reportFixPlan(plan);
-      }
-      console.log(colors.slateDim.dim("  (Dry run \u2014 no changes applied)"));
-      console.log("");
-      fixTimer.done("Fix dry-run preview complete", { actionCount: actions.length });
-      return;
-    }
-
-    // ── Create snapshot before modifying files ──────────────────────────
-    await createPreFixSnapshot(rootDir, result.findings, actions.length);
-
-    // ── Safe mode: auto-apply safe fixes only ───────────────────────────
-    if (options.safe) {
-      const safeActions = actions.filter((a) => a.type === "safe");
-      await runSafeFixes(safeActions, options);
-      fixTimer.done("Safe fixes applied", { safeActionCount: safeActions.length });
-      return;
-    }
-
-    // ── Interactive mode ────────────────────────────────────────────────
-    await runInteractiveFixes(actions, options);
-    fixTimer.done("Interactive fixes completed", { actionCount: actions.length });
-  } catch (error) {
-    fixTimer.fail(error, "Fix execution failed");
-    if (isBiltError(error)) {
-      throw error;
-    }
-    throw new RemediationError(
-      `Remediation failed: ${error instanceof Error ? error.message : String(error)}`,
-      {
-        cause: error,
-        context: { projectRoot: rootDir },
-      },
-    );
+  if (result.findings.length === 0) {
+    console.log("");
+    console.log(colors.mintClear.bold("  " + glyphs.passed + " No issues found \u2014 nothing to fix"));
+    console.log("");
+    return;
   }
+
+  // ── Generate fix actions ────────────────────────────────────────────
+  const actions = await generateFixActions(rootDir, result.findings, options);
+
+  if (actions.length === 0) {
+    console.log("");
+    console.log(
+      colors.amberFlag.apply(
+        "  " + glyphs.warning + " Issues found but no automated fixes available. Review manually.",
+      ),
+    );
+    console.log("");
+    return;
+  }
+
+  // ── Dry-run: preview only ───────────────────────────────────────────
+  if (options.dryRun) {
+    for (const action of actions) {
+      const plan = await action.preview();
+      await reportFixPlan(plan);
+    }
+    console.log(colors.slateDim.dim("  (Dry run \u2014 no changes applied)"));
+    console.log("");
+    return;
+  }
+
+  // ── Create snapshot before modifying files ──────────────────────────
+  await createPreFixSnapshot(rootDir, result.findings, actions.length);
+
+  // ── Safe mode: auto-apply safe fixes only ───────────────────────────
+  if (options.safe) {
+    const safeActions = actions.filter((a) => a.type === "safe");
+    await runSafeFixes(safeActions, options);
+    return;
+  }
+
+  // ── Interactive mode ────────────────────────────────────────────────
+  await runInteractiveFixes(actions, options);
 }

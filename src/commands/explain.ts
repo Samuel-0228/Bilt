@@ -5,7 +5,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { logger } from "../core/logging/logger.js";
 import { TAXONOMY } from "../core/readiness/taxonomy.js";
 import { colors, glyphs, divider } from "../ui/theme.js";
 import { RULE_TEMPLATES } from "../core/finding/templates.js";
@@ -391,12 +390,7 @@ export async function executeExplain(
       printFormattedConcept(parsed);
     }
     return 0;
-  } catch (err) {
-    logger.debug("Failed to locate or parse concept markdown", {
-      path: filePath,
-      target: targetArg,
-      error: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
     console.error("");
     console.error(
       colors.pulseCoral.bold(

@@ -1,6 +1,5 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import { validateBaselineData } from "../security/validation.js";
 
 export interface BaselineData {
   version: "1.0.0";
@@ -40,8 +39,8 @@ export async function loadBaseline(
   const baselinePath = getBaselinePath(rootDir);
   try {
     const raw = await fs.readFile(baselinePath, "utf-8");
-    const data = validateBaselineData(JSON.parse(raw));
-    if (data && Array.isArray(data.fingerprints)) {
+    const data = JSON.parse(raw) as BaselineData;
+    if (Array.isArray(data.fingerprints)) {
       return new Set(data.fingerprints);
     }
     return null;

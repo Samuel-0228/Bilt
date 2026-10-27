@@ -13,7 +13,6 @@ import { VERSION } from "../version.js";
 import { recordSessionIteration } from "../core/agent/session.js";
 import { detectTampering } from "../core/trust/tamper.js";
 import { colors, glyphs } from "../ui/theme.js";
-import { logger } from "../core/logging/logger.js";
 
 export interface CheckCommandOptions {
   format?: "human" | "agent" | "json";
@@ -31,7 +30,6 @@ export async function executeCheck(
   const targetDir = await validateProjectDirectory(dir);
   const format = options.format || "human";
   const projectRoot = path.resolve(targetDir);
-  const checkTimer = logger.startTimer("check", { command: "check", projectRoot });
 
   const selectedCategories = options.categories
     ? (options.categories.split(",").map((c) => c.trim()) as ReadinessCategory[])
@@ -125,13 +123,6 @@ export async function executeCheck(
     console.log(`  Next action [${agentOutput.nextAction.type}]: ${agentOutput.nextAction.instruction}`);
     console.log("");
   }
-
-  checkTimer.done("Check execution completed", {
-    status: agentOutput.status,
-    openFindings: result.findings.length,
-    exitCode,
-    sessionId: sessionResult.session.id,
-  });
 
   return exitCode;
 }
