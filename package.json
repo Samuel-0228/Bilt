@@ -78,7 +78,7 @@
     "cosmiconfig": "^9.0.2",
     "dotenv": "^17.4.2",
     "enquirer": "^2.4.1",
-    "execa": "^9.6.1",
+    "execa": "^10.2.1",
     "fast-glob": "^3.3.3",
     "simple-git": "^4.0.2",
     "zod": "^4.4.3"
