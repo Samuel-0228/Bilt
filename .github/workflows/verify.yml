@@ -62,7 +62,7 @@ jobs:
           echo "SARIF generated (size: $(wc -c < bilt-results.sarif) bytes)"
 
       - name: Upload SARIF results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         continue-on-error: true
         with:
